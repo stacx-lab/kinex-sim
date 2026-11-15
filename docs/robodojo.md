@@ -41,7 +41,7 @@ may need `--timeout 1800`). A worker serves the one task it was launched with.
 ## Source and assets
 
 Preparation exports RoboDojo with both forks into `.runtime/robodojo`, applies
-RoboEnv's four patches (success no longer ends an episode unless requested; an
+RoboEnv's four patches (success and a failed constraint end an episode only with early stop; an
 injected model client replaces the policy server; predicate diagnostics hooks;
 Isaac Lab's livestream dependency becomes an extra), and installs the forks as
 editable packages into `robodojo-native`.
@@ -85,7 +85,11 @@ frame holds the commanded targets and calls upstream's `EvalEnv.take_action` wit
 the joint action dictionary, which interpolates the arms and fingers within the
 frame, as RoboEnv does. Success is native completion and success; graded tasks
 report upstream's 0..100 score as a reward in [0, 1]. The horizon is the native
-`step_lim` unless a maximum is given.
+`step_lim` unless a maximum is given. `--early-stop` ends the episode where `EvalEnv`
+does: at its completion, or when a task constraint fails (a `query` or `trigger_query`
+that held on more steps than its task allows, such as `push_T`'s lifted T), with that
+constraint as the cause. Without it a failed constraint keeps success false and the
+episode runs to its horizon.
 
 The episode loads saved layout `ids[seed % len(ids)]`, retried up to three times
 when it fails upstream's settle check, so a seed keeps its layout.

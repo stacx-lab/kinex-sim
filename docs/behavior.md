@@ -54,8 +54,8 @@ the public instances, these are `sweeping_garage`'s two at seed 0 and one at see
 its garage door.
 
 Success is the activity's BDDL goal predicate, evaluated every step; the reward is
-1 while it holds. `--stop-on-success` ends the episode at the first success, as the
-evaluator's termination does. The default horizon is the evaluator's timeout, 1.5
+1 while it holds. `--early-stop` ends the episode at the first success, as the
+evaluator's termination does; BEHAVIOR has no failure termination. The default horizon is the evaluator's timeout, 1.5
 average human demonstrations (`task.jsonl`), for example 3224 steps (107 s) for
 `turning_on_radio`. `behavior-dex` keeps the R1Pro's 30 Hz and horizon. The G1 steps at
 50 Hz instead of the evaluator's 30 Hz and gets the same time, 5374 steps. The world node's `max_steps` parameter overrides the horizon.

@@ -56,10 +56,10 @@ class BehaviorSim:
     default_task = "turning_on_radio"
     check_task = staticmethod(check_task)
 
-    def __init__(self, embodiment, *, max_steps=None, terminate_on_success=False):
+    def __init__(self, embodiment, *, max_steps=None, early_stop=False):
         self.embodiment = embodiment
         self.requested_max_steps = self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
         self.period = 1. / embodiment.frequencies["action_frequency"]
         self.episode = self.task = None
         self.spectators, self._spectators, self._frames = (), {}, {}
@@ -127,7 +127,7 @@ class BehaviorSim:
         self.success = self.episode.step(self.embodiment.action(self.episode, np.asarray(action, float)))
         self.steps, self._frames = self.steps + 1, {}
         self.reward = float(self.success)
-        self.done = self.steps >= self.max_steps or (self.terminate_on_success and self.success)
+        self.done = self.steps >= self.max_steps or (self.early_stop and self.success)
         if self._spectators:
             self._place(self._spectators)  # where the next step renders them
 

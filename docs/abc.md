@@ -89,10 +89,17 @@ Upstream has no evaluator for `put_markers_in_{top,middle,bottom}_drawer` and
 markers inside the closed drawer and released, or a released five-level tower,
 held for one second). These rules only read state.
 
+`--early-stop` ends an episode where `abc_minimal`'s evaluator ends a rollout
+(`eval_policy.py: rollout_over`): at its first success (`ever_success`), except for a
+task that reports `ever_failed`. `ball_tray_balancing` succeeds from its reset and ends
+only at its failure, with the cause `ball_dropped` or `ball_left_tray`; the
+`count_*_into_opaque_box` tasks report `ever_failed` as always false, so they never end
+early. The four tasks judged by RoboEnv's rules end at that success.
+
 | Setting | Default |
 |---|---|
 | Execution, seed, randomize | realtime, 0, true |
-| Maximum steps, stop on success | unlimited, false |
+| Maximum steps, early stop | unlimited, false |
 | Observation cameras | top, left, right; 640×480; 30 Hz while subscribed |
 | Spectators, with `--record` only | third_person, wrist, right_wrist; 960×720; 10 Hz |
 

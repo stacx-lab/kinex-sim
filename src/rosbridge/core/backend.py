@@ -68,6 +68,14 @@ class SimulatorBackend(Protocol):
     A backend whose native command is not a position, such as a gripper
     direction, converts the position target inside step().
 
+    A backend sets done at its step limit, if it has one, and, when created with
+    early_stop, also where its simulator's own evaluator ends an episode, such as
+    a success or a task failure. It then names that stop in `stop`, a pair of the
+    record's reason ("success" or "failure") and a native cause or None; `stop`
+    stays None otherwise, so done without it is the step limit ("timeout"). A
+    backend whose only early stop is success may leave `stop` unset: done with
+    success then names it.
+
     Optionally, measures() returns the backend's own measures of the episode as
     JSON fields, such as BEHAVIOR's q_score; the episode record adds them.
     """
@@ -85,9 +93,10 @@ class SimulatorBackend(Protocol):
     done: bool
     reward: float
     success: bool
+    stop: tuple[str, str | None] | None
     spectators: tuple[SpectatorView, ...]
 
-    def __init__(self, *, max_steps, terminate_on_success): ...
+    def __init__(self, *, max_steps, early_stop): ...
     def reset(self, task: str, seed: int, randomize: bool = True) -> None: ...
     def state(self) -> tuple[np.ndarray, np.ndarray]: ...
     def step(self, action: np.ndarray) -> None: ...

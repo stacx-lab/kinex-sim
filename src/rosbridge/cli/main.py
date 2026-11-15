@@ -53,10 +53,9 @@ def parser():
                              help="The spectator views to record (default: all the simulator offers); requires --record")
         command.add_argument("--record-quality", type=int, metavar="CRF",
                              help="H.264 constant rate factor, lower is sharper (default: 20); requires --record")
-        success = command.add_mutually_exclusive_group()
-        success.add_argument("--stop-on-success", dest="stop_on_success", action="store_true")
-        success.add_argument("--no-stop-on-success", dest="stop_on_success", action="store_false")
-        command.set_defaults(stop_on_success=None)
+        command.add_argument("--early-stop", action="store_true",
+                             help="End the episode where the simulator's own evaluator does, such as at a success "
+                                  "or a task failure, and say why; without it only the step limit ends it")
         if name == "launch":
             command.add_argument("--detach", action="store_true")
     for name in ("status", "stop", "judge"):

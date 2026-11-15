@@ -1,5 +1,6 @@
 """Own one launch graph and its domain lease, independent of the invoking terminal."""
 from contextlib import ExitStack
+import json
 import os
 from pathlib import Path
 import signal
@@ -122,6 +123,10 @@ def main():
                     if record["demo"] and code == 0 and record.get("ready_at"):
                         exit_code = 0
                         break
+                    reported = path.parent / "launch-failure.json"
+                    if reported.is_file():
+                        # The world says why it could not start, such as an error of its backend's reset.
+                        raise RuntimeError(json.loads(reported.read_text())["error"] + "; see graph.log")
                     raise RuntimeError(f"Required graph exited unexpectedly (exit {code}); see graph.log")
                 if record["state"] == "starting" and time.monotonic() >= deadline:
                     raise TimeoutError("Launch readiness timeout; see graph.log")

@@ -42,10 +42,10 @@ class RoboCasaSim:
     period = 1 / 20
 
     def __init__(self, *, cameras=tuple(CAMERAS), width=256, height=256,
-                 max_steps=None, terminate_on_success=False):
+                 max_steps=None, early_stop=False):
         self.cameras, self.width, self.height = tuple(cameras), width, height
         self.requested_max_steps = self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
         self.env = self._depth = self._spectator = None
         self.spectators = ()
 
@@ -75,7 +75,7 @@ class RoboCasaSim:
         check_task(project_root() / '.runtime/robocasa', spec['native_task'])
         candidate = RoboCasaSim(cameras=self.cameras, width=self.width, height=self.height,
                                 max_steps=self.requested_max_steps,
-                                terminate_on_success=self.terminate_on_success)
+                                early_stop=self.early_stop)
         candidate.spectators = self.spectators
         # Kitchen generation also draws from process RNGs; a failed reset keeps the
         # live episode's future randomness.
@@ -202,7 +202,7 @@ class RoboCasaSim:
         # the history some tasks keep.
         self.reward, self.success = float(reward), bool(reward)
         self.done = bool((self.max_steps and self.steps >= self.max_steps)
-                         or (self.terminate_on_success and self.success))
+                         or (self.early_stop and self.success))
 
     @staticmethod
     def _quat(matrix):

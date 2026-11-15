@@ -23,9 +23,9 @@ class LiberoSim:
     period = 1 / 20
 
     def __init__(self, *, cameras=tuple(CAMERAS), width=256, height=256,
-                 max_steps=None, terminate_on_success=False):
+                 max_steps=None, early_stop=False):
         self.cameras, self.width, self.height = tuple(cameras), width, height
-        self.max_steps, self.terminate_on_success = max_steps, terminate_on_success
+        self.max_steps, self.early_stop = max_steps, early_stop
         self.wrapper = self._spectator = None
         self.spectators = ()
 
@@ -59,7 +59,7 @@ class LiberoSim:
         task = spec['native_task']
         check_task(runtime, task)
         candidate = LiberoSim(cameras=self.cameras, width=self.width, height=self.height,
-                              max_steps=self.max_steps, terminate_on_success=self.terminate_on_success)
+                              max_steps=self.max_steps, early_stop=self.early_stop)
         candidate.spectators = self.spectators
         # Native construction uses process RNGs. A failed reset must also preserve
         # the live episode's future randomness.
@@ -170,7 +170,7 @@ class LiberoSim:
         self.reward = float(reward)
         self.success = bool(self.wrapper.check_success())
         self.done = bool((self.max_steps and self.steps >= self.max_steps)
-                         or (self.terminate_on_success and self.success))
+                         or (self.early_stop and self.success))
 
     @staticmethod
     def _quat(matrix):

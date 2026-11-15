@@ -97,7 +97,9 @@ instruction; building the kitchen takes about 10 s. Tasks marked
 matching layout and style. The other tasks sample all kitchens and objects. The
 default horizon is upstream's dataset horizon for the task (for example 750 steps
 for `PickPlaceCounterToCabinet`), or none when upstream has no dataset; `--max-steps`
-overrides it. Success is Kitchen's native predicate, evaluated once per step. The
+overrides it. Success is Kitchen's native predicate, evaluated once per step;
+`--early-stop` ends the episode at its first success, and RoboCasa has no failure
+termination. The
 native language instruction is printed to the run log when the episode starts;
 rosbridge does not publish it.
 

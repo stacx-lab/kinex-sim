@@ -1,5 +1,6 @@
 """The world node: ROS callbacks queue work; the main thread owns the simulator and publishers."""
 import faulthandler
+import json
 import math
 import os
 from pathlib import Path
@@ -30,8 +31,7 @@ class SimNode(Node):
         self.sim = None
         self.executor_error = None
         p = self._read_parameters()
-        self.sim = load_backend(p["backend"])(max_steps=p["max_steps"] or None,
-                                              terminate_on_success=p["terminate_on_success"])
+        self.sim = load_backend(p["backend"])(max_steps=p["max_steps"] or None, early_stop=p["early_stop"])
         if p["spectator_rate_hz"]:
             # The views a recording asked for (comma-separated; empty: every view the simulator offers). The
             # simulator sets up only these, so views nobody records cost no rendering.
@@ -43,7 +43,7 @@ class SimNode(Node):
         # A run is one episode: the launch's task and seed, loaded once.
         self.sim.reset(p["task"] or self.sim.default_task, p["seed"], p["randomize"])
         self.world = WorldRuntime(self.sim, p["mode"], lambda: self.observations.publish(),
-                                  stop_on_success=p["terminate_on_success"])
+                                  early_stop=p["early_stop"])
         self.devices = [device(spec, self) for spec in self.sim.devices]
         self.declare_parameter("spectator_views", [v.name for v in self.sim.spectators],
                                ParameterDescriptor(read_only=True), ignore_override=True)
@@ -59,7 +59,7 @@ class SimNode(Node):
 
     def _read_parameters(self):
         defaults = {"backend": "", "task": "", "seed": 0, "randomize": True, "mode": "realtime",
-                    "max_steps": 0, "terminate_on_success": False, "spectator_rate_hz": 0.,
+                    "max_steps": 0, "early_stop": False, "spectator_rate_hz": 0.,
                     "spectator_width": 960, "spectator_height": 720, "spectator_select": ""}
         for name, value in defaults.items():
             self.declare_parameter(name, value, ParameterDescriptor(read_only=True))
@@ -167,6 +167,9 @@ def main():
         error = f"{type(failure).__name__}: {failure}"[:500]
         print("world stopped by an error:", file=sys.stderr, flush=True)
         traceback.print_exc()
+        if not hasattr(node, 'world') and os.environ.get("ROSBRIDGE_RUN_DIR"):
+            # The launch names why the world could not start (docs/README.md), such as a seed out of range.
+            (Path(os.environ["ROSBRIDGE_RUN_DIR"]) / "launch-failure.json").write_text(json.dumps({"error": error}))
     finally:
         if hasattr(node, 'world'):
             node.world.close(error=error)

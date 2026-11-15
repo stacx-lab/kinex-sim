@@ -11,7 +11,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 WORLD = ("backend", "task", "seed", "mode", "spectator_rate_hz", "spectator_width", "spectator_height",
-         "spectator_select", "terminate_on_success")
+         "spectator_select", "early_stop")
 
 
 def generate_launch_description():

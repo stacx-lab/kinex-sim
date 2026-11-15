@@ -8,5 +8,5 @@ class HandsOnWorker(WorkerBackend):
     close_timeout_s = 120.
 
     def measures(self):
-        """The native failure that ended the trial, if one did (HandsOnSim.measures)."""
+        """The episode's native seed (HandsOnSim.measures)."""
         return self._call("measures")

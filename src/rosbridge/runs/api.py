@@ -51,8 +51,7 @@ def launch(selection, *, project=None, options=None, demo=False):
     arguments = [f"backend:={config['name']}", f"task:={task['native_task']}"]
     # A catalog task may name a default seed, e.g. a scene that is stable from seed 0.
     seed = options.get("seed") if options.get("seed") is not None else task.get("seed")
-    for name, value in (("mode", mode), ("seed", seed),
-                        ("terminate_on_success", options.get("stop_on_success"))):
+    for name, value in (("mode", mode), ("seed", seed), ("early_stop", options.get("early_stop") or None)):
         if value is not None:
             arguments.append(f"{name}:={str(value).lower() if isinstance(value, bool) else value}")
     if recording_dir is not None:
@@ -90,6 +89,7 @@ def launch(selection, *, project=None, options=None, demo=False):
             if current.get("ready_at"):
                 return current, process
             if process.poll() is not None or current["state"] == "failed":
+                current = read(path)  # as the supervisor left it
                 raise RuntimeError(current.get("error", "Supervisor failed") + f"; logs: {folder}")
             time.sleep(.05)
         raise TimeoutError(f"Supervisor startup timed out; logs: {folder}")

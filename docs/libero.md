@@ -71,8 +71,8 @@ The episode starts from an official initial state. `randomize: true` chooses a s
 with a seeded NumPy generator; `false` selects state zero. Five native
 initialization intervals hold the initial arm pose and finger position before the
 episode's public clock and step counter start at zero. Native reward and success are
-available through `rosbridge judge RUN_ID`; `--stop-on-success` ends the episode on
-success.
+available through `rosbridge judge RUN_ID`; `--early-stop` ends the episode at the first
+success, as the evaluator's `done` does; LIBERO has no failure termination.
 
 ## Cameras, recording and demo
 

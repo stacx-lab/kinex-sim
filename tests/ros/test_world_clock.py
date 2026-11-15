@@ -92,12 +92,16 @@ def test_terminal_tick_and_runtime_unavailable(tmp_path):
         graph.close()
 
 
-def test_a_run_launched_to_stop_on_success_ends_saying_so(tmp_path):
-    graph = Graph(tmp_path, max_steps=5, task="succeeds", stop_on_success=True)
+@pytest.mark.parametrize("task, message", [
+    ("succeeds", "episode ended during wait; the episode ended because the task succeeded"),
+    ("stumbles", "episode ended during wait; the episode ended because the task failed (toy_stumbled)"),
+])
+def test_an_early_stop_run_ends_saying_why(tmp_path, task, message):
+    graph = Graph(tmp_path, max_steps=5, task=task, early_stop=True)
     try:
         result = graph.wait(1.)
         assert not result.success and result.waited_s == pytest.approx(.2)
-        assert result.message == "episode ended during wait; the episode ended because the task succeeded"
+        assert result.message == message
     finally:
         graph.close()
 

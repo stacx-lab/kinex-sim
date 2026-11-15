@@ -108,12 +108,12 @@ class RoboTwinSim:
     period = SUBSTEPS * PHYSICS_DT
     width, height = 320, 240
 
-    def __init__(self, *, cameras=CAMERAS, max_steps=None, terminate_on_success=False):
+    def __init__(self, *, cameras=CAMERAS, max_steps=None, early_stop=False):
         self.cameras = tuple(cameras)
         # env is the native upstream task instance; task is its catalog name.
         self.requested_max_steps = max_steps
         self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
         self.env = None
         self.spectators, self._spectators, self._depth = (), {}, {}
 
@@ -132,7 +132,7 @@ class RoboTwinSim:
         spec = resolve("robotwin", task=task)[2]
         check_task(runtime(), spec["native_task"])
         candidate = RoboTwinSim(cameras=self.cameras, max_steps=self.requested_max_steps,
-                                terminate_on_success=self.terminate_on_success)
+                                early_stop=self.early_stop)
         candidate.spectators = self.spectators
         # Native scene generation seeds process RNGs; a failed reset keeps the live
         # episode's future randomness.
@@ -245,7 +245,7 @@ class RoboTwinSim:
         self.env.take_action_cnt = self.steps
         self.reward = float(self.success)
         self.done = bool((self.max_steps and self.steps >= self.max_steps)
-                         or (self.terminate_on_success and self.success))
+                         or (self.early_stop and self.success))
 
     # Cameras ----------------------------------------------------------------------------
 

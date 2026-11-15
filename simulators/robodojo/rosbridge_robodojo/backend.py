@@ -73,13 +73,30 @@ class NoModelClient:
         return lambda *args, **kwargs: None
 
 
+def checks(spec):
+    """A reward check, or an "or" list of them, as words: is_lift(label=t, z_threshold=0.01)."""
+    if isinstance(spec, tuple):
+        name, arguments = spec
+        return f"{name}({', '.join(f'{key}={value}' for key, value in arguments.items())})"
+    return " or ".join(checks(item) for item in spec)
+
+
+def violations(manager):
+    """The constraints an episode exceeded: a query (or triggered query) that held more often than allowed."""
+    queries = [(query, aim, count) for query, aim, count in manager.query_list[0]]
+    queries += [(query, aim, count) for _, query, _, _, aim, count in manager.trigger_query_list[0]]
+    found = [f"{' and '.join(checks(c) for c in query)} held on {count} step{'s' * (count != 1)}, at most {aim}"
+             for query, aim, count in queries if count > aim]
+    return "; ".join(found)
+
+
 def values(value):
     if hasattr(value, "detach"):
         value = value.detach().cpu().numpy()
     return np.asarray(value, dtype=float)
 
 
-def config(task, stop_on_success, env_cfg_type="arx_x5"):
+def config(task, early_stop, env_cfg_type="arx_x5"):
     """Upstream src/eval_client/main.py configuration for one environment."""
     from env.global_configs import BENCHMARK, ENV_CONFIG_PATH, ROOT_DIR
     from omegaconf import OmegaConf
@@ -90,7 +107,7 @@ def config(task, stop_on_success, env_cfg_type="arx_x5"):
     eval_cfg = load_yaml(os.path.join(ENV_CONFIG_PATH, env_cfg_type + ".yml"))
     eval_cfg.update(task_name=task, num_envs=1, device_id=0, eval_batch=False,
                     policy_name="rosbridge", additional_info="", seed=0,
-                    physx_monitor_enabled=False, stop_on_success=stop_on_success)
+                    physx_monitor_enabled=False, early_stop=early_stop)
     run = os.environ["ROBODOJO_RUN_ID"]
     deploy_cfg = {"policy_name": "rosbridge", "port": 0, "host": "localhost", "protocol": "ws",
                   "policy_server_url": "ws://localhost:0", "evaluation_id": run,
@@ -125,10 +142,11 @@ class RoboDojoSim:
     default_task = "pack_objects_into_box"
     width, height = 640, 480
 
-    def __init__(self, *, max_steps=None, terminate_on_success=False):
+    def __init__(self, *, max_steps=None, early_stop=False):
         self.requested_max_steps = max_steps
         self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
+        self.stop = None
         self.cameras = tuple(CAMERAS)
         self.env = None
         self.task = None
@@ -158,7 +176,7 @@ class RoboDojoSim:
             boot()
             import src.eval_client.eval_env as eval_env
             self.task = native
-            self.env = eval_env.create_eval_env(config(native, self.terminate_on_success), _APP,
+            self.env = eval_env.create_eval_env(config(native, self.early_stop), _APP,
                                                 model_client=NoModelClient())
             self.interval = int(self.env.obs_manager.collect_interval)
             self.physics_dt = float(self.env.dt)
@@ -192,7 +210,7 @@ class RoboDojoSim:
         # EvalEnv checks its own counter in take_action; keep both limits equal.
         self.env.step_lim = self.max_steps
         self._index()
-        self.steps, self.done = 0, False
+        self.steps, self.done, self.stop = 0, False, None
         self._score()
         if self.spectators and not self._spectators:
             self._open_spectators()
@@ -263,8 +281,15 @@ class RoboDojoSim:
         self.env.take_action(native)
         self.steps += 1
         self._score()
-        self.done = bool(self.env.end_flag[0] or self.steps >= self.max_steps
-                         or (self.terminate_on_success and self.success))
+        if self.early_stop and self.env.end_flag[0]:
+            # EvalEnv ends at its completion, or at a failed constraint (patch 0001 keeps both for early_stop).
+            # A failure before the step limit, or one that names a constraint at it; else the limit ended it.
+            found = violations(self.env.reward_manager)
+            if self.success:
+                self.stop = ("success", None)
+            elif found or self.steps < self.max_steps:
+                self.stop = ("failure", found or "a task constraint failed")
+        self.done = bool(self.env.end_flag[0] or self.steps >= self.max_steps)
 
     def _score(self):
         self.success = bool(self.env.completed[0] and self.env.success[0])

@@ -27,17 +27,30 @@ def joint_names():
     return names
 
 
+def rollout_stop(task_eval):
+    """Where abc_minimal's evaluator ends a rollout early (eval_policy.py: rollout_over): a task that reports
+    ever_failed, such as ball_tray_balancing, at its failure; any other at its first success."""
+    if "ever_failed" in task_eval:
+        if not task_eval["ever_failed"]:
+            return None
+        detail = [name for name, value in (("ball_dropped", task_eval.get("ball_dropped")),
+                                           ("ball_left_tray", task_eval.get("inside_tray") is False)) if value]
+        return "failure", ", ".join(detail) or "ever_failed"
+    return ("success", None) if task_eval.get("ever_success") else None
+
+
 class AbcSim:
     default_task = "put_plastic_bottles_in_bin"
 
     def __init__(self, *, cameras=("top", "left", "right"), width=640, height=480,
-                 max_steps=None, terminate_on_success=False):
+                 max_steps=None, early_stop=False):
         self.cameras = tuple(cameras)
         self.width, self.height = width, height
         self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
         self.env = self._renderer = None
-        self._spectator = self._supplemental = None
+        self._spectator = self._supplemental = self.stop = None
+        self._task_eval = {}
         self.spectators = ()
 
     def configure_spectators(self, width=960, height=720, views=None):
@@ -58,12 +71,12 @@ class AbcSim:
             task=spec.name,
             render_cameras=False,
             max_episode_steps=self.max_steps,
-            terminate_on_success=self.terminate_on_success,
+            terminate_on_success=False,  # early stop follows the evaluator's rollout_over instead
             # inhand_transfer samples its object when the env is built.
             **({"seed": seed} if spec.env_task == "inhand_transfer" else {}),
         )
         candidate = AbcSim(cameras=self.cameras, width=self.width, height=self.height,
-                           max_steps=self.max_steps, terminate_on_success=self.terminate_on_success)
+                           max_steps=self.max_steps, early_stop=self.early_stop)
         candidate.spectators = self.spectators
         candidate.env, candidate.task, candidate.seed = env, spec.name, seed
         try:
@@ -73,7 +86,7 @@ class AbcSim:
             if missing:
                 raise ValueError(f"unknown cameras: {missing}")
             candidate.period = float(env.model.opt.timestep) * env._control_decimation
-            candidate.steps, candidate.done = 0, False
+            candidate.steps, candidate.done, candidate.stop = 0, False, None
             candidate._index(env.model)
             if hasattr(self, "layout") and candidate.layout != self.layout:
                 raise ValueError("reset cannot change the action layout")
@@ -125,6 +138,7 @@ class AbcSim:
 
     def _score(self, info):
         info = info or {}
+        self._task_eval = info
         self.reward = float(info.get("reward", 0.0))
         self.success = bool(info.get("success", False))
 
@@ -166,9 +180,11 @@ class AbcSim:
         self.steps += 1
         self._refresh()
         self._evaluate(info)
-        self.done = bool(terminated or truncated
-                         or (self._supplemental is not None and self.terminate_on_success
-                             and self.success))
+        if self.early_stop:
+            # Upstream lacks an evaluator for the supplemental tasks; their judge-only success ends them.
+            self.stop = (rollout_stop(self._task_eval) if self._supplemental is None else
+                         ("success", None) if self.success else None)
+        self.done = bool(terminated or truncated or self.stop)
 
     def camera_pose(self, camera):
         """Optical-frame pose (pos, quat_wxyz) in the world frame."""

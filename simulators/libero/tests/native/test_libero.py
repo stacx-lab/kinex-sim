@@ -46,7 +46,7 @@ def test_reset_determinism_failure_and_budget(monkeypatch):
             sim.step(sim.state()[0])
         sim.reset(sim.default_task, 18, False)
         assert not sim.done
-        sim.terminate_on_success = True
+        sim.early_stop = True
         monkeypatch.setattr(sim.wrapper, 'check_success', lambda: True)
         sim.step(sim.state()[0])
         assert sim.done and sim.success

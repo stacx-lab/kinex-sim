@@ -10,7 +10,7 @@ guide](README.md) for shared lifecycle and timing contracts.
 ```bash
 rosbridge prepare handson
 rosbridge tasks list --simulator handson
-rosbridge launch handson/t12-load-and-start-microwave --execution-mode stepped --timeout 1800
+rosbridge launch handson/t12-load-and-start-microwave --execution-mode stepped --early-stop --seed 3 --timeout 1800
 rosbridge setup handson/handson-rokae-wuji --directory ../my-handson-workspace
 ```
 
@@ -34,12 +34,14 @@ robot and rendering assets.
 ## Episodes
 
 A launch builds the episode as upstream's `handson/evaluation/native.py:run_episode` does:
+- **Seed:** the launch's seed `k`, from 0 to 9, names the task's `k`-th native seed that a
+  pre-screen accepted (see [Seeds and the settle gate](#seeds-and-the-settle-gate)). For 16
+  Core tasks the native seed selects a setting and derives the reset seed.
 - **Task contract:** the task's frozen contract replaces every `HANDSON_*` variable.
-- **Seed:** for 16 Core tasks the seed selects a setting and derives the reset seed.
 - **Scene:** construction converts the task's MJCF scene into the run directory (about
   0.5 GB, removed when the run stops).
-- **Settle gate:** after the reset, a stable-origin gate settles the scene. It can reject a
-  seed; the launch then fails with its error, as upstream reports it, and another seed is needed.
+- **Settle gate:** after the reset, a stable-origin gate settles the scene. The pre-screen
+  kept only native seeds it accepts.
 - **Instruction:** the seeded instruction (canonical or paraphrased) is written with
   upstream's other receipts to `handson/PROMPT.json` in the run's directory
   (`.cache/rosbridge/runs/<id>/`). Give it to the agent; it is not published on ROS.
@@ -55,15 +57,87 @@ of wall time (0.4–0.9 s on a shared L40S), so a realtime run lags the clock; p
 percentile of demonstration length; the `eval_flex` tasks keep their native durations), from
 222 steps (`t19`) to 7200 (`eval_flex01`).
 
-Success is upstream's `succeed`. Upstream ends a trial at its first success or failure.
-Here `--stop-on-success` ends the episode at the first success. A native failure does not
-end the episode, but no success can follow it:
-- a task's failure predicate;
-- for `t11_line_up_blocks`, a direct hand contact.
+Success is upstream's `succeed` at each step. The evaluator ends a trial at its first
+outcome (`evaluation/rollout.py`), and so does a run launched with `--early-stop`: at a
+success, or at a task failure, whose cause the wait reply and the record name:
+- `native_failed`, with the native info that explains it, such as
+  `native_failed: ycb01_failure_reason=ball_or_hand_touched_gate`: 38 tasks have failure
+  predicates, from a dropped object or a forbidden contact to a step order violated or a
+  physics check failed;
+- `native_c12_direct_hand_contact` for `t11_line_up_blocks`, the evaluator's own rule;
+- `native_terminated` when the native environment ends a trial without either flag, as
+  `t17_open_latched_door` can.
 
-From then on `success` stays false, and the episode record's `failure` names the cause.
-`t10_lift_carton` scores support, lift and hold, recording grip force as a diagnostic, as
-the evaluator does.
+A step that succeeds and fails at once is a success, as the evaluator scores it. The other
+27 tasks can only succeed or time out. Without `--early-stop` the episode runs to its horizon
+and reports no failure; `success` is the native `succeed` of its last step, and some states
+make it unreachable without failing (in `t02` a cable seated before the plug, in `t31` an
+interrupted brew). Tasks whose success does not latch can also lose a success before the
+horizon. `t10_lift_carton` scores support, lift and hold, recording grip force as a
+diagnostic, as the evaluator does.
+
+## Seeds and the settle gate
+
+Every task has ten seeds, 0–9. Seed `k` names the task's `k`-th native seed in
+`simulators/handson/seeds.json`, the table of a pre-screen. The pre-screen tried each task's
+native seeds in the order 0, 1, 2, … and kept the first ten that it accepts: upstream's
+settle gate accepts the reset, and every task body the native environment exposes ends the
+gate within 2 cm of where the reset put it. The gate checks only that the scene comes to
+rest. At native seed 0, for example, it accepts `t09_insert_peg` although its socket tray
+slides 6 cm while settling; across the gate, bodies that stay in place move at most a few
+millimetres. Both checks are deterministic, so a kept seed starts on every
+launch as it did in the screen. The table also records why each native seed before the last
+kept one was rejected: `settle_gate`, or `scene` with the bodies that moved. A seed outside
+0–9 fails the launch, as does a native seed that the gate rejects on another machine; neither
+is replaced. The episode record's `seed` is the launch's seed and `native_seed` the native one.
+
+A native seed samples the layout, the table height and, where a task has one, its goal. `t24`
+always asks for the tennis ball and `t26` for the apple: only the constructor overrides of
+upstream's archived paper trials choose their targets, and rosbridge does not use those
+trials. For the 16 tasks in upstream's `settings.json`, the native seed selects a setting and
+derives the reset seed. The instruction is fixed by task, native seed and goal: canonical for
+about one seed in five, else one of 32 paraphrases. Give the agent only `PROMPT.json`'s
+`prompt`. Its `canonical_prompt` (the unparaphrased instruction), `goal` and
+`native_goal_readback` must not reach the agent; `eval_gen05`'s readback also gives the
+knobs' initial angles. Every receipt in `<run>/handson/` is the judge's, not the agent's:
+
+| Receipt | Holds |
+|---|---|
+| `PROMPT.json` | The instruction, its draw and the goal |
+| `ORIGIN_PARAMETERS.json`, `ORIGIN_IMPLEMENTATION.json`, `TRACE_IMPLEMENTATION.json`, `CHECKER_LAYOUT_PATCH.json` | The settle gate's parameters and pinned implementations |
+| `SETTING_SELECTION.json` (16 tasks) | The setting, such as `t38`'s initial and target knob angles, and every derived seed |
+| `TASK_BOUNDARY.json`, `TASK_BOUNDARY_SETTLE.json` (`t01`, `t15`, `t38`) | Every object pose and joint position, and the native task info |
+| `CARTON_RAW_FORCE_000/` (`t10`) | Raw grip force |
+| `AS019_SCENE_BRIDGE.json` (`t22`) | The scene bridge |
+
+The settle gate is upstream's, per task contract: a frozen stable-origin gate for 34 Core
+tasks, a checker-boundary gate for `t01`, `t15` and `t38`, and the current gate with its
+defaults for Transfer-16. Thirteen tasks have no settle gate: `t05`, `t12`, `t13`, `t20`, `t21`,
+`t30`, `t31`, `t32`, `t37`, `t42`, `t43`, `t45` and `t46`. It rejects a seed whose reset
+drifts more than 5 mm or 3° while settling, penetrates, or does not come to rest in time.
+
+The screen reset 698 native seeds and rejected 38, in 14 tasks; the other 52 tasks keep native
+seeds 0–9. The same native seeds fail across tasks: 4 in 12 tasks, 6 in 10 and 8 in 7. `t23`
+and `t27` reject five seeds each (`t27` keeps native seeds up to 14), `eval_gen07` four, and
+`t09`'s native seed 0 is the only rejection of the scene check. Upstream rejects reset
+candidates too: in its archive of 45,000 accepted paper trials, 4.8 % of candidates were
+rejected, most for `t27`, `t23` and `t07`, and its campaign replaced each with the next
+candidate. Its public evaluator replaces none.
+
+The table is the output of `tools/handson_seeds.py`:
+
+```bash
+pixi run --frozen -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
+    python tools/handson_seeds.py --gpus 0,1,2,3,4,5,6,7 --per-gpu 2
+```
+
+It resets each candidate once in a process of its own, as a launch does but without ROS, and
+rewrites the table after every verdict. A rerun screens only what is missing, so it resumes an
+interrupted screen; `--count` extends every task to more seeds and `--tasks` narrows it. A
+reset whose error is not a verdict runs once more, and a second error leaves its task
+incomplete. Each GPU starts one reset at a time, and only while it has `--min-free-gb` (22 GB)
+free. Every run's detail goes to `seeds.json.log.jsonl`, which is not committed.
+
 
 ## Devices
 

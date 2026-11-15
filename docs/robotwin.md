@@ -77,7 +77,8 @@ The episode starts as upstream evaluation does: `setup_demo` for the seed, the
 expert dry run (`play_once`, whose planning may fail without consequence), then
 `setup_demo` again in evaluation mode. It takes about a minute. Success is
 upstream's `check_success`, evaluated on every substep and latched; the episode
-horizon is the native `step_lim` unless a maximum is given.
+horizon is the native `step_lim` unless a maximum is given. `--early-stop` ends the
+episode at the first success, as the evaluator does; RoboTwin has no failure termination.
 
 ## Recording and checks
 

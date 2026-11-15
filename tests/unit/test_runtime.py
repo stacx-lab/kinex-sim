@@ -13,11 +13,11 @@ from rosbridge.runtime.world import WorldRuntime
 TIME_LIMIT = "the episode ended because the time limit was reached"
 
 
-def world(mode="stepped", max_steps=None, backend=ToyBackend, task="toy", stop_on_success=False, **kwargs):
+def world(mode="stepped", max_steps=None, backend=ToyBackend, task="toy", early_stop=False, **kwargs):
     published = []
-    sim = backend(max_steps, stop_on_success)
+    sim = backend(max_steps, early_stop)
     sim.reset(task, 0, False)
-    runtime = WorldRuntime(sim, mode, lambda: published.append(sim.steps), stop_on_success, **kwargs)
+    runtime = WorldRuntime(sim, mode, lambda: published.append(sim.steps), early_stop, **kwargs)
     return runtime, published
 
 
@@ -98,17 +98,36 @@ def test_terminal_tick_completes_due_waits_then_fails_others():
     assert not future.result().success and future.result().message == f"episode is done; {TIME_LIMIT}"
 
 
-@pytest.mark.parametrize("stop_on_success, max_steps, end_step, cause", [
-    (True, 5, 2, "the task succeeded"),
-    (True, 2, 2, "the task succeeded"),  # its first success on the limit's own step
-    (False, 3, 3, "the time limit was reached"),  # the goal holds at the limit of a run that goes on after success
+@pytest.mark.parametrize("task, early_stop, max_steps, end_step, cause", [
+    ("succeeds", True, 5, 2, "the task succeeded"),
+    ("succeeds", True, 2, 2, "the task succeeded"),  # its first success on the limit's own step
+    ("succeeds", False, 3, 3, "the time limit was reached"),  # a run without early stop goes on after success
+    ("stumbles", True, 5, 2, "the task failed (toy_stumbled)"),  # a stop of the backend's own names its cause
+    ("stumbles", False, 3, 3, "the time limit was reached"),
 ])
-def test_a_wait_reply_says_why_the_episode_ended(stop_on_success, max_steps, end_step, cause):
-    runtime, _ = world(max_steps=max_steps, task="succeeds", stop_on_success=stop_on_success)
+def test_a_wait_reply_says_why_the_episode_ended(task, early_stop, max_steps, end_step, cause):
+    runtime, _ = world(max_steps=max_steps, task=task, early_stop=early_stop)
     pending = wait(runtime, 1.)
     finish(runtime)
-    assert runtime.steps == end_step and runtime.sim.success
+    assert runtime.steps == end_step
     assert pending.result().message == f"episode ended during wait; the episode ended because {cause}"
+
+
+@pytest.mark.parametrize("task, early_stop, reason, cause, first_success_step", [
+    ("succeeds", True, "success", None, 2),
+    ("succeeds", False, "timeout", None, 2),  # the step at which an early-stop run would have ended
+    ("stumbles", True, "failure", "toy_stumbled", None),
+    ("stumbles", False, "timeout", None, None),
+])
+def test_records_say_why_the_episode_ended(tmp_path, monkeypatch, task, early_stop, reason, cause, first_success_step):
+    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    runtime, _ = world(max_steps=4, task=task, early_stop=early_stop)
+    wait(runtime, 1.)
+    finish(runtime)
+    runtime.close()
+    outcome, = records(tmp_path)
+    assert (outcome['reason'], outcome.get('cause'), outcome['first_success_step'], outcome['early_stop']) == (
+        reason, cause, first_success_step, early_stop)
 
 
 def replied(runtime, duration):
@@ -218,7 +237,7 @@ def test_the_episode_is_recorded_once_when_it_ends(tmp_path, monkeypatch):
     runtime.close()  # stopping a run whose episode has ended adds no second record
     outcome, = [json.loads(line) for line in (tmp_path / 'episode-results.jsonl').read_text().splitlines()]
     assert outcome['done'] and not outcome['success']
-    assert (outcome['reason'], outcome['step']) == ('max_steps', 1)
+    assert (outcome['reason'], outcome['step']) == ('timeout', 1)
 
 
 def test_stopping_records_the_open_episode(tmp_path, monkeypatch):
@@ -283,7 +302,7 @@ def test_records_add_a_backends_measures(tmp_path, monkeypatch):
     finish(runtime)
     runtime.close()
     outcome, = records(tmp_path)
-    assert (outcome['reason'], outcome['progress'], runtime.sim.measured) == ('max_steps', .25, 1)
+    assert (outcome['reason'], outcome['progress'], runtime.sim.measured) == ('timeout', .25, 1)
 
 
 def test_a_world_stopped_by_an_error_records_no_measures(tmp_path, monkeypatch):

@@ -1,13 +1,16 @@
 """HandsOn tasks on the bimanual ROKAE AR5 rig with Wuji hands; runs in the native worker.
 
 Isaac Sim 5.1 needs Python 3.11, so the world node proxies this class through
-rosbridge.core.worker. A reset replays the PhysX branch of upstream's official
-evaluator (handson/evaluation/native.py:run_episode): the frozen task contract, the
-seeded setting, native construction, reset, the stable-origin settle gate and the
-seeded instruction, written to PROMPT.json in the run directory. Every 1/30 s step
-passes the hands' absolute joint targets through the native action path and replaces
-only its palm-pose IK with the arms' absolute joint targets, so native hand slewing,
-arm step limits and success and failure predicates apply.
+rosbridge.core.worker. A launch's seed k names the task's k-th native seed that a
+pre-screen accepted (seeds.json, written by tools/handson_seeds.py). A reset replays the
+PhysX branch of upstream's official evaluator (handson/evaluation/native.py:run_episode)
+at that native seed: the frozen task contract, the seeded setting, native construction,
+reset, the stable-origin settle gate and the seeded instruction, written to PROMPT.json
+in the run directory. Every 1/30 s step passes the hands' absolute joint targets through
+the native action path and replaces only its palm-pose IK with the arms' absolute joint
+targets, so native hand slewing, arm step limits and success and failure predicates apply.
+An early-stop run ends where the evaluator ends a trial (evaluation/rollout.py): at its
+first success, or at a task failure the native environment or the evaluator reports.
 
 Cameras render through upstream's three-view capture, with two contract choices: the
 default camera profile for every task, the head camera undistorted (its calibrated K
@@ -24,6 +27,7 @@ import numpy as np
 from rosbridge.catalog import resolve
 from rosbridge.core import ActionLayout, CommandGroup
 from rosbridge.core.devices import device_inventory, spectator_views
+from .seeds import screened_seed
 
 SIDES = ("right", "left")
 CAMERAS = {"head_camera": "main", "left_camera": "wrist_left", "right_camera": "wrist_right"}
@@ -33,6 +37,12 @@ OPENGL_TO_OPTICAL = np.diag([1., -1., -1., 1.])
 # Each path-traced pass renders every enabled render product completely; frames reach an
 # annotator a pass or more later. Upstream's capture renders six passes per view.
 RENDER_PASSES, SPECTATOR_PASSES = 6, 2
+# Native info entries whose names contain these explain a failure (failure_reason, ycb01_failure_reason, ...).
+FAILURE_INFO = ("fail", "reason")
+
+
+class SettleGateRejected(RuntimeError):
+    """Upstream's stable-origin settle gate rejected a reset. Deterministic for a task and native seed."""
 
 
 def values(value):
@@ -83,15 +93,40 @@ def contract_cameras():
     return contract
 
 
+def failure_cause(cause, info):
+    """A task failure's cause and the native info of its step that explains it: set scalar entries whose names
+    contain fail or reason, such as "native_failed: ycb01_failure_reason=ball_or_hand_touched_gate"."""
+    detail = [f"{key}={str(value)[:200]}" for key, value in info.items()
+              if key != "failed" and any(word in key for word in FAILURE_INFO)
+              and isinstance(value, (str, bool, int, float)) and value is not False and value != ""]
+    return cause + (": " + ", ".join(detail) if detail else "")
+
+
+def native_stop(returned, reason, timed_out):
+    """Where the evaluator ends a trial after a step (rollout.py): None to go on, else the record's reason and
+    cause. A step that succeeds is a success, as the evaluator scores its info["succeed"], also when it fails."""
+    info = returned["info"]
+    if info.get("succeed"):
+        return "success", None
+    if reason not in (None, "native_terminated", "native_truncated"):
+        return "failure", reason  # an evaluator rule, such as t11's direct hand contact
+    if info.get("failed"):
+        return "failure", failure_cause("native_failed", info)
+    if reason == "native_terminated" and not timed_out:
+        # t17 publishes the frame's failed over the latched one, so its trial can end with neither flag.
+        return "failure", failure_cause("native_terminated", info)
+    return None
+
+
 class HandsOnSim:
     default_task = "t24_place_ball_in_bowl"
     period = 1 / 30
 
-    def __init__(self, *, max_steps=None, terminate_on_success=False):
+    def __init__(self, *, max_steps=None, early_stop=False):
         self.requested_max_steps = self.max_steps = max_steps
-        self.terminate_on_success = terminate_on_success
+        self.early_stop = early_stop
         self.cameras = tuple(CAMERAS)
-        self.env = self.task = self.failure = self._tracker = self._frames = self._temporary = None
+        self.env = self.task = self.stop = self.native_seed = self._tracker = self._frames = self._temporary = None
         self.spectators, self._spectators = (), {}
 
     @property
@@ -104,9 +139,22 @@ class HandsOnSim:
     # Episode lifecycle ------------------------------------------------------------------
 
     def reset(self, task, seed, randomize=True):
-        """The seeded native episode, as the official evaluator builds it; randomize has no effect.
+        """The episode at the task's seed-th screened native seed, as the official evaluator builds it; randomize
+        has no effect. Isaac hosts one episode per process.
+        """
+        task = resolve("handson", task=task)[2]["native_task"]
+        native_seed = screened_seed(task, seed)
+        try:
+            self._reset(task, seed, native_seed)
+        except SettleGateRejected as error:
+            # The screen accepted this native seed, so the gate decides differently on this machine.
+            raise SettleGateRejected(f"seed {seed} names native seed {native_seed}, which the pre-screen accepted, "
+                                     f"but the settle gate rejected it here: {error}") from error
 
-        Isaac hosts one episode per process. The settle gate may reject a seed; the error ends the launch.
+    def _reset(self, task, seed, native_seed):
+        """The native episode at native_seed, recorded as seed; tools/handson_seeds.py screens native seeds with it.
+
+        The settle gate may reject the native seed: SettleGateRejected.
         """
         if self.env is not None:
             raise ValueError("a HandsOn worker serves one episode; start another run for another")
@@ -118,7 +166,7 @@ class HandsOnSim:
         from handson.tasks.registry import TASKS
         from rosbridge.core.gpu import single_gpu
 
-        self.task, self.seed = resolve("handson", task=task)[2]["native_task"], seed
+        self.task, self.seed, self.native_seed = resolve("handson", task=task)[2]["native_task"], seed, native_seed
         # Upstream's receipts and PROMPT.json stay with a managed run; tests use a temporary directory.
         run = os.environ.get("ROSBRIDGE_RUN_DIR")
         if not run:
@@ -140,16 +188,25 @@ class HandsOnSim:
         self._adapter.prepare_cameras()
         task_contracts.install_native_trace(self.task, out)
         self._adapter.prepare(out)
-        selection = setting_runtime.prepare(self.task, seed, out)
+        selection = setting_runtime.prepare(self.task, native_seed, out)
         setting_runtime.configure_solver(selection)
-        reset_seed = selection["seeds"]["reset"] if selection else seed
+        reset_seed = selection["seeds"]["reset"] if selection else native_seed
         self.env, self._wrapped, _ = native.construct(self.task, reset_seed, selection=selection)
         env = self.env
         if not env._cameras:
             env._init_recording_cameras()
         observation, info = env.reset(seed=reset_seed)
-        task_contracts.initialize(env, self._wrapped, observation, info, contract, out)
-        (out / "PROMPT.json").write_text(json.dumps(bind(env, self.task, seed), indent=2) + "\n")
+        try:
+            task_contracts.initialize(env, self._wrapped, observation, info, contract, out)
+        except Exception as error:
+            settle = out / "TASK_BOUNDARY_SETTLE.json"
+            if type(error).__name__ == "RecordingOriginStabilityError" or (
+                    settle.is_file() and not json.loads(settle.read_text())["passed"]):
+                # Upstream's stable-origin gate rejected this reset; its evaluator reports the rejection and
+                # substitutes no other seed. It is deterministic for a task and native seed.
+                raise SettleGateRejected(f"{self.task} native seed {native_seed}: {str(error)[:300]}") from error
+            raise
+        (out / "PROMPT.json").write_text(json.dumps(bind(env, self.task, native_seed), indent=2) + "\n")
         if self._adapter.spec.force_scoring:  # t10 scores support, lift and hold; force is diagnostic
             from handson.evaluation.carton import install
             self._tracker = install(env, out / "CARTON_RAW_FORCE_000")
@@ -203,18 +260,16 @@ class HandsOnSim:
             command[side] = np.r_[np.zeros(7), hand]  # a zero palm pose is "not commanded"
         _, _, terminated, truncated, info = self.env.step(command)
         self.steps += 1
-        reason = self._adapter.terminal_reason(dict(terminated=terminated, truncated=truncated, info=info),
-                                               env=self.env)
-        contact = reason not in (None, "native_terminated", "native_truncated")
-        if self.failure is None and (info.get("failed") or contact):
-            # Upstream ends the trial at a failure, so it can no longer succeed.
-            self.failure = reason if contact else "native_failed"
-        self.success = bool(info.get("succeed")) and self.failure is None
+        self.success = bool(info.get("succeed"))
         self.reward = float(self.success)
-        self.done = self.steps >= self.max_steps or (self.terminate_on_success and self.success)
+        if self.early_stop:
+            returned = dict(terminated=terminated, truncated=truncated, info=info)
+            self.stop = native_stop(returned, self._adapter.terminal_reason(returned, env=self.env),
+                                    self.steps >= self.max_steps)
+        self.done = self.steps >= self.max_steps or self.stop is not None
 
     def measures(self):
-        return {"failure": self.failure}
+        return {"native_seed": self.native_seed}
 
     def link_pose(self, side, link):
         """A robot body's world pose (rotation, translation), for geometry checks."""

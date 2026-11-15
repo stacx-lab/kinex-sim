@@ -34,7 +34,7 @@ environments used by active managed runs.
 
 `launch` accepts `SIMULATOR/TASK`, an unambiguous native task name or task slug,
 or a simulator's default-task alias. It takes `--execution-mode`, `--seed`,
-`--stop-on-success`, `--domain-id`, `--timeout`, `--record DIR` and
+`--early-stop`, `--domain-id`, `--timeout`, `--record DIR` and
 `--record-type`. It requires preparation; launch never downloads assets.
 Launch remains in the foreground unless `--detach` is supplied. Ctrl-C stops the
 complete graph. Detached launch returns once the world node, its clock and wait
@@ -100,13 +100,17 @@ native control steps; zero is immediate; negative, nonfinite or unrepresentable
 waits fail. Waits are sequential: a wait requested while another is pending is
 rejected, and `world/stop` (`std_srvs/srv/Trigger`) cancels the pending one. A run
 is one episode, of the task and seed it was launched with. There is no reset: to
-start over, stop the run and launch another. An episode ends only at its first
-success, when launched with `--stop-on-success`, at its step limit, if it has one, or
-when a simulator step fails, which the record states as reason `error` with the error.
-Termination completes a wait due on that tick and fails an unfinished one; from then
-on, every valid wait's reply adds `; the episode ended because the task succeeded`,
-`because the time limit was reached` or `because the simulation failed (<exception
-type>)`. A wait admitted before a client times out stays pending until it completes
+start over, stop the run and launch another. An episode ends at its step limit, if it
+has one, or when a simulator step fails. Launched with `--early-stop`, it also ends where
+its simulator's own evaluator ends one: at a success for every simulator, and at a task
+failure the evaluator reports for ABC's `ball_tray_balancing`, RoboDojo and HandsOn (see
+their pages). The record states why as its `reason`: `success`, `failure` with the native
+`cause`, `timeout`, `error` with the error, or `stopped` for a run stopped before its
+episode ended; `first_success_step` is the step of the first success either way, and
+`early_stop` says how the run was launched. Termination completes a wait due on that tick
+and fails an unfinished one; from then on, every valid wait's reply adds `; the episode
+ended because the task succeeded`, `because the task failed (<cause>)`, `because the time
+limit was reached` or `because the simulation failed (<exception type>)`. A wait admitted before a client times out stays pending until it completes
 or `world/stop` cancels it; abrupt process loss may prevent a response, so use wall
 timeouts.
 
