@@ -21,7 +21,8 @@ def test_catalog_arm_and_camera_geometry_matches_measurements(tmp_path, variant,
     from kinex.lib.geometry import compose_rt, xyzq_to_rt
     from kinex.lib.joints import JointModel
     project = Path(__file__).resolve().parents[4]
-    setup(f"libero/libero-panda-{variant}", tmp_path, project=project)
+    result = setup(f"libero/{task}", tmp_path, seed=0, project=project)
+    assert result["robot"] == f"libero/libero-panda-{variant}"
     directory = tmp_path / ".kinex/devices"
     profiles = {name: yaml.safe_load((directory / name / "profile.yaml").read_text())
                 for name in ("arm", "camera_agentview", "camera_wrist")}
