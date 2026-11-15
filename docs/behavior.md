@@ -19,15 +19,15 @@ embodiment differs. Upstream is pinned to
 ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES rosbridge prepare behavior
 rosbridge tasks list --simulator behavior
 rosbridge launch behavior/turning-on-radio --execution-mode stepped --timeout 1800
-rosbridge setup behavior/behavior-r1pro --directory ../my-behavior-workspace
+rosbridge setup behavior/turning-on-radio --directory ../my-behavior-workspace
 
 ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES rosbridge prepare behavior-g1
 rosbridge launch behavior-g1/turning-on-radio --execution-mode stepped --timeout 1800
-rosbridge setup behavior-g1/behavior-g1-sharpa --directory ../my-g1-workspace
+rosbridge setup behavior-g1/turning-on-radio --directory ../my-g1-workspace
 
 ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES rosbridge prepare behavior-dex
 rosbridge launch behavior-dex/turning-on-radio --execution-mode stepped --timeout 1800
-rosbridge setup behavior-dex/behavior-r1pro-sharpa --directory ../my-dex-workspace
+rosbridge setup behavior-dex/turning-on-radio --directory ../my-dex-workspace
 ```
 
 Task IDs are kebab-cased activity names. The simulators catalog the same

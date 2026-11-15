@@ -87,7 +87,7 @@ def test_cameras_render_the_contract_and_leave_physics_unchanged(sim):
 
 @requires_kinex
 def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
-    rig = Rig("handson/handson-rokae-wuji", tmp_path)
+    rig = Rig(TASK, tmp_path, seed=0)  # the workspace of the episode the fixture loaded
     target = sim.state()[0]
     for _, offset in SIDES:
         target[[offset + 1, offset + 3]] += .2
@@ -109,7 +109,7 @@ def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
                 measured = sim.native("link_pose", side, link)
                 np.testing.assert_allclose(expected[0], measured[0], atol=1e-4)
                 np.testing.assert_allclose(expected[1], measured[1], atol=1e-4)
-        sim.render("head_camera")  # a capture places every camera at its nominal mount
+        sim.render("head_camera")  # a capture places every camera at its drawn mount
         for camera, expected in (("head_camera", rig.mount("head_camera")),
                                  ("left_camera", compose(palms["left"], rig.mount("left_camera"))),
                                  ("right_camera", compose(palms["right"], rig.mount("right_camera")))):

@@ -21,7 +21,7 @@ def assert_pose(expected, measured, atol=1e-6):
 @pytest.mark.parametrize("task", ["put_plastic_bottles_in_bin", "count_into_opaque_box",
                                   "pouring", "put_markers_in_top_drawer"])
 def test_rig_matches_native_arms_grippers_and_cameras(tmp_path, task):
-    rig = Rig("abc/abc-yam", tmp_path)
+    rig = Rig("abc", tmp_path)
     sim = AbcSim()
     try:
         sim.reset(task, 0, False)
@@ -53,7 +53,7 @@ def test_rig_matches_native_arms_grippers_and_cameras(tmp_path, task):
 
 
 def test_rig_intrinsics_and_depth_range_match_rendering(tmp_path):
-    rig = Rig("abc/abc-yam", tmp_path)
+    rig = Rig("abc", tmp_path)
     sim = AbcSim()
     try:
         sim.reset(sim.default_task, 0, False)

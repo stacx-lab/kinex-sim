@@ -12,9 +12,9 @@ targets, so native hand slewing, arm step limits and success and failure predica
 An early-stop run ends where the evaluator ends a trial (evaluation/rollout.py): at its
 first success, or at a task failure the native environment or the evaluator reports.
 
-Cameras render through upstream's three-view capture, with two contract choices: the
-default camera profile for every task, the head camera undistorted (its calibrated K
-kept), and nominal mounts without the per-seed jitter.
+Cameras render through upstream's three-view capture as the evaluator renders them: the
+task's camera profile and the episode's drawn mount offsets (rosbridge_handson.cameras),
+with the head camera undistorted (its calibrated K kept).
 """
 import json
 import os
@@ -27,13 +27,12 @@ import numpy as np
 from rosbridge.catalog import resolve
 from rosbridge.core import ActionLayout, CommandGroup
 from rosbridge.core.devices import device_inventory, spectator_views
+from .cameras import CAMERAS, OPENGL_TO_OPTICAL, camera_seed, contract, lens, offsets
 from .seeds import screened_seed
 
 SIDES = ("right", "left")
-CAMERAS = {"head_camera": "main", "left_camera": "wrist_left", "right_camera": "wrist_right"}
 SPECTATORS = (("third_person", "head_camera"), ("left_wrist", "left_camera"),
               ("right_wrist", "right_camera"))
-OPENGL_TO_OPTICAL = np.diag([1., -1., -1., 1.])
 # Each path-traced pass renders every enabled render product completely; frames reach an
 # annotator a pass or more later. Upstream's capture renders six passes per view.
 RENDER_PASSES, SPECTATOR_PASSES = 6, 2
@@ -65,32 +64,15 @@ def hydra_texture(product):
     return manager._hydra_textures.get(manager._context, product).hydra_texture
 
 
-def lens(spec):
-    """A contract camera's width, height, fx, fy, cx, cy: its native K, with the image's pixel centers."""
-    (fx, _, cx), (_, fy, cy), _ = spec["K_effective"]
-    width, height = spec["native_width_height"]
-    return width, height, float(fx), float(fy), float(cx), float(cy)
-
-
-def contract_cameras():
-    """The default camera profile for every task, with the head camera's distortion zeroed."""
-    from handson.evaluation import camera_contracts, camera_randomization
+def activate_cameras(task):
+    """The task's camera contract, with the head camera undistorted, active for the episode."""
+    from handson.evaluation import camera_contracts
     from handson.sim.isaaclab import calibrated_cameras
-    contract = camera_contracts.current()  # the default profile while none is active
-    main = contract["cameras"]["main"]
-    main["D_effective"] = [0.] * len(main["D_effective"])
-    camera_contracts._active.set(contract)  # authors the lens and checks it in render_probe
+    value = contract(task)
+    camera_contracts._active.set(value)  # authors the lens and checks it in render_probe, as use(task) does
     profile = calibrated_cameras.profile  # checked by verify_environment
     calibrated_cameras.profile = lambda: {**profile(), "runtime_D": [0.] * len(profile()["runtime_D"])}
-    sample = camera_randomization.sample
-
-    def nominal(*args):
-        draw = sample(*args)
-        for camera in draw["cameras"].values():
-            camera.update(translation_m=[0.] * 3, quaternion_wxyz=[1., 0., 0., 0.], roll_pitch_yaw_deg=[0.] * 3)
-        return {**draw, "enabled": False}
-    camera_randomization.sample = nominal
-    return contract
+    return value
 
 
 def failure_cause(cause, info):
@@ -182,7 +164,7 @@ class HandsOnSim:
                           HANDSON_ISAACLAB_DEFER_CAMERA_RENDER="0",
                           HANDSON_ISAACLAB_REQUIRE_REAL_RECORDING_CAMERAS="1",
                           HANDSON_ISAACSIM_RENDERER_GPU=str(single_gpu()))
-        self._contract = contract_cameras()
+        self._contract = activate_cameras(self.task)
         install_launcher("physx")
         install_native_camera_creation(HandsOnABCIsaacLabEnv)
         self._adapter.prepare_cameras()
@@ -191,6 +173,10 @@ class HandsOnSim:
         selection = setting_runtime.prepare(self.task, native_seed, out)
         setting_runtime.configure_solver(selection)
         reset_seed = selection["seeds"]["reset"] if selection else native_seed
+        # The episode's camera draw, as run_episode seeds render_probe.
+        self._camera_seed = selection["seeds"]["camera"] if selection else native_seed
+        assert self._camera_seed == camera_seed(self.task, native_seed)
+        self._offsets = offsets(self.task, self._camera_seed)
         self.env, self._wrapped, _ = native.construct(self.task, reset_seed, selection=selection)
         env = self.env
         if not env._cameras:
@@ -301,7 +287,8 @@ class HandsOnSim:
             # One native capture renders all three views; it never steps physics.
             from handson.evaluation.cameras import render_probe
             from handson.evaluation.native import capture
-            self._frames = self.steps, render_probe(self.env, {"task": self.task}, self._out, 0, self.seed,
+            # It places each camera at its drawn mount, as at the episode's camera seed.
+            self._frames = self.steps, render_probe(self.env, {"task": self.task}, self._out, 0, self._camera_seed,
                                                     "rosbridge", capture, save_png=False)
         return np.ascontiguousarray(self._frames[1][CAMERAS[camera]])
 
@@ -330,14 +317,15 @@ class HandsOnSim:
                                            texture, rgb)
 
     def _mount(self, camera):
-        """A view's OpenGL world pose, as upstream's capture places it."""
+        """A view's OpenGL world pose, as upstream's capture places it: nominal mount and drawn offset."""
         from handson.eef52 import measured_palm_pose
         from handson.evaluation.cameras import pose_matrix
         spec = self._contract["cameras"][CAMERAS[camera]]
         if camera == "head_camera":
-            return np.asarray(spec["nominal_world_pose_opengl"])
+            return np.asarray(spec["nominal_world_pose_opengl"]) @ self._offsets[camera]
         pose, _ = measured_palm_pose(self.env, camera.removesuffix("_camera"))
-        return pose_matrix(pose[:3], pose[3:]) @ np.asarray(spec["nominal_camera_to_palm_opengl"])
+        return (pose_matrix(pose[:3], pose[3:]) @ np.asarray(spec["nominal_camera_to_palm_opengl"])
+                @ self._offsets[camera])
 
     def render_spectator(self, name):
         from handson.evaluation.cameras import role_render_products

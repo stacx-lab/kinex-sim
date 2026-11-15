@@ -95,7 +95,7 @@ def rt(matrix):
 
 @requires_kinex
 def test_rig_matches_native_chains_hands_and_head_camera(tmp_path, sim):
-    rig = Rig("behavior-g1/behavior-g1-sharpa", tmp_path)
+    rig = Rig("behavior-g1", tmp_path)
     q = sim.state()[0]
     base = np.linalg.inv(sim.native("link_pose", "pelvis"))
 

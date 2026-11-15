@@ -10,7 +10,7 @@ follows RoboEnv's RoboTwin device runtime. Upstream is pinned to
 rosbridge prepare robotwin
 rosbridge tasks list --simulator robotwin
 rosbridge launch robotwin/handover-block-aloha-agilex --execution-mode stepped
-rosbridge setup robotwin/robotwin-aloha-agilex --directory ../my-robotwin-workspace
+rosbridge setup robotwin/handover-block-aloha-agilex --directory ../my-robotwin-workspace
 ```
 
 `robotwin` selects `handover_block`. Task IDs keep RoboEnv's embodiment suffix,

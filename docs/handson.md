@@ -11,7 +11,7 @@ guide](README.md) for shared lifecycle and timing contracts.
 rosbridge prepare handson
 rosbridge tasks list --simulator handson
 rosbridge launch handson/t12-load-and-start-microwave --execution-mode stepped --early-stop --seed 3 --timeout 1800
-rosbridge setup handson/handson-rokae-wuji --directory ../my-handson-workspace
+rosbridge setup handson/t12-load-and-start-microwave --seed 3 --directory ../my-handson-workspace
 ```
 
 `handson` selects `t24_place_ball_in_bowl`. Task IDs are the native names with
@@ -175,14 +175,21 @@ target slewing. The rig `handson/handson-rokae-wuji`:
 Cameras are RGB and render through upstream's three-view RTX capture: its exposure per
 sensor, and wrist views that hide the wrist's own cables. One capture renders all three
 views at a camera sample, six path-traced passes each (about 14 s on a shared L40S); it never
-steps physics. Two choices keep the images on the Kinex
-contract, where a profile is an undistorted pinhole at a fixed mount:
+steps physics. The cameras are the evaluator's for the task and seed:
 - **Head camera:** the calibrated K of the Gemini 336 (854×480, fx 463.39, fy 463.00, an
-  off-center principal point (431.77, 239.92)), with its lens distortion zeroed.
-- **Wrist cameras:** 848×480 on the palms (fx 272.14 left, 267.01 right). Every task uses
-  this default camera profile; `t05` and `t15` would use 269.56 in the paper.
-- **Mounts:** every camera renders at its nominal mount, without the evaluator's per-seed
-  jitter (±2 mm, ±0.3°).
+  off-center principal point (431.77, 239.92)), rendered with its lens distortion zeroed, so
+  its profile is an undistorted pinhole whose rays Kinex computes locally.
+- **Wrist cameras:** 848×480 on the palms (fx 272.14 left, 267.01 right), or both 269.56 in
+  `t05` and `t15`, whose camera profile is their own.
+- **Mounts:** each episode draws an offset per camera from its camera seed (at most 2 mm and
+  0.3° per axis), as the evaluator's capture does: the setting's camera seed for the 16 tasks
+  with a setting, else the native seed. The head camera is fixed in the world and each wrist
+  camera on its palm, both at their nominal mount composed with that offset.
+
+`rosbridge setup handson/TASK --seed K` exports the workspace of that task and seed: the rig
+with each camera's intrinsics and drawn mount (`rosbridge_handson.workspace`, from upstream's
+camera contracts without Isaac; it needs `rosbridge prepare handson`). The catalog rig itself
+holds the default profile at nominal mounts.
 
 ## Recording and checks
 
@@ -200,5 +207,5 @@ pixi run -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handso
     python tools/robots/build_handson.py                # rewrites the catalog rig
 ```
 
-With `KINEX_PYTHON`, the native checks also compare the exported rig's palm FK,
-fingertips and camera mounts with Isaac.
+With `KINEX_PYTHON`, the native checks also compare the exported workspace of `t24` at seed 0
+(palm FK, fingertips and drawn camera mounts) with Isaac.

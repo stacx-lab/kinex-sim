@@ -29,7 +29,7 @@ def sim():
 
 
 def test_rig_matches_native_arms_grippers_tcp_and_cameras(tmp_path, sim):
-    rig = Rig("robotwin/robotwin-aloha-agilex", tmp_path)
+    rig = Rig("robotwin", tmp_path)
     target = sim.state()[0]
     target[[0, 7]] += .2
     target[[1, 8]] += .3
@@ -56,7 +56,7 @@ def test_rig_matches_native_arms_grippers_tcp_and_cameras(tmp_path, sim):
 
 
 def test_rig_intrinsics_match_rendering(tmp_path, sim):
-    rig = Rig("robotwin/robotwin-aloha-agilex", tmp_path)
+    rig = Rig("robotwin", tmp_path)
     for camera in sim.cameras:
         profile = rig.profiles[camera]
         color = profile["color"]

@@ -102,17 +102,20 @@ copies their content.
 ```sh
 rosbridge robots list
 rosbridge tasks list --simulator libero --robot libero/libero-panda-tabletop
-rosbridge setup libero/libero-panda-tabletop --directory ../my-libero-workspace --domain-id 83
+rosbridge setup libero/libero-spatial-01 --directory ../my-libero-workspace --domain-id 83
 rosbridge launch libero/libero-spatial-01 --execution-mode stepped --domain-id 83
 ```
 
-Setup is offline: it exports unloaded profiles on the selected ROS domain and
-writes `.kinex/kinex.json` with the `ros-jazzy` provider; it neither starts Kinex
-nor launches a simulator, and it refuses an existing workspace. Prepare Kinex
-Python separately; it builds `kinex_interfaces` and installs ROS clients in its own
-environment. A workspace belongs to one rig: launch tasks whose robot ID matches
-it, and export another workspace for another rig. Each simulator's native
-`test_kinex_geometry.py` checks its rigs' profile frames against the simulator.
+`rosbridge setup` takes a task as `launch` does, and `--seed`, and exports the workspace that
+a launch of that task and seed serves: the task's rig, with the profile changes its simulator
+makes for that task and seed. Only HandsOn makes any: its cameras' intrinsics and mounts differ
+by task and seed (see its page). The seed defaults as launch's does. Setup is offline: it exports
+unloaded profiles on the selected ROS domain and writes `.kinex/kinex.json` with the `ros-jazzy`
+provider; it neither starts Kinex nor launches a simulator, and it refuses an existing
+workspace. Prepare Kinex Python separately; it builds `kinex_interfaces` and installs ROS
+clients in its own environment. Export a workspace for each task and seed whose devices
+differ, and launch that task and seed in it. Each simulator's native
+`test_kinex_geometry.py` checks its default task's workspace against the simulator.
 
 ## Episodes and judging
 

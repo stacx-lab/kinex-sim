@@ -115,7 +115,7 @@ def assert_pose(expected, measured, atol=1e-4):
 
 @requires_kinex
 def test_rig_matches_native_chains_grippers_and_cameras(tmp_path, sim):
-    rig = Rig("behavior/behavior-r1pro", tmp_path)
+    rig = Rig("behavior", tmp_path)
     target = sim.state()[0]
     torso, grips = channels(sim, "torso"), [channels(sim, f"{side}_gripper")[0] for side in ("left", "right")]
     target[torso[1]] += .1

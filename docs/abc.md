@@ -49,7 +49,7 @@ The simulator hosts these devices on one `world` node:
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
 | `camera_top`, `camera_left`, `camera_right` | `<camera>/image`, `<camera>/depth`, `<camera>/camera_info` |
 
-Every task runs on the Kinex rig `abc/abc-yam`; `rosbridge setup abc/abc-yam`
+Every task runs on the Kinex rig `abc/abc-yam`; `rosbridge setup abc/TASK`
 exports its workspace (arm URDFs measured from the MuJoCo model, mounts at
 (0.2525, ±0.31, 0.76), wrist cameras on the `link_6` flanges).
 

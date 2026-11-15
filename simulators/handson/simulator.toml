@@ -8,6 +8,8 @@ python_path = "simulators/handson"
 install = ["handson"]
 asset_preparer = "rosbridge_handson.assets:prepare"
 asset_checker = "rosbridge_handson.assets:check_task"
+# rosbridge setup: each camera's intrinsics and mount for a task and seed.
+workspace = "rosbridge_handson.workspace:profiles"
 default_task = "t24_place_ball_in_bowl"
 ros_package = "rosbridge_handson"
 task_catalog = "tasks.toml"

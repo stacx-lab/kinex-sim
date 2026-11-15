@@ -13,7 +13,7 @@ def assert_pose(expected, measured):
 
 
 def test_catalog_chain_cameras_and_fingers_match_measurements(tmp_path):
-    rig = Rig("robocasa/robocasa-panda-omron", tmp_path)
+    rig = Rig("robocasa", tmp_path)
     sim = RoboCasaSim()
     try:
         sim.reset(sim.default_task, 0)

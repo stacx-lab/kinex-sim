@@ -47,8 +47,9 @@ def rt(position, quaternion_wxyz):
 
 
 class Rig:
-    def __init__(self, identifier, directory):
-        setup(identifier, directory, project=PROJECT)
+    """The Kinex workspace a task and seed's launch serves (rosbridge setup)."""
+    def __init__(self, selection, directory, seed=None):
+        setup(selection, directory, seed=seed, project=PROJECT)
         self.directory = Path(directory) / ".kinex/devices"
         self.profiles = {path.parent.name: yaml.safe_load(path.read_text())
                          for path in self.directory.glob("*/profile.yaml")}

@@ -30,9 +30,17 @@ def manifest(simulator):
     return tomllib.loads((PROJECT / "simulators" / simulator / "simulator.toml").read_text())
 
 
+def task_of(robot):
+    """The first catalog task on a robot: setup exports a task's workspace."""
+    from rosbridge.catalog import tasks
+    return next(task["id"] for task in tasks(PROJECT).values() if task["robot"] == robot)
+
+
 def export(identifier, directory, **options):
-    with patch.dict("sys.modules", {"rclpy": None, "mujoco": None}):
-        result = setup(identifier, directory, project=PROJECT, **options)
+    """A robot's workspace through its first task, without the simulator's task and seed changes."""
+    with patch.dict("sys.modules", {"rclpy": None, "mujoco": None}), \
+            patch("rosbridge.catalog.robots.changes", lambda *args: {}):
+        result = setup(task_of(identifier), directory, project=PROJECT, **options)
     root = Path(directory) / ".kinex"
     profiles = {path.parent.name: yaml.safe_load(path.read_text())
                 for path in root.glob("devices/*/profile.yaml")}
@@ -66,10 +74,12 @@ def test_every_rig_exports_unloaded_profiles_on_rosbridge_endpoints(tmp_path, id
             assert not exported.is_symlink() and "LinkPublisher(profile, context" in exported.read_text()
             assert (root / "devices" / name / profile["model"]["path"]).is_file()
     assert not any(root.rglob("*.pyc")) and not any(path.is_symlink() for path in root.rglob("*"))
-    with pytest.raises(ValueError, match="already contains"):
-        setup(identifier, tmp_path, project=PROJECT)
+    assert result["robot"] == identifier and result["task"] == task_of(identifier)
+    with pytest.raises(ValueError, match="already contains"), \
+            patch("rosbridge.catalog.robots.changes", lambda *args: {}):
+        setup(task_of(identifier), tmp_path, project=PROJECT)
     with pytest.raises(ValueError, match="domain ID"):
-        setup(identifier, tmp_path / "other", project=PROJECT, domain_id=-1)
+        setup(task_of(identifier), tmp_path / "other", project=PROJECT, domain_id=-1)
 
 
 def test_native_gripper_commands_drive_their_fingers_through_mimics(tmp_path):
@@ -103,7 +113,7 @@ def test_rigs_carry_their_calibration_in_profiles(tmp_path, variant, base):
     project = Path(__file__).resolve().parents[2]
     identifier = f"libero/libero-panda-{variant}"
     with patch.dict("sys.modules", {"rclpy": None, "mujoco": None}):
-        setup(identifier, tmp_path, project=project)
+        setup(task_of(identifier), tmp_path, project=project)
     root = tmp_path / ".kinex"
     assert yaml.safe_load((root / "workspace.yaml").read_text())["identity"]["id"] == identifier.split("/")[1]
     arm = yaml.safe_load((root / "devices/arm/profile.yaml").read_text())
@@ -169,3 +179,42 @@ def test_kinex_schema_and_readiness_accept_every_rig(tmp_path):
     for robot, plan in zip(robots, json.loads(result.stdout)):
         assert plan["robot"] == robot.split("/")[1]
         assert {item["status"] for item in plan["items"]} == {"done"}, (robot, plan["items"])
+
+
+def test_setup_takes_the_launch_seed_and_names_its_task(tmp_path):
+    from rosbridge.catalog import tasks
+    seeded = next(task for task in tasks(PROJECT, "robotwin").values() if "seed" in task)
+    result = setup(seeded["id"], tmp_path / "default", project=PROJECT)
+    assert (result["task"], result["seed"], result["robot"]) == (seeded["id"], seeded["seed"], seeded["robot"])
+    assert setup(seeded["id"], tmp_path / "chosen", seed=3, project=PROJECT)["seed"] == 3
+    with pytest.raises(ValueError, match="Unknown task"):
+        setup("robotwin/no-such-task", tmp_path / "unknown", project=PROJECT)
+
+
+HANDSON = PROJECT / ".runtime/handson/handson/handson/evaluation/camera_contracts.py"
+
+
+@pytest.mark.skipif(not HANDSON.is_file(), reason="HandsOn is not prepared")
+def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path):
+    rig = PROJECT / "catalog/robots/handson/handson-rokae-wuji/devices"
+    nominal = {name: yaml.safe_load((rig / name / "profile.yaml").read_text()) for name in
+               ("head_camera", "left_camera", "right_arm")}
+
+    def profiles(task, seed):
+        directory = tmp_path / f"{task}-{seed}"
+        setup(f"handson/{task}", directory, seed=seed, project=PROJECT)
+        return {name: yaml.safe_load((directory / ".kinex/devices" / name / "profile.yaml").read_text())
+                for name in nominal}
+    first, second = profiles("t24-place-ball-in-bowl", 0), profiles("t24-place-ball-in-bowl", 1)
+    # Each seed draws its own mounts, a few millimetres from the nominal ones, on the same parents.
+    for camera in ("head_camera", "left_camera"):
+        assert first[camera]["frames"] != second[camera]["frames"] != nominal[camera]["frames"]
+        assert first[camera]["frames"]["base"]["parent"] == nominal[camera]["frames"]["base"]["parent"]
+        offset = [a - b for a, b in zip(first[camera]["frames"]["base"]["translation_m"],
+                                        nominal[camera]["frames"]["base"]["translation_m"])]
+        assert 0 < max(map(abs, offset)) < .005
+        assert first[camera]["color"]["distortion"] == {"model": "none"}
+    assert first["right_arm"] == second["right_arm"] == {**nominal["right_arm"], "loaded": False}
+    # t05 renders its wrists through its own profile.
+    assert profiles("t05-fill-cup", 0)["left_camera"]["color"]["projection"]["fx"] == pytest.approx(269.564, abs=1e-3)
+    assert first["left_camera"]["color"]["projection"]["fx"] == pytest.approx(272.135, abs=1e-3)

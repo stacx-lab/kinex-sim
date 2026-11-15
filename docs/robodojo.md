@@ -12,7 +12,7 @@ lifecycle and timing contracts.
 rosbridge prepare robodojo
 rosbridge tasks list --simulator robodojo
 rosbridge launch robodojo/stack-bowls --execution-mode stepped --timeout 1800
-rosbridge setup robodojo/robodojo-arx-x5 --directory ../my-robodojo-workspace
+rosbridge setup robodojo/stack-bowls --directory ../my-robodojo-workspace
 ```
 
 `robodojo` selects `pack_objects_into_box`. The twelve `*_random` variants are not

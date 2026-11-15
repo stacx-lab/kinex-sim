@@ -1,9 +1,10 @@
 """Measure the HandsOn ROKAE AR5 / Wuji rig and write catalog/robots/handson/handson-rokae-wuji.
 
 Chains come from upstream's robot MJCF (sim/envs/xmls/rokae_wuji1_<side>.xml), which Isaac imports
-at the same base poses for every task. Cameras are the default profile of the camera contract the
-backend renders with: the head camera fixed in the world, each wrist camera on its palm. The native
-test checks both against the live Isaac scene. Runs in the native environment after
+at the same base poses for every task. Cameras are the default profile of the camera contract at
+their nominal mounts: the head camera fixed in the world, each wrist camera on its palm. rosbridge
+setup changes them to the task's profile and the episode's drawn mounts (rosbridge_handson.workspace);
+the native test checks that workspace against the live Isaac scene. Runs in the native environment after
 `rosbridge prepare handson`:
     pixi run -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
         python tools/robots/build_handson.py
@@ -20,7 +21,8 @@ sys.path[:0] = [str(ROOT / "simulators/handson"), str(Path(__file__).parent)]
 import mujoco  # noqa: E402
 import rigs  # noqa: E402
 from handson.evaluation.camera_contracts import current  # noqa: E402
-from rosbridge_handson.backend import CAMERAS, OPENGL_TO_OPTICAL, SIDES, lens  # noqa: E402
+from rosbridge_handson.backend import SIDES  # noqa: E402
+from rosbridge_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, lens  # noqa: E402
 
 PACKAGE = ROOT / ".runtime/handson/handson/handson"
 

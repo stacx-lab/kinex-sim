@@ -65,9 +65,10 @@ def parser():
     robots = commands.add_parser("robots")
     listing = robots.add_subparsers(dest="robots_command", required=True).add_parser("list")
     common(listing)
-    setup = commands.add_parser("setup", help="Export unloaded Kinex device profiles")
+    setup = commands.add_parser("setup", help="Export the unloaded Kinex workspace of a task and seed")
     common(setup)
-    setup.add_argument("robot")
+    setup.add_argument("selection", help="Task as launch takes it, such as handson/t24-place-ball-in-bowl")
+    setup.add_argument("--seed", type=int, help="The launch seed whose devices to export (default: launch's)")
     setup.add_argument("--directory", type=Path)
     setup.add_argument("--domain-id", type=domain, default=0)
     task = commands.add_parser("tasks")
@@ -129,7 +130,8 @@ def main(argv=None):
         if args.command in ("robots", "setup"):
             from rosbridge.catalog.robots import list_robots, setup
             result = ({"robots": list_robots(args.project)} if args.command == "robots" else
-                      setup(args.robot, args.directory, project=args.project, domain_id=args.domain_id))
+                      setup(args.selection, args.directory, seed=args.seed, project=args.project,
+                            domain_id=args.domain_id))
             emit(result, args.json)
             return 0
         from rosbridge.runs import api

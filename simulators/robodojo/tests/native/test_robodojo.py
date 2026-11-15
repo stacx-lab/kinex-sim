@@ -87,7 +87,7 @@ def test_reset_is_bounded_reloads_the_layout_and_serves_one_task(sim):
 
 @requires_kinex
 def test_rig_matches_native_arms_fingers_and_cameras(tmp_path, sim):
-    rig = Rig("robodojo/robodojo-arx-x5", tmp_path)
+    rig = Rig("robodojo", tmp_path)
     target = sim.state()[0]
     target[[0, 7]] += .2
     target[[1, 8]] += .3
