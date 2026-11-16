@@ -227,7 +227,10 @@ def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path
         offset = [a - b for a, b in zip(first[camera]["frames"]["base"]["translation_m"],
                                         nominal[camera]["frames"]["base"]["translation_m"])]
         assert 0 < max(map(abs, offset)) < .005
-        assert first[camera]["color"]["distortion"] == {"model": "none"}
+        assert first[camera]["color"] == nominal[camera]["color"]
+    # The head camera renders through its calibrated lens; the wrist cameras are undistorted pinholes.
+    assert first["head_camera"]["color"]["distortion"]["model"] == "opencv_brown_conrady"
+    assert first["left_camera"]["color"]["distortion"] == {"model": "none"}
     assert first["right_arm"] == second["right_arm"] == {**nominal["right_arm"], "loaded": False}
     # Upstream holds a single-arm task's left arm and hand at home in some tasks; there they take no commands.
     held = profiles("eval-gen01-cover-lunchbox", 0)
@@ -238,6 +241,21 @@ def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path
     # t05 renders its wrists through its own profile.
     assert profiles("t05-fill-cup", 0)["left_camera"]["color"]["projection"]["fx"] == pytest.approx(269.564, abs=1e-3)
     assert first["left_camera"]["color"]["projection"]["fx"] == pytest.approx(272.135, abs=1e-3)
+
+
+@pytest.mark.skipif(not HANDSON.is_file(), reason="HandsOn is not prepared")
+def test_every_handson_task_renders_the_lenses_of_the_catalog_rig():
+    """A task's cameras may change their pinhole, never whether they have a lens: the lens decides the geometry
+    services and node of the rig's profile."""
+    from rosbridge.catalog import resolve, tasks
+    from rosbridge.catalog.robots import changes
+    rig = PROJECT / "catalog/robots/handson/handson-rokae-wuji/devices"
+    models = {name: yaml.safe_load((rig / name / "profile.yaml").read_text())["color"]["distortion"]
+              for name in ("head_camera", "left_camera", "right_camera")}
+    for identifier in tasks(PROJECT, "handson"):
+        root, config, task = resolve(identifier, PROJECT)
+        by_device = changes(root, config, task, 0)
+        assert {name: by_device[name]["color"]["distortion"] for name in models} == models, identifier
 
 
 def test_a_workspace_hook_changes_profiles_by_json_merge_patch():

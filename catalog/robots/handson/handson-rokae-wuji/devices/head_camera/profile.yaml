@@ -1,7 +1,9 @@
 name: head_camera
 runtime:
   domain_id: 0
-  nodes: []
+  nodes:
+  - entry: geometry.py
+    factory: create
   ready_timeout_s: 30
 operations:
   image:
@@ -19,10 +21,48 @@ operations:
       reliability: reliable
       durability: volatile
     timeout_s: 10
+  geometry:
+    description: 'The active lens geometry: {} returns {streams: {color: descriptor}}, the
+      profile''s width, height, projection and distortion with the optical frame and a calibration_id.'
+    transport: service
+    direction: input
+    endpoint: /head_camera/geometry
+    type: kinex_interfaces/srv/Json
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: volatile
+    timeout_s: 10
+  unproject:
+    description: 'Pixels to optical rays through the lens: {stream, calibration_id, pixels:
+      [[u, v], ...]} returns {rays: [[x, y, 1], ...]}, null where invalid; at most 8192 pixels.'
+    transport: service
+    direction: input
+    endpoint: /head_camera/unproject
+    type: kinex_interfaces/srv/Json
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: volatile
+    timeout_s: 10
+  project:
+    description: 'Optical-frame points to pixels through the lens: {stream, calibration_id,
+      points: [[X, Y, Z], ...]} with Z > 0 returns {pixels: [[u, v], ...]}, null where invalid;
+      at most 8192 points.'
+    transport: service
+    direction: input
+    endpoint: /head_camera/project
+    type: kinex_interfaces/srv/Json
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: volatile
+    timeout_s: 10
   camera_info:
-    description: CameraInfo mirroring the profile, with K and P from color.projection, zero
-      plumb_bob distortion, image size and optical frame. Kinex reads camera geometry from
-      the profile, not from this topic; intrinsics are not TF transforms.
+    description: CameraInfo mirroring the profile, with K and P from color.projection, plumb_bob
+      distortion from color.distortion, image size and optical frame. Kinex reads camera geometry
+      from the profile and the geometry services, not from this topic; intrinsics are not
+      TF transforms.
     transport: topic
     direction: output
     endpoint: /head_camera/camera_info
@@ -50,11 +90,19 @@ color:
     model: pinhole
     fx: 463.393371582031
     fy: 463.001892089844
-    cx: 431.767272949219
-    cy: 239.918975830078
+    cx: 431.267272949219
+    cy: 239.418975830078
     skew: 0
   distortion:
-    model: none
+    model: opencv_brown_conrady
+    k1: 0.006466560531
+    k2: -0.047953009605
+    p1: -0.000352804054
+    p2: -0.000104829684
+    k3: 0.033223710954
+  fov:
+    horizontal_deg: 85.818468933895
+    vertical_deg: 54.848977765638
 frames:
   base:
     translation_m:

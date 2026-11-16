@@ -100,8 +100,9 @@ def test_cameras_render_the_contract_and_leave_physics_unchanged(sim):
         image = sim.render(camera)
         assert image.shape == (size[1], size[0], 3) and image.dtype == np.uint8 and image.std() > 1
         assert sim.intrinsics(camera)[:2] == size
-    # The head camera keeps its calibrated, off-center principal point.
-    assert sim.intrinsics("head_camera")[4:] == pytest.approx((431.767, 239.919), abs=1e-3)
+    # The head camera keeps its calibrated, off-center principal point, in ROS pixel centers.
+    assert sim.intrinsics("head_camera")[4:] == pytest.approx((431.267, 239.419), abs=1e-3)
+    assert set(sim.distortion) == {"head_camera"} and len(sim.distortion["head_camera"]) == 5
     for view in sim.spectators:
         assert sim.render_spectator(view.name).shape == (720, 960, 3)
         assert sim.spectator_intrinsics(view.name)[2:] == (479.5, 359.5)
@@ -145,6 +146,57 @@ def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
             measured = rt(*sim.camera_pose(camera))
             np.testing.assert_allclose(expected[0], measured[0], atol=1e-4)
             np.testing.assert_allclose(expected[1], measured[1], atol=1e-4)
+
+
+def lined_up(image, view, spectator_k, rays, size=96):
+    """Shifts (x, y, dx, dy) in pixels of a camera image's textured patches against its spectator view, an
+    undistorted pinhole at the same pose, resampled where rays (H x W x 3, the profile's) meet it."""
+    import cv2
+    fs, _, cx, cy = spectator_k
+    gray = lambda rgb: cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)  # noqa: E731
+    expected = cv2.remap(gray(view), (fs * rays[..., 0] + cx).astype(np.float32),
+                         (fs * rays[..., 1] + cy).astype(np.float32), cv2.INTER_LINEAR)
+    measured, window, shifts = gray(image), cv2.createHanningWindow((size, size), cv2.CV_32F), []
+    for y in range(0, measured.shape[0] - size + 1, size // 2):
+        for x in range(0, measured.shape[1] - size + 1, size // 2):
+            patch = measured[y:y + size, x:x + size].copy()
+            if patch.std() > 4:
+                (dx, dy), response = cv2.phaseCorrelate(expected[y:y + size, x:x + size].copy(), patch, window)
+                if response > .2:
+                    shifts.append((x + size / 2, y + size / 2, dx, dy))
+    return np.array(shifts)
+
+
+@requires_kinex
+def test_cameras_render_the_geometry_their_profiles_state(tmp_path, sim):
+    """Each image lines up with its undistorted spectator through the rays Kinex computes from the camera's
+    profile: locally for the wrists' pinholes, through the OpenCV adapter of the head camera's geometry node.
+    Without the head camera's lens, its edges miss by pixels."""
+    from kinex.lib.camera import rays
+    from kinex.lib.camera_geometry import OpenCVGeometry
+    rig = Rig(TASK, tmp_path, seed=0)
+    for camera, view in (("head_camera", "third_person"), ("left_camera", "left_wrist"),
+                         ("right_camera", "right_wrist")):
+        color = rig.profiles[camera]["color"]
+        width, height = color["width"], color["height"]
+        u, v = (grid.ravel() for grid in np.meshgrid(np.arange(width, dtype=float), np.arange(height, dtype=float)))
+        image, spectator = sim.render(camera), sim.render_spectator(view)
+        if color["distortion"]["model"] == "none":
+            through = rays(color, u, v)
+        else:
+            stream = {key: color[key] for key in ("width", "height", "projection", "distortion")}
+            through = np.asarray(OpenCVGeometry({**stream, "frame": f"{camera}/base"}).unproject(
+                np.column_stack([u, v]).tolist()))
+        shifts = lined_up(image, spectator, sim.spectator_intrinsics(view), through.reshape(height, width, 3))
+        size = np.hypot(shifts[:, 2], shifts[:, 3])
+        assert len(shifts) > 50 and np.median(size) < .3, camera
+        assert abs(shifts[:, 2].mean()) < .15 and abs(shifts[:, 3].mean()) < .15, camera  # principal point
+        if camera == "head_camera":
+            edges = np.abs(shifts[:, 0] - color["projection"]["cx"]) > 300
+            assert np.median(size[edges]) < .35
+            pinhole = lined_up(image, spectator, sim.spectator_intrinsics(view), rays(
+                {**color, "distortion": {"model": "none"}}, u, v).reshape(height, width, 3))
+            assert np.median(np.hypot(*pinhole[edges][:, 2:].T)) > 1.
 
 
 def test_episode_ends_at_its_step_limit_and_serves_one_episode(sim):

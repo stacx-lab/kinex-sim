@@ -8,7 +8,8 @@ native seed the launch's seed names (seeds.json). In the HELD tasks the left arm
 from pathlib import Path
 import sys
 
-from .cameras import CAMERAS, camera_seed, contract, lens, matrix_xyzw, mounts, offsets
+from rosbridge.catalog.cameras import clean, color
+from .cameras import CAMERAS, camera_seed, contract, distortion, lens, matrix_xyzw, mounts, offsets
 from .seeds import screened_seed
 
 PARENTS = {"head_camera": "world:base", "left_camera": "left_arm:palm", "right_camera": "right_arm:palm"}
@@ -19,14 +20,9 @@ HELD = ("eval_comb01_cover_pitcher_and_box", "eval_gen01_cover_lunchbox", "eval_
         "eval_gen06_spray_shoe", "eval_gen07_stack_boxes")
 
 
-def clean(value, digits=12):
-    value = round(float(value), digits)
-    return 0.0 if value == 0 else value
-
-
 def profiles(runtime, task, seed, catalog=None):
-    """Profile changes by device for a task and launch seed: each camera's color geometry and base frame, and in a
-    HELD task no command operations on the left arm and hand."""
+    """Profile changes by device for a task and launch seed: each camera's color geometry (its pinhole and lens)
+    and base frame, and in a HELD task no command operations on the left arm and hand."""
     source = Path(runtime) / "handson"
     if not (source / "handson/evaluation/camera_contracts.py").is_file():
         raise ValueError("HandsOn's cameras need its upstream source; run rosbridge prepare handson")
@@ -37,11 +33,11 @@ def profiles(runtime, task, seed, catalog=None):
     mount = mounts(value, offsets(task, camera_seed(task, native)))
     result = {}
     for device, role in CAMERAS.items():
-        width, height, fx, fy, cx, cy = lens(value["cameras"][role])
+        spec = value["cameras"][role]
+        geometry = color(*lens(spec), distortion(spec))
+        del geometry["fps"]  # null, which a merge patch would read as a removal
         result[device] = {
-            "color": {"width": width, "height": height,
-                      "projection": {"model": "pinhole", "fx": clean(fx), "fy": clean(fy), "cx": clean(cx),
-                                     "cy": clean(cy), "skew": 0}},
+            "color": geometry,
             "frames": {"base": {"translation_m": [clean(v) for v in mount[device][:3, 3]],
                                 "rotation_xyzw": [clean(v) for v in matrix_xyzw(mount[device][:3, :3])],
                                 "parent": PARENTS[device]}}}

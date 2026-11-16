@@ -227,11 +227,16 @@ never steps physics. A subscribed camera therefore samples at 2 Hz of simulation
 30 Hz. A new subscriber still gets the current frame at once, so a Kinex read (subscribe, take
 one frame, unsubscribe) renders the current step whenever it reads. The cameras are the
 evaluator's for the task and seed:
-- **Head camera:** the calibrated K of the Gemini 336 (854×480, fx 463.39, fy 463.00, an
-  off-center principal point (431.77, 239.92)), rendered with its lens distortion zeroed, so
-  its profile is an undistorted pinhole whose rays Kinex computes locally.
-- **Wrist cameras:** 848×480 on the palms (fx 272.14 left, 267.01 right), or both 269.56 in
-  `t05` and `t15`, whose camera profile is their own.
+- **Head camera:** the Gemini 336's calibration (854×480, fx 463.39, fy 463.00, an
+  off-center principal point) and lens, OpenCV's Brown-Conrady model (k1, k2, p1, p2, k3).
+  Its profile states the lens (`opencv_brown_conrady`) and field of view, and a Kinex node
+  in its device directory (`geometry.py`) serves `geometry`, `unproject` and `project`
+  through Kinex's OpenCV adapter; images stay as rendered.
+- **Wrist cameras:** undistorted pinholes of 848×480 on the palms (fx 272.14 left, 267.01
+  right), or both 269.56 in `t05` and `t15`, whose camera profile is their own.
+- **Principal points:** Isaac's lens places upstream's K with pixel corners at integers, so
+  each profile states K's principal point less half a pixel, in ROS pixel centers: (431.27,
+  239.42) for the head camera, the image center for the wrists.
 - **Mounts:** each episode draws an offset per camera from its camera seed (at most 2 mm and
   0.3° per axis), as the evaluator's capture does: the setting's camera seed for the 16 tasks
   with a setting, else the native seed. The head camera is fixed in the world and each wrist

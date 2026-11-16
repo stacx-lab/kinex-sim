@@ -14,8 +14,8 @@ An early-stop run ends where the evaluator ends a trial (evaluation/rollout.py):
 first success, or at a task failure the native environment or the evaluator reports.
 
 Cameras render through upstream's three-view capture as the evaluator renders them: the
-task's camera profile and the episode's drawn mount offsets (rosbridge_handson.cameras),
-with the head camera undistorted (its calibrated K kept).
+task's camera profile, with the head camera's calibrated lens, and the episode's drawn mount
+offsets (rosbridge_handson.cameras).
 """
 import json
 import os
@@ -28,7 +28,7 @@ import numpy as np
 from rosbridge.catalog import resolve
 from rosbridge.core import ActionLayout, CommandGroup
 from rosbridge.core.devices import device_inventory, spectator_views
-from .cameras import CAMERAS, OPENGL_TO_OPTICAL, camera_seed, contract, lens, offsets
+from .cameras import CAMERAS, OPENGL_TO_OPTICAL, camera_seed, contract, distortion, lens, offsets
 from .seeds import screened_seed
 
 SIDES = ("right", "left")
@@ -80,13 +80,10 @@ def hydra_texture(product):
 
 
 def activate_cameras(task):
-    """The task's camera contract, with the head camera undistorted, active for the episode."""
+    """The task's camera contract, active for the episode."""
     from handson.evaluation import camera_contracts
-    from handson.sim.isaaclab import calibrated_cameras
     value = contract(task)
     camera_contracts._active.set(value)  # authors the lens and checks it in render_probe, as use(task) does
-    profile = calibrated_cameras.profile  # checked by verify_environment
-    calibrated_cameras.profile = lambda: {**profile(), "runtime_D": [0.] * len(profile()["runtime_D"])}
     return value
 
 
@@ -182,6 +179,8 @@ class HandsOnSim:
                           HANDSON_ISAACLAB_REQUIRE_REAL_RECORDING_CAMERAS="1",
                           HANDSON_ISAACSIM_RENDERER_GPU=str(single_gpu()))
         self._contract = activate_cameras(self.task)
+        lenses = {camera: distortion(self._contract["cameras"][role]) for camera, role in CAMERAS.items()}
+        self.distortion = {camera: d for camera, d in lenses.items() if d is not None}
         install_launcher("physx")
         install_native_camera_creation(HandsOnABCIsaacLabEnv)
         self._adapter.prepare_cameras()

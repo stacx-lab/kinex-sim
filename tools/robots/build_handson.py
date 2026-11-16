@@ -22,7 +22,7 @@ import mujoco  # noqa: E402
 import rigs  # noqa: E402
 from handson.evaluation.camera_contracts import current  # noqa: E402
 from rosbridge_handson.backend import SIDES  # noqa: E402
-from rosbridge_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, lens  # noqa: E402
+from rosbridge_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, distortion, lens  # noqa: E402
 
 PACKAGE = ROOT / ".runtime/handson/handson/handson"
 
@@ -78,7 +78,8 @@ def main():
     devices["head_camera"] = rigs.camera(
         "head_camera",
         "Fixed RGB head camera above the station.", lens(spec),
-        rigs.pose_frame("world:base", np.asarray(spec["nominal_world_pose_opengl"]) @ OPENGL_TO_OPTICAL))
+        rigs.pose_frame("world:base", np.asarray(spec["nominal_world_pose_opengl"]) @ OPENGL_TO_OPTICAL),
+        distortion=distortion(spec))
     order = ["world", "right_arm", "right_hand", "left_arm", "left_hand",
              "head_camera", "left_camera", "right_camera"]
     rigs.write_rig(ROOT / "catalog/robots/handson/handson-rokae-wuji",

@@ -103,6 +103,7 @@ Nothing has been reported to HandsOn yet. Section 14 lists the reports worth fil
 | 11.3 | `eval_gen06` | The spray cone never rendered | prepared |
 | 11.4 | all | A three-view capture costs seconds; cameras sampled at 30 Hz | rosbridge |
 | 11.5 | `t49` | Collision-only grip boxes are invisible | open |
+| 11.6 | all | The head camera rendered without its lens; every principal point was half a pixel off | rosbridge |
 | 12.1 | all | No torsional friction at fingertips; default friction 1.0/0.8 | property |
 | 12.2 | all | Heavily damped PD arm drives | property |
 | 12.3 | all but `eval_flex01` | Stiff finger drives | property |
@@ -460,6 +461,23 @@ Each camera view is path-traced; a three-view capture costs about 4 s (3.7–7 s
 
 `sim/isaaclab/lw_native_articulation_scene.py:1416-1427` makes the grasp proxies collision-only and invisible, so the hand meets boxes it cannot see. *Read*. Status: open (minor).
 
+### 11.6 The head camera rendered without its lens; every principal point was half a pixel off
+
+Upstream renders the head camera through the Gemini 336's calibrated lens. Isaac's OpenCV lens schema carries the Brown-Conrady coefficients k1, k2, p1, p2 and k3; k4 to k6 are 0. rosbridge zeroed the lens so that Kinex could compute the camera's rays from its profile, which moved the image's edges by up to 4.3 px against the evaluator's. The lens schema also places every camera's principal point (upstream's K, authored by `sim/isaaclab/calibrated_cameras.py:apply_lens` on all three cameras) with pixel corners at integers, half a pixel from ROS and OpenCV pixel centers.
+
+*Measured* against an undistorted spectator at each camera's pose, by phase correlation of textured patches:
+
+- with the profiles' K as stated, the wrist images lay 0.37 px off in both axes, and so did the head image;
+- with half a pixel added to (cx, cy), the wrists' mean offset is below 0.04 px;
+- the head image's edges miss a pinhole by about 2 px, but line up with the calibrated lens within 0.3 px; scaling the lens by 0.8 or 1.2 fits worse.
+
+Status: rosbridge.
+- The head camera renders through its lens, as the evaluator does.
+- Its profile states the lens (`opencv_brown_conrady`) and its field of view, and its device's Kinex node serves `geometry`, `unproject` and `project` through Kinex's OpenCV adapter.
+- `camera_info` carries the same plumb_bob D.
+- Every profile's principal point is K's less half a pixel.
+- HandsOn's native suite checks all three cameras this way.
+
 ## 12. Properties to know
 
 ### 12.1 No torsional friction at fingertips, and default friction
@@ -519,6 +537,7 @@ None has been filed.
 | U14 | Instruction against checker: `t17` (disclosed), `eval_comb02`, `t37`'s label (7.1, 7.2, 7.4) | Read |
 | U15 | `eval_gen06`'s budget copied from `t50` (10.1) | `evaluation/budgets.json:309-313` |
 | U16 | `eval_comb06`'s stream drawn on a miss (9.2); `t49`'s invisible grip boxes (11.5) | A salt pour 8.6 cm off the axis draws into the pot |
+| U17 | `apply_lens` authors OpenCV's K on Isaac's lens schema, which places the principal point with pixel corners at integers: the cameras render half a pixel off their calibration (11.6) | Compare a camera with an undistorted pinhole at its pose |
 
 ## 15. Not investigated
 

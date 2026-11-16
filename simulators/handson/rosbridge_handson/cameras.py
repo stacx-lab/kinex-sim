@@ -4,7 +4,8 @@ The task's camera profile (evaluation/camera_contracts.py: select) gives each ca
 mount; t05 and t15 have a profile of their own. Each episode draws a small mount offset per camera
 (evaluation/camera_randomization.py: sample, at most 2 mm and 0.3 deg per axis) from its camera seed: the
 setting's camera seed for the 16 tasks with a setting, else the native seed (evaluation/native.py: run_episode).
-The head camera renders as an undistorted pinhole with its calibrated K, so Kinex computes its rays locally.
+The head camera renders through its calibrated lens, OpenCV's Brown-Conrady model, which its rig profile states and
+its camera node serves to Kinex; the wrist cameras are undistorted pinholes.
 """
 import numpy as np
 
@@ -25,18 +26,27 @@ def pose_matrix(position, quaternion_wxyz):
 
 
 def lens(spec):
-    """A contract camera's width, height, fx, fy, cx, cy: its native K, with the image's pixel centers."""
+    """A contract camera's width, height, fx, fy, cx, cy in ROS pixel coordinates, as it renders. Upstream authors
+    its K on Isaac's OpenCV lens (calibrated_cameras.apply_lens), which places the principal point with pixel
+    corners at integers: rendered against an undistorted pinhole at the same pose, every camera's image lies half
+    a pixel off its K in ROS (and OpenCV) pixel centers. So its principal point is K's less half a pixel."""
     (fx, _, cx), (_, fy, cy), _ = spec["K_effective"]
     width, height = spec["native_width_height"]
-    return width, height, float(fx), float(fy), float(cx), float(cy)
+    return width, height, float(fx), float(fy), float(cx) - .5, float(cy) - .5
+
+
+def distortion(spec):
+    """A contract camera's lens as OpenCV Brown-Conrady (k1, k2, p1, p2, k3), or None for an undistorted pinhole."""
+    d = [float(v) for v in spec["D_effective"]]
+    if any(d[5:]):
+        raise ValueError(f"lens {d} has rational terms; Kinex's OpenCV geometry takes k1, k2, p1, p2, k3")
+    return tuple(d[:5]) if any(d) else None
 
 
 def contract(task):
-    """The task's camera contract, with the head camera's distortion zeroed."""
+    """The task's camera contract."""
     from handson.evaluation import camera_contracts
     value, _ = camera_contracts.select(task)
-    main = value["cameras"]["main"]
-    main["D_effective"] = [0.] * len(main["D_effective"])
     return value
 
 

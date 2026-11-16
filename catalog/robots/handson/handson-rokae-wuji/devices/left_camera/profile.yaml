@@ -50,8 +50,8 @@ color:
     model: pinhole
     fx: 272.135223388672
     fy: 272.135223388672
-    cx: 424.0
-    cy: 240.0
+    cx: 423.5
+    cy: 239.5
     skew: 0
   distortion:
     model: none

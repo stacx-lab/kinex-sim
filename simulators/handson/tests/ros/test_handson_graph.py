@@ -78,6 +78,9 @@ def test_handson_graph_serves_the_kinex_devices_from_a_native_worker(tmp_path, m
         assert last["hand"].name[:4] == [f"right_finger1_joint{j}" for j in range(1, 5)]
         assert (last["info"].width, last["info"].height, last["info"].header.frame_id) == (
             854, 480, "head_camera/base")
+        # The head camera's lens, in ROS pixel centers.
+        assert last["info"].distortion_model == "plumb_bob" and last["info"].d[0] == pytest.approx(.00646656)
+        assert last["info"].k[2] == pytest.approx(431.267, abs=1e-3)
         assert (last["spectator"].width, last["spectator"].height) == (960, 720)
         assert last["palm"].header.frame_id == "left_arm/base" and list(last["palm"].joint_names) == ["palm"]
         goal, hand = pose(last["palm"]), list(last["hand"].position)
