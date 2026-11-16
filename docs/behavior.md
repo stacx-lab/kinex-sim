@@ -5,7 +5,9 @@ Isaac Sim 5.1 with BEHAVIOR's R1Pro, as the official evaluator configures it: de
 `base`, `torso`, `left_arm`, `right_arm`, `left_gripper`, `right_gripper` and RGB-D
 `head_camera`, `left_camera` and `right_camera`. Upstream is pinned to
 `a8247a8cc1633fe1ca0cc66aa07243d46c64f155`, as RoboEnv pins it. See the
-[design and CLI guide](README.md) for shared lifecycle and timing contracts.
+[design and CLI guide](README.md) for shared lifecycle and timing contracts, and [BEHAVIOR:
+known environment issues](behavior-known-issues.md) for what is known to be wrong or
+surprising in the activities, and which of it rosbridge changes.
 
 ```bash
 ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES rosbridge prepare behavior
@@ -55,6 +57,10 @@ Two of the rules OmniGibson judges by are patched:
 |---|---|---|
 | `0005-slicer-blade.patch` | A sliceable object is halved, and a half diced, when it touches any part of any slicer while any slicer of the scene is active. A slicer turns inactive after it touches whole food, and active again 2 s after it last touched whole food. | An object is cut by a slicer that is active, touches it and reaches it with its blade: the box of its slicer meta link, BEHAVIOR's cutting volume, where that link is at the step, 5 mm larger on every side. The slicer that cut turns inactive, and active again 2 s after it last touched whole or cut food. A slicer without such a meta link cuts with its whole body. |
 | `0006-projection-remover-margin.patch` | A particle remover by projection takes a visual particle whose centre lies inside its volume. | It takes one whose centre lies within 1 cm of its volume. |
+
+Both change what is judged, so on the activities they decide, results do not compare with
+the evaluator's ([known issues](behavior-known-issues.md), 5.1 and 5.2), and neither do
+`sweeping_garage`'s at the two seeds whose particles loading removes (6.1).
 
 Unpatched, a knife's handle cuts what it touches (`make_pizza` takes its dough and a
 pepperoni whole), an inactive knife cuts while another is active, and a knife lying on
