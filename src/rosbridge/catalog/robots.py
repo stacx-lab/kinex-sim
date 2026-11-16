@@ -4,8 +4,8 @@ Each robot is a complete workspace skeleton whose profiles carry its calibration
 Files shared by several robots are symlinks; export copies their content. A simulator
 whose devices differ by task or seed, such as HandsOn's cameras, names a `workspace`
 hook in its manifest: "module:function" under its python_path, called with its runtime
-directory, the native task and the seed, which returns profile changes by device as
-JSON merge patches (RFC 7386).
+directory, the native task, the seed and the robot's catalog profiles by device, which
+returns profile changes by device as JSON merge patches (RFC 7386).
 """
 import importlib
 from pathlib import Path
@@ -38,6 +38,12 @@ def merge(profile, changes):
             profile[key] = value
 
 
+def catalog_profiles(root, identifier):
+    """A catalog robot's device profiles by device name."""
+    devices = root / "catalog/robots" / identifier / "devices"
+    return {path.parent.name: yaml.safe_load(path.read_text()) for path in sorted(devices.glob("*/profile.yaml"))}
+
+
 def changes(root, config, task, seed):
     """The simulator's profile changes for a task and seed, by device; none without a workspace hook."""
     if not config.get("workspace"):
@@ -52,7 +58,7 @@ def changes(root, config, task, seed):
     finally:
         if added:
             sys.path.remove(path)
-    return hook(root / ".runtime" / config["name"], task["native_task"], seed)
+    return hook(root / ".runtime" / config["name"], task["native_task"], seed, catalog_profiles(root, task["robot"]))
 
 
 def setup(selection, directory=None, *, seed=None, project=None, domain_id=0):

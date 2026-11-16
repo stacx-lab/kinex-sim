@@ -24,7 +24,7 @@ def clean(value, digits=12):
     return 0.0 if value == 0 else value
 
 
-def profiles(runtime, task, seed):
+def profiles(runtime, task, seed, catalog=None):
     """Profile changes by device for a task and launch seed: each camera's color geometry and base frame, and in a
     HELD task no command operations on the left arm and hand."""
     source = Path(runtime) / "handson"
