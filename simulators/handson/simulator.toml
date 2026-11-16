@@ -1,7 +1,7 @@
 name = "handson"
 source = "third_party/handson"
 source_url = "https://github.com/TsinghuaC3I/HandsOn.git"
-source_revision = "fee28452fa50d3ee906445f1717ce2449cc83798"
+source_revision = "c9598b53fc2a01355e74837de397bd7b2b1ab602"
 patches = "patches/handson"
 python_path = "simulators/handson"
 # The installable package and its bundled assets live in the repository's handson/ directory.

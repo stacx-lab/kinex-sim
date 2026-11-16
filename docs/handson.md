@@ -3,7 +3,7 @@
 HandsOn runs its 66 dexterous-manipulation tasks on two ROKAE AR5 arms with Wuji hands
 in Isaac Sim 5.1 and Isaac Lab, as its official PhysX evaluator builds them: Core-50
 (`t01`–`t50`) and Transfer-16 (`eval_comb01..06`, `eval_gen01..07`, `eval_flex01..03`).
-Upstream is pinned to `fee28452fa50d3ee906445f1717ce2449cc83798`, with Isaac Lab v2.3.2
+Upstream is pinned to `c9598b53fc2a01355e74837de397bd7b2b1ab602`, with Isaac Lab v2.3.2
 (`isaac-sim/IsaacLab@37ddf626`) as a nested source. See the [design and CLI
 guide](README.md) for shared lifecycle and timing contracts.
 
@@ -137,6 +137,11 @@ interrupted screen; `--count` extends every task to more seeds and `--tasks` nar
 reset whose error is not a verdict runs once more, and a second error leaves its task
 incomplete. Each GPU starts one reset at a time, and only while it has `--min-free-gb` (22 GB)
 free. Every run's detail goes to `seeds.json.log.jsonl`, which is not committed.
+
+Upstream's leaderboard (`docs/leaderboard.md` at the pin) also ranks two prompted agents on a
+palm-and-finger interface like rosbridge's, GPT-6 and Fable 5.2, over ten fixed trials per
+task with a budget of model calls rather than steps. Its trials are not these seeds, so the
+two sets of results are not directly comparable.
 
 
 ## Devices

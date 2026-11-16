@@ -1,4 +1,4 @@
-# HandsOn's 66 evaluation tasks (handson/tasks/registry.py at fee28452): Core-50 (t01..t50) and
+# HandsOn's 66 evaluation tasks (handson/tasks/registry.py at c9598b53): Core-50 (t01..t50) and
 # Transfer-16 (eval_comb, eval_gen, eval_flex). Budgets are upstream's evaluation/budgets.json. A
 # seed k names the task's k-th native seed that tools/handson_seeds.py accepted (seeds.json); the
 # native seed derives the reset (and, for 16 Core tasks, a setting) as the official evaluator does.

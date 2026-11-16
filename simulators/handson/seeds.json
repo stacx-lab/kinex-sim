@@ -3,7 +3,7 @@
  "count": 10,
  "candidates": "0, 1, 2, ... in order",
  "drift_m": 0.02,
- "source_revision": "fee28452fa50d3ee906445f1717ce2449cc83798",
+ "source_revision": "c9598b53fc2a01355e74837de397bd7b2b1ab602",
  "gpu": "NVIDIA L40S",
  "tasks": {
   "eval_comb01_cover_pitcher_and_box": {
