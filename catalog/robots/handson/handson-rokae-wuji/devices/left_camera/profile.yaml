@@ -38,8 +38,7 @@ meta:
   updated_at: '2026-10-24T00:00:00Z'
 type: rgb
 layout: mono
-description: RGB camera on the left wrist, looking along the hand, rendered by HandsOn's RTX
-  capture. Calibration and the optical-frame mount on the left_arm palm are in the profile.
+description: RGB camera on the left wrist, looking along the hand.
 source: introspected
 calibrated_at: null
 method: introspection

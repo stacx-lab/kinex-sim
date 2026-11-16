@@ -20,17 +20,11 @@ operations:
       durability: transient_local
     timeout_s: 10
   pose_target:
-    description: 'Trajectory of palm poses in right_arm/base: header.frame_id right_arm/base,
-      joint_names [palm] and one transform per point, translation in metres and a unit quaternion
-      (xyzw), timed from receipt by strictly increasing time_from_start and finishing within
-      120 seconds; velocities and accelerations must be empty. A zero header stamp selects
-      now; a nonzero stamp must not start in the past. Poses are absolute, interpolated at
-      the native control period (positions linearly, rotations by slerp) from the held target,
-      or from the measured palm before the first command. HandsOn''s own arm IK (damped least
-      squares, one iteration per step from the measured joints) and the task''s palm limits
-      execute them, so a pose may be reached only in part or over several steps. Replacement
-      clears pending references; invalid trajectories are ignored, so verify the measured
-      palm on TF.'
+    description: 'Trajectory of absolute palm poses in right_arm/base: joint_names [palm],
+      one transform per point (metres, unit quaternion xyzw), time_from_start strictly increasing
+      and within 120 seconds; a zero header stamp starts it now. It is interpolated from the
+      current target. HandsOn''s own IK tracks it and may stop short of a pose. A new trajectory
+      replaces the active one and an invalid one is ignored; verify the palm on TF.'
     transport: topic
     direction: input
     endpoint: /right_arm/pose_target
@@ -41,8 +35,7 @@ operations:
       durability: volatile
     timeout_s: 10
   pose_state:
-    description: 'Measured palm pose in right_arm/base (joint_names [palm]), with the world-clock
-      acquisition stamp of joint_state: the pose TF gives right_arm/palm at that stamp.'
+    description: Measured palm pose in right_arm/base, stamped with joint_state.
     transport: topic
     direction: output
     endpoint: /right_arm/pose_state
@@ -68,11 +61,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: ROKAE AR5 seven-joint right arm of the HandsOn station. Geometry is the sibling
-  arm.urdf with palm (right_palm_link, the pose HandsOn's EEF52 actions command) as the tip
-  link; measured links are on TF as right_arm/<link>, and helpers.joint_model('right_arm')
-  computes FK/IK from it. Commands are palm poses, which HandsOn's own arm IK executes with
-  the task's palm limits, guards and drives; an arm not yet commanded holds its posture.
+description: Seven-joint ROKAE AR5 right arm, commanded by the pose of its tip link palm,
+  where the right hand is mounted.
 source: introspected
 calibrated_at: null
 method: introspection

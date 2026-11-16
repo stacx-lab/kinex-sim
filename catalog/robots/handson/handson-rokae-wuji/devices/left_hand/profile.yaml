@@ -55,12 +55,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: 'Wuji 20-joint left hand on the left_arm palm, finger-major from the thumb (finger1)
-  to the little finger (finger5), as HandsOn''s hand20 actions. Geometry is the sibling hand.urdf
-  from the palm to the fingertips, with no single tip link; commands are absolute joint positions
-  that the native controller slews toward, and contact is physical. The single-arm tasks eval_comb01,
-  eval_gen01, eval_gen03, eval_gen06, eval_gen07 hold the left arm and hand at home: their
-  workspaces declare no commands for them.'
+description: Wuji 20-joint left hand on the left_arm palm; finger1 is the thumb and finger5
+  the little finger.
 source: introspected
 calibrated_at: null
 method: introspection

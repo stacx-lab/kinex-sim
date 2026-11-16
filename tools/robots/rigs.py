@@ -77,8 +77,8 @@ def world(description):
 
 def joint(name, description, joints, home, base, *, units="radians", part="arm", tip="flange",
           model="arm.urdf", pose=None):
-    """A joint device; tip is its FK/IK link, None for trees such as hands. With pose, the device takes pose
-    targets of its tip, which pose says the simulator executes, instead of joint targets."""
+    """A joint device; tip is its FK/IK link, None for trees such as hands. With pose, a sentence on how the
+    simulator executes them, the device takes pose targets of its tip instead of joint targets."""
     count = len(joints)
     over = f"all {count} {part} joints" if count > 1 else f"the {part} joint"
     ops = {
@@ -90,18 +90,14 @@ def joint(name, description, joints, home, base, *, units="radians", part="arm",
     }
     if pose:
         ops["pose_target"] = operation(
-            f"Trajectory of {tip} poses in {name}/base: header.frame_id {name}/base, joint_names [{tip}] "
-            "and one transform per point, translation in metres and a unit quaternion (xyzw), timed "
-            "from receipt by strictly increasing time_from_start and finishing within 120 seconds; "
-            "velocities and accelerations must be empty. A zero header stamp selects now; a nonzero "
-            "stamp must not start in the past. Poses are absolute, interpolated at the native control "
-            "period (positions linearly, rotations by slerp) from the held target, or from the measured "
-            f"{tip} before the first command. {pose} Replacement clears pending references; invalid "
-            f"trajectories are ignored, so verify the measured {tip} on TF.",
+            f"Trajectory of absolute {tip} poses in {name}/base: joint_names [{tip}], one transform per "
+            "point (metres, unit quaternion xyzw), time_from_start strictly increasing and within 120 "
+            "seconds; a zero header stamp starts it now. It is interpolated from the current target. "
+            f"{pose} A new trajectory replaces the active one and an invalid one is ignored; verify "
+            f"the {tip} on TF.",
             "topic", "input", f"/{name}/pose_target", "trajectory_msgs/msg/MultiDOFJointTrajectory")
         ops["pose_state"] = operation(
-            f"Measured {tip} pose in {name}/base (joint_names [{tip}]), with the world-clock acquisition "
-            f"stamp of joint_state: the pose TF gives {name}/{tip} at that stamp.",
+            f"Measured {tip} pose in {name}/base, stamped with joint_state.",
             "topic", "output", f"/{name}/pose_state", "sensor_msgs/msg/MultiDOFJointState",
             qos(durability="transient_local"))
     else:
