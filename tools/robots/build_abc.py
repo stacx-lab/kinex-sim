@@ -1,7 +1,7 @@
 """Measure the ABC YAM rig from MuJoCo and write catalog/robots/abc/abc-yam.
 
 Run in the ABC environment after `rosbridge prepare abc`:
-    pixi run -e abc python tools/robots/build_abc.py
+    pixi run --frozen -e abc python tools/robots/build_abc.py
 """
 from pathlib import Path
 import sys

@@ -2,7 +2,7 @@
 
 Chains come from the embodiment URDF; mounts, wrist cameras and the TCP are
 measured in the live SAPIEN scene. Run after `rosbridge prepare robotwin`:
-    pixi run -e robotwin python tools/robots/build_robotwin.py
+    pixi run --frozen -e robotwin python tools/robots/build_robotwin.py
 """
 from pathlib import Path
 import sys

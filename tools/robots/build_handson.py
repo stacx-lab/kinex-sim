@@ -6,7 +6,7 @@ their nominal mounts: the head camera fixed in the world, each wrist camera on i
 setup changes them to the task's profile and the episode's drawn mounts (rosbridge_handson.workspace);
 the native test checks that workspace against the live Isaac scene. Runs in the native environment after
 `rosbridge prepare handson`:
-    pixi run -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
+    pixi run --frozen -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
         python tools/robots/build_handson.py
 """
 import ast

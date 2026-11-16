@@ -3,7 +3,7 @@
 Chains come from the composed G1 and Sharpa URDF (rosbridge_behavior.g1_model); the base
 footprint and the head camera mount are measured in the live OmniGibson scene. Runs in the
 native environment after `rosbridge prepare behavior-g1`:
-    pixi run -e behavior-g1-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior-g1 \
+    pixi run --frozen -e behavior-g1-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior-g1 \
         python tools/robots/build_behavior_g1.py
 """
 from pathlib import Path

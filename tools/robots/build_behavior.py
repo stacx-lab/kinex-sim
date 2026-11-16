@@ -2,7 +2,7 @@
 
 Chains come from the R1Pro URDF; the grasp frames and camera mounts are measured in the live
 OmniGibson scene. Runs in the native environment after `rosbridge prepare behavior`:
-    pixi run -e behavior-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior \
+    pixi run --frozen -e behavior-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior \
         python tools/robots/build_behavior.py
 """
 from pathlib import Path

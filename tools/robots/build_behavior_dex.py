@@ -5,7 +5,7 @@ The body is the R1Pro rig's (build_behavior.body): chains from the composed URDF
 the wrist cameras on the backs of the hands. Each hand is a Sharpa joint device on its arm's
 flange. Runs in the native environment after
 `rosbridge prepare behavior-dex`:
-    pixi run -e behavior-dex-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior-dex \
+    pixi run --frozen -e behavior-dex-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior-dex \
         python tools/robots/build_behavior_dex.py
 """
 from pathlib import Path

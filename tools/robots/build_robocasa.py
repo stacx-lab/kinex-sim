@@ -1,7 +1,7 @@
 """Measure the RoboCasa PandaOmron rig from MuJoCo and write catalog/robots/robocasa/robocasa-panda-omron.
 
 Run in the RoboCasa environment after `rosbridge prepare robocasa`:
-    pixi run -e robocasa python tools/robots/build_robocasa.py
+    pixi run --frozen -e robocasa python tools/robots/build_robocasa.py
 """
 from pathlib import Path
 import sys

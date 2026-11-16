@@ -2,7 +2,7 @@
 
 Chains come from the X5 URDF; mounts and cameras are measured in the live Isaac
 scene. Runs in the native environment after `rosbridge prepare robodojo`:
-    pixi run -e robodojo-native env PYTHONPATH=src:simulators/robodojo:.runtime/robodojo \
+    pixi run --frozen -e robodojo-native env PYTHONPATH=src:simulators/robodojo:.runtime/robodojo \
         python tools/robots/build_robodojo.py
 """
 from pathlib import Path
