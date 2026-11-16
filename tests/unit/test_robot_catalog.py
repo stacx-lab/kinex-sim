@@ -23,6 +23,8 @@ OPERATIONS = {
 # A joint device commanded by the pose of its one tip link serves pose_target in place of joint_target.
 POSE = {"joint_state": "sensor_msgs/msg/JointState", "pose_state": "sensor_msgs/msg/MultiDOFJointState",
         "pose_target": "trajectory_msgs/msg/MultiDOFJointTrajectory", "stop": "std_srvs/srv/Trigger"}
+# A camera rendered through a lens also serves its geometry, from a node that runs in Kinex.
+GEOMETRY = {op: "kinex_interfaces/srv/Json" for op in ("geometry", "unproject", "project")}
 WORLD = {"time": ("/clock", "rosgraph_msgs/msg/Clock"),
          "wait": ("/world/wait", "kinex_interfaces/srv/Wait"),
          "stop": ("/world/stop", "std_srvs/srv/Trigger")}
@@ -65,20 +67,26 @@ def test_every_rig_exports_unloaded_profiles_on_rosbridge_endpoints(tmp_path, id
         operations = POSE if "pose_target" in profile["operations"] else OPERATIONS.get(profile["type"])
         if operations is POSE:
             assert profile["type"] == "joint" and len(profile["model"]["tip_links"]) == 1
+        lens = profile["type"] in ("rgb", "rgbd") and profile["color"]["distortion"]["model"] != "none"
+        if lens:
+            assert profile["color"]["distortion"]["model"] == "opencv_brown_conrady" and profile["color"]["fov"]
+            operations = {**operations, **GEOMETRY}
         expected = WORLD if name == "world" else {
             op: (f"/{name}/{op}", kind) for op, kind in operations.items()}
         assert {op: (spec["endpoint"], spec["type"]) for op, spec in profile["operations"].items()} == expected
         assert all(isinstance(op["description"], str) and op["description"]
                    for op in profile["operations"].values())
         assert all("parent" in frame for frame in profile["frames"].values())
-        # Profiles borrow rosbridge's endpoints; only URDF link publishers run in Kinex.
-        nodes = ([{"entry": "links.py", "factory": "create"}]
-                 if profile["type"] in ("joint", "gripper") else [])
+        # Profiles borrow rosbridge's endpoints; only URDF link publishers and lens geometry run in Kinex.
+        entry = "links.py" if profile["type"] in ("joint", "gripper") else "geometry.py" if lens else None
+        nodes = [{"entry": entry, "factory": "create"}] if entry else []
         assert profile["runtime"]["nodes"] == nodes
         for node in nodes:
             exported = root / "devices" / name / node["entry"]
-            assert not exported.is_symlink() and "LinkPublisher(profile, context" in exported.read_text()
-            assert (root / "devices" / name / profile["model"]["path"]).is_file()
+            marker = {"links.py": "LinkPublisher(profile, context", "geometry.py": "serve_geometry(node, profile"}
+            assert not exported.is_symlink() and marker[node["entry"]] in exported.read_text()
+            if "model" in profile:
+                assert (root / "devices" / name / profile["model"]["path"]).is_file()
     assert not any(root.rglob("*.pyc")) and not any(path.is_symlink() for path in root.rglob("*"))
     assert result["robot"] == identifier and result["task"] == task_of(identifier)
     with pytest.raises(ValueError, match="already contains"), \

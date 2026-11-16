@@ -58,11 +58,12 @@ def depth_image(t, frame, metres):
     return msg
 
 
-def camera_info(t, frame, width, height, fx, fy, cx, cy):
+def camera_info(t, frame, width, height, fx, fy, cx, cy, distortion=None):
+    """distortion: the lens's plumb_bob (k1, k2, p1, p2, k3); None is an undistorted pinhole."""
     from sensor_msgs.msg import CameraInfo
     msg = CameraInfo(width=width, height=height, distortion_model="plumb_bob")
     msg.header.stamp, msg.header.frame_id = t, frame
-    msg.d = [0.0] * 5
+    msg.d = [float(v) for v in distortion] if distortion is not None else [0.0] * 5
     msg.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
     msg.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
     msg.p = [fx, 0.0, cx, 0.0, 0.0, fy, cy, 0.0, 0.0, 0.0, 1.0, 0.0]

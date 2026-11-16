@@ -56,10 +56,15 @@ simulation time, or the simulator's own rate, 2 Hz for HandsOn), and at once for
 new subscriber, so a Kinex read (`helpers.camera_frame`, snapshots) gets
 the current frame even in a paused stepped world.
 
-Camera profiles declare undistorted pinhole intrinsics (`distortion: {model: none}`),
-so Kinex derives FOV and computes rays locally; cameras serve no geometry
-services. `camera_info` mirrors the profile and is not a geometry source. `fps` is
-null because frames render on demand rather than at a fixed rate.
+Camera profiles declare pinhole intrinsics in ROS pixel centers. A camera rendered
+as an undistorted pinhole declares `distortion: {model: none}`, and Kinex derives
+its FOV and computes its rays locally. A camera its evaluator renders through a lens
+(HandsOn's head camera) declares the lens as OpenCV's Brown-Conrady model
+(`opencv_brown_conrady`: k1, k2, p1, p2, k3) and its FOV. A Kinex node in its device
+directory (`geometry.py`) serves `geometry`, `unproject` and `project` through Kinex's
+`OpenCVGeometry`, and images stay as rendered. `camera_info` mirrors the profile, its
+plumb_bob D included, and is not a geometry source. `fps` is null because frames
+render on demand rather than at a fixed rate.
 
 The simulator publishes state and measurements without TF. Kinex computes FK/IK
 from the arm URDF, publishes calibrated mounts and fixed frames such as

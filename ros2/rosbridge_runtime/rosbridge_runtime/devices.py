@@ -181,7 +181,9 @@ class Camera:
             self.depth.publish(self.render_depth(stamp))
 
     def publish(self, stamp):
-        self.info.publish(conv.camera_info(stamp, self.frame, *self.node.sim.intrinsics(self.spec.source)))
+        sim = self.node.sim
+        lens = getattr(sim, 'distortion', {}).get(self.spec.source)
+        self.info.publish(conv.camera_info(stamp, self.frame, *sim.intrinsics(self.spec.source), lens))
         self.send(stamp)
 
     def matched(self, status):

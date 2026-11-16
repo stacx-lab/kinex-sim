@@ -10,6 +10,8 @@ import math
 import numpy as np
 import yaml
 
+from rosbridge.catalog import cameras
+
 CREATED = "2026-10-24T00:00:00Z"
 LINKS = '''"""Publish the device's URDF links on TF from measured joint states."""
 from pathlib import Path
@@ -20,6 +22,20 @@ from kinex.node import LinkPublisher
 def create(profile, context):
     return LinkPublisher(profile, context, Path(__file__).parent)
 '''
+GEOMETRY = '''"""Serve the camera's lens geometry from its profile; Kinex computes undistorted pinholes' rays itself."""
+from rclpy.node import Node
+
+from kinex.lib.camera_geometry import OpenCVGeometry, serve_geometry
+from kinex.node import node_name
+
+
+def create(profile, context):
+    node = Node(node_name(profile, "geometry"), context=context)
+    color = {key: profile["color"][key] for key in ("width", "height", "projection", "distortion")}
+    serve_geometry(node, profile, {"color": OpenCVGeometry({**color, "frame": f"{profile['name']}/base"})})
+    return node
+'''
+NODES = {"links.py": LINKS, "geometry.py": GEOMETRY}
 
 
 def qos(reliability="reliable", durability="volatile"):
@@ -172,15 +188,12 @@ def locomotion(name, description, axes, base, *, timeout_s, units="normalized"):
                   frames={"base": base})
 
 
-def camera(name, description, intrinsics, base, depth_range=None):
-    width, height, *pinhole = intrinsics
-    fx, fy, cx, cy = map(float, pinhole)
-    # Undistorted pinhole: Kinex derives FOV and rays from the profile, so cameras serve no
-    # geometry services. fps is null: frames render on demand at camera samples.
-    color = {"width": width, "height": height, "fps": None,
-             "projection": {"model": "pinhole", "fx": clean(fx), "fy": clean(fy), "cx": clean(cx),
-                            "cy": clean(cy), "skew": 0},
-             "distortion": {"model": "none"}}
+def camera(name, description, intrinsics, base, depth_range=None, distortion=None):
+    """An RGB or RGB-D camera; distortion is its lens's OpenCV Brown-Conrady (k1, k2, p1, p2, k3), or None for
+    an undistorted pinhole. Kinex derives an undistorted pinhole's FOV and rays from the profile; a distorted
+    camera's node serves its geometry (GEOMETRY)."""
+    width, height = intrinsics[:2]
+    color = cameras.color(*intrinsics, distortion)
     rgbd = depth_range is not None
     ops = {
         "image": operation(
@@ -196,11 +209,29 @@ def camera(name, description, intrinsics, base, depth_range=None):
             "missing or out-of-range samples. Rendered with its image: same stamp and frame_id, "
             "so pair the two by stamp.", "topic", "output", f"/{name}/depth",
             "sensor_msgs/msg/Image")
-    ops["camera_info"] = operation(
-        "CameraInfo mirroring the profile, with K and P from color.projection, zero plumb_bob "
-        "distortion, image size and optical frame. Kinex reads camera geometry from the profile, "
-        "not from this topic; intrinsics are not TF transforms.", "topic", "output",
-        f"/{name}/camera_info", "sensor_msgs/msg/CameraInfo", qos(durability="transient_local"))
+    if distortion is None:
+        info = ("CameraInfo mirroring the profile, with K and P from color.projection, zero plumb_bob "
+                "distortion, image size and optical frame. Kinex reads camera geometry from the profile, "
+                "not from this topic; intrinsics are not TF transforms.")
+    else:
+        info = ("CameraInfo mirroring the profile, with K and P from color.projection, plumb_bob "
+                "distortion from color.distortion, image size and optical frame. Kinex reads camera "
+                "geometry from the profile and the geometry services, not from this topic; intrinsics are "
+                "not TF transforms.")
+        for operation_name, text in (
+                ("geometry", "The active lens geometry: {} returns {streams: {color: descriptor}}, the "
+                             "profile's width, height, projection and distortion with the optical frame and "
+                             "a calibration_id."),
+                ("unproject", "Pixels to optical rays through the lens: {stream, calibration_id, pixels: "
+                              "[[u, v], ...]} returns {rays: [[x, y, 1], ...]}, null where invalid; at most "
+                              "8192 pixels."),
+                ("project", "Optical-frame points to pixels through the lens: {stream, calibration_id, "
+                            "points: [[X, Y, Z], ...]} with Z > 0 returns {pixels: [[u, v], ...]}, null "
+                            "where invalid; at most 8192 points.")):
+            ops[operation_name] = operation(text, "service", "input", f"/{name}/{operation_name}",
+                                            "kinex_interfaces/srv/Json")
+    ops["camera_info"] = operation(info, "topic", "output", f"/{name}/camera_info",
+                                   "sensor_msgs/msg/CameraInfo", qos(durability="transient_local"))
     facts = {"color": color}
     if rgbd:
         near, far = depth_range
@@ -209,7 +240,8 @@ def camera(name, description, intrinsics, base, depth_range=None):
                           "scale_m_per_unit": 0.001, "invalid_value": 0, "valid_range_m": span,
                           "reliable_range_m": dict(span), "registration": "color"}
     facts["frames"] = {"base": base}
-    return device(name, "rgbd" if rgbd else "rgb", description, ops, layout=None if rgbd else "mono", **facts)
+    return device(name, "rgbd" if rgbd else "rgb", description, ops, layout=None if rgbd else "mono",
+                  nodes=() if distortion is None else ("geometry.py",), **facts)
 
 
 def workspace(identifier, name, kind, model):
@@ -435,7 +467,8 @@ def source_tree(source, root, name, comment):
 
 
 def write_rig(directory, manifest, devices, files=None):
-    """devices: name -> profile; files: relative path -> text, for URDFs and link publishers."""
+    """devices: name -> profile; files: relative path -> text, for URDFs. Each device's nodes are written from
+    NODES."""
     directory = Path(directory)
     (directory / "devices").mkdir(parents=True, exist_ok=True)
     (directory / "workspace.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
@@ -443,7 +476,7 @@ def write_rig(directory, manifest, devices, files=None):
         folder = directory / "devices" / name
         folder.mkdir(exist_ok=True)
         (folder / "profile.yaml").write_text(yaml.safe_dump(profile, sort_keys=False, width=88))
-        if profile["runtime"]["nodes"]:
-            (folder / "links.py").write_text(LINKS)
+        for node in profile["runtime"]["nodes"]:
+            (folder / node["entry"]).write_text(NODES[node["entry"]])
     for path, text in (files or {}).items():
         (directory / path).write_text(text)

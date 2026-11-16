@@ -93,6 +93,12 @@ class SimulatorBackend(Protocol):
     subscribed camera renders (default 30), for a simulator whose renders are
     expensive. A new subscriber still gets a frame at once.
 
+    Optionally, distortion maps a camera to the OpenCV Brown-Conrady lens
+    (k1, k2, p1, p2, k3) its images render through, as its evaluator renders
+    them; a camera it does not name renders as an undistorted pinhole. The
+    camera's CameraInfo carries it, and its rig's profile and geometry node
+    state the same lens (tools/robots/rigs.py: camera).
+
     Optionally, measures() returns the backend's own measures of the episode as
     JSON fields, such as BEHAVIOR's q_score; the episode record adds them.
     """
