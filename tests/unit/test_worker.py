@@ -118,7 +118,7 @@ def test_worker_dies_with_its_proxy_process():
         try:
             if open(f"/proc/{child}/stat").read().split()[2] == "Z":
                 return
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):  # it exited meanwhile
             return
         time.sleep(.05)
     raise AssertionError("worker outlived its proxy process")
