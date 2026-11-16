@@ -1,7 +1,7 @@
 # Design and usage
 
 rosbridge exposes public robotics simulators, currently ABC, LIBERO, RoboTwin,
-RoboDojo, RoboCasa, BEHAVIOR and HandsOn, as managed ROS 2 graphs that speak Kinex's device contract. It uses native ROS topics and
+RoboDojo, RoboCasa, BEHAVIOR, HandsOn and BiDex-100, as managed ROS 2 graphs that speak Kinex's device contract. It uses native ROS topics and
 services, with no HTTP or WebSocket bridge. The command-line environment stays
 separate from simulator environments.
 
@@ -274,6 +274,7 @@ pixi run --frozen -e behavior-native smoke && pixi run --frozen -e behavior test
 pixi run --frozen -e behavior-g1-native smoke && pixi run --frozen -e behavior-g1 test-ros
 pixi run --frozen -e behavior-dex-native smoke && pixi run --frozen -e behavior-dex test-ros
 pixi run --frozen -e handson-native smoke && pixi run --frozen -e handson test-ros
+pixi run --frozen -e bidex smoke && pixi run --frozen -e bidex test-ros
 pixi run --frozen -e abc python -m pytest -q tests/integration
 rosbridge demo abc
 rosbridge demo libero --execution-mode realtime
@@ -284,6 +285,7 @@ rosbridge demo behavior --timeout 1800
 rosbridge demo behavior-g1 --timeout 1800
 rosbridge demo behavior-dex --timeout 1800
 rosbridge demo handson --timeout 1800
+rosbridge demo bidex
 ```
 
 Kinex-backed checks (rig geometry against each simulator, Kinex client tests)
@@ -299,9 +301,9 @@ Unit tests cover the command buffer, scheduling, the robot catalog, source
 preparation and caches. Native checks compare actions and timing with upstream and
 verify spectator state/image isolation. ROS checks verify the device endpoints,
 waits, stops and spectator streams in both modes on the synthetic backend,
-ABC, LIBERO, RoboTwin and RoboCasa, and RoboDojo, BEHAVIOR and HandsOn through their native workers.
+ABC, LIBERO, RoboTwin, RoboCasa and BiDex-100, and RoboDojo, BEHAVIOR and HandsOn through their native workers.
 Integration checks exercise actual CLI runs, two domains, failure
 cleanup, foreground/detached shutdown and MP4/MCAP recording. Skipped checks are
 not validation evidence. See [ABC](abc.md), [LIBERO](libero.md), [RoboTwin](robotwin.md),
-[RoboDojo](robodojo.md), [RoboCasa](robocasa.md), [BEHAVIOR](behavior.md) and [HandsOn](handson.md)
+[RoboDojo](robodojo.md), [RoboCasa](robocasa.md), [BEHAVIOR](behavior.md), [HandsOn](handson.md) and [BiDex-100](bidex.md)
 for device maps.
