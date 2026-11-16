@@ -1,4 +1,4 @@
-"""BEHAVIOR's official evaluation episode for any embodiment; runs in the native worker.
+"""BEHAVIOR's official evaluation episode on the R1Pro; runs in the native worker.
 
 Follows OmniGibson's eval/evaluator.py and eval/eval.py for one environment: the activity's
 scene with the evaluator's rooms and transition rules, a horizon of 1.5 average human
@@ -84,15 +84,15 @@ def remove_particles_out(scene, rooms):
     return removed
 
 
-def data_root(simulator):
-    return project_root() / ".runtime" / simulator / "datasets"
+def data_root():
+    return project_root() / ".runtime/behavior/datasets"
 
 
-def boot(simulator):
+def boot():
     """Configure OmniGibson before Kit starts: prepared data, headless Kit on one GPU."""
     from rosbridge.core.gpu import single_gpu
 
-    os.environ.update(OMNIGIBSON_DATA_PATH=str(data_root(simulator)), OMNIGIBSON_HEADLESS="1",
+    os.environ.update(OMNIGIBSON_DATA_PATH=str(data_root()), OMNIGIBSON_HEADLESS="1",
                       OMNIGIBSON_GPU_ID="0", OMNIGIBSON_RENDER_GPU=str(single_gpu()))
     os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
     from omnigibson.macros import gm
@@ -107,7 +107,7 @@ def boot(simulator):
 class Episode:
     """One activity's environment; Isaac hosts one per process."""
 
-    def __init__(self, task, embodiment, max_steps=None):
+    def __init__(self, task, r1pro, max_steps=None):
         import omnigibson as og
         from omnigibson.eval.utils.eval_utils import (
             EVAL_TIMEOUT_MULTIPLIER, TASK_NAMES_TO_ROOMS, generate_basic_environment_config)
@@ -118,26 +118,21 @@ class Episode:
         task_cfg = yaml.safe_load((metadata / "available_tasks.yaml").read_text())[task][0]
         cfg = generate_basic_environment_config(task_name=task, task_cfg=task_cfg)
         cfg["scene"]["load_room_instances"] = TASK_NAMES_TO_ROOMS[task]  # partial_scene_load
-        # The evaluator's timeout counts its own steps; an embodiment at another rate gets the same time.
-        rate = embodiment.frequencies["action_frequency"] / cfg["env"]["action_frequency"]
-        cfg["env"].update(embodiment.frequencies)
-        robot = embodiment.robot_config()
-        position, orientation = embodiment.start_pose({"position": task_cfg["robot_start_position"],
-                                                       "orientation": task_cfg["robot_start_orientation"]})
-        robot["position"], robot["orientation"] = values(position).tolist(), values(orientation).tolist()
+        robot = r1pro.robot_config()
+        robot["position"] = values(task_cfg["robot_start_position"]).tolist()
+        robot["orientation"] = values(task_cfg["robot_start_orientation"]).tolist()
         cfg["robots"] = [robot]
-        cfg["task"]["presampled_pose_key"] = embodiment.pose_key
         # load() places the robot at the instance's presampled pose, as the evaluator does, and the
-        # scene's initial state keeps it; the task must not move a pelvis-rooted G1 to the floor.
+        # scene's initial state keeps it.
         cfg["task"]["use_presampled_robot_pose"] = False
-        self.max_steps = max_steps or int(load_human_stats(task)["length"] * EVAL_TIMEOUT_MULTIPLIER * rate)
+        self.max_steps = max_steps or int(load_human_stats(task)["length"] * EVAL_TIMEOUT_MULTIPLIER)
         cfg["task"]["termination_config"]["max_steps"] = self.max_steps
-        self.task, self.embodiment = task, embodiment
+        self.task = task
         self.env = og.Environment(configs=cfg)
         if self.env.num_envs != 1 or len(self.env.scene.robots) != 1:
             raise ValueError("BEHAVIOR episodes hold one scene with one robot")
         self.robot = self.env.scene.robots[0]
-        embodiment.configure(self.robot)
+        r1pro.configure(self.robot)
         # Physics views must exist before the first load reads or restores robot joint state.
         og.sim.update_handles()
         # The robot cannot pass a door onto a room without its floor: such doors are closed and locked.
@@ -173,9 +168,8 @@ class Episode:
         scope = task.object_scopes[0]
         for key, state in recursively_convert_to_torch(json.loads(Path(path).read_text())).items():
             if key == "robot_poses":
-                pose = get_presampled_robot_poses(state, robot_model=robot.model,
-                                                  pose_key=self.embodiment.pose_key)[0]
-                robot.set_position_orientation(*self.embodiment.start_pose(pose), frame="scene")
+                pose = get_presampled_robot_poses(state, robot_model=robot.model)[0]
+                robot.set_position_orientation(pose["position"], pose["orientation"], frame="scene")
                 scene.write_task_metadata(key=key, data=state)
             else:
                 scope[key].load_state(state, serialized=False)

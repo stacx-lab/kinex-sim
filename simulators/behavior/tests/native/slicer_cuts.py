@@ -16,7 +16,7 @@ import numpy as np
 
 from rosbridge_behavior.environment import boot, rotation, values
 
-boot("behavior")
+boot()
 import omnigibson as og  # noqa: E402
 import torch as th  # noqa: E402
 from omnigibson.object_states import SlicerActive  # noqa: E402

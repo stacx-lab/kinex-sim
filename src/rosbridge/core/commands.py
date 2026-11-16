@@ -6,9 +6,9 @@ import numpy as np
 
 # A base stops this long in world time after its last velocity command (Kinex locomotion watchdog).
 VELOCITY_TIMEOUT_S = 0.5
-# Targets this close outside a limit (rad or m) are held at it, not refused. Measured positions sit past their limits
-# (Sharpa hand joints driven to them read up to 1e-6 rad beyond; 5e-4 rad was seen on a Sharpa pinky), so a client that
-# sends a measured posture back, or interpolates and rounds past a limit, sends a valid target.
+# Targets this close outside a limit (rad or m) are held at it, not refused. Measured positions can sit slightly past
+# their limits, so a client that sends a measured posture back, or interpolates and rounds past a limit, sends a valid
+# target.
 LIMIT_TOLERANCE = 1e-3
 
 

@@ -6,7 +6,7 @@ import sys
 
 from rosbridge_behavior.environment import boot
 
-boot("behavior")
+boot()
 import omnigibson as og  # noqa: E402
 import torch as th  # noqa: E402
 

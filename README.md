@@ -20,7 +20,7 @@ rosbridge launch abc --execution-mode stepped --record ./recordings/abc
 - [RoboTwin devices, assets and examples](docs/robotwin.md)
 - [RoboDojo devices, native worker and examples](docs/robodojo.md)
 - [RoboCasa mobile manipulator, assets and examples](docs/robocasa.md)
-- [BEHAVIOR household activities with the R1Pro, the R1Pro with Sharpa hands, or a G1 with Sharpa hands](docs/behavior.md)
+- [BEHAVIOR household activities with the R1Pro](docs/behavior.md)
 - [HandsOn dexterous manipulation with two ROKAE arms and Wuji hands](docs/handson.md)
 - [BiDex-100 bimanual dexterous manipulation with Franka or Astribot arms and Sharpa hands](docs/bidex.md)
 - [Kinex device contract and robot catalog](docs/kinex.md)

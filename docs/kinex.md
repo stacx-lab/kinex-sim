@@ -30,18 +30,15 @@ command arms with absolute native joint positions and grippers with the same
 normalized value they were trained on. RoboCasa's grip joint `gripper` is robosuite's
 integrated command, limits [-1, 1] with `open: -1` and `closed: 1`, which its finger
 joints mimic from their actuator ranges. BEHAVIOR's R1Pro grip joint `<side>_gripper`
-is the evaluator's smooth command, limits [-1, 1] with `open: 1` and `closed: -1`. The
-Sharpa hands, on the G1 and on the R1Pro of `behavior-dex`, are `joint` devices: 22
-commanded joints each and no tip link. HandsOn's Wuji hands are `joint` devices of 20 joints
-on their arm's `palm`, the tip link of each ROKAE arm and the frame HandsOn's palm-pose
-actions command. BiDex-100's Sharpa hands are `joint` devices of 22 joints on their arm's
+is the evaluator's smooth command, limits [-1, 1] with `open: 1` and `closed: -1`.
+HandsOn's Wuji hands are `joint` devices of 20 joints on their arm's `palm`, the tip link
+of each ROKAE arm and the frame HandsOn's palm-pose actions command. BiDex-100's Sharpa hands are `joint` devices of 22 joints on their arm's
 `flange`; as BiDex's evaluator does, rosbridge passes their targets and the arms' to MuJoCo's
 actuators unchanged, which bound them.
 
 A base is a Kinex `locomotion` device in the single mode `drive`: `velocity`
 declares the commandable axes in native units (RoboCasa and BEHAVIOR's R1Pro:
-normalized `vx`, `vy`, `wz`, also with Sharpa hands; the BEHAVIOR G1: `vx`, `vy`, `wz` in m/s and rad/s within
-GR00T's navigation limits), the base stops 0.5 s of world time after the last twist, and `odometry`
+normalized `vx`, `vy`, `wz`), the base stops 0.5 s of world time after the last twist, and `odometry`
 reports the twist in `<base>/base` with a pose in `<base>/odom` relative to the
 episode start. Its `frames.base` is an unlocalized root; a mobile rig chains its
 other devices from it (`torso` on `base:base`, the arm on `torso:top`).
@@ -72,8 +69,7 @@ from the arm URDF, publishes calibrated mounts and fixed frames such as
 
 `rosbridge robots list` lists every rig. Builders in `tools/robots` measure each
 rig from its simulator (`build_abc.py`, `build_robotwin.py`, `build_robodojo.py`,
-`build_robocasa.py`, `build_behavior.py`, `build_behavior_g1.py`, `build_behavior_dex.py`,
-`build_handson.py`, `build_bidex.py`);
+`build_robocasa.py`, `build_behavior.py`, `build_handson.py`, `build_bidex.py`);
 native geometry tests check the exported profiles with Kinex's own FK against the
 simulator.
 
@@ -84,8 +80,6 @@ simulator.
 | `robodojo/robodojo-arx-x5` | `left_arm`, `right_arm` (ARX X5, both `joint1..6`), normalized grippers, RGB `head_camera`, `left_camera`, `right_camera` | 42 |
 | `robocasa/robocasa-panda-omron` | `base` (Omron, locomotion), `torso` (lift), `arm` (Panda, `robot0_joint1..7`), integrated-command `gripper`, RGB-D `camera_left`, `camera_right`, `camera_wrist` | 365 |
 | `behavior/behavior-r1pro` | `base` (holonomic, locomotion), `torso` (`torso_joint1..4`), `left_arm`, `right_arm` (`<side>_arm_joint1..7`), smooth grippers, RGB-D `head_camera` (720²), `left_camera`, `right_camera` (480²) | 100 |
-| `behavior-g1/behavior-g1-sharpa` | `base` (legged, locomotion), `torso` (waist), `left_arm`, `right_arm` (G1, 7 joints), `left_hand`, `right_hand` (Sharpa Wave, 22 joints), RGB-D `head_camera` | 100 |
-| `behavior-dex/behavior-r1pro-sharpa` | `base` (holonomic, locomotion), `torso` (`torso_joint1..4`), `left_arm`, `right_arm` (`<side>_arm_joint1..7`), `left_hand`, `right_hand` (Sharpa Wave, 22 joints, in place of the grippers), RGB-D `head_camera` (720²), `left_camera`, `right_camera` (480², on the backs of the hands) | 100 |
 | `handson/handson-rokae-wuji` | `right_arm`, `left_arm` (ROKAE AR5, `joint1..7_<side>`, tip `palm`), `right_hand`, `left_hand` (Wuji, `<side>_finger1..5_joint1..4`), RGB `head_camera` (854×480), `left_camera`, `right_camera` (848×480, on the palms) | 66 |
 | `bidex/bidex-fr3v2-sharpa-tabletop`, `bidex/bidex-fr3v2-sharpa-dexjoco` | `right_arm`, `left_arm` (Franka FR3v2, `<side>_fr3v2_joint1..7`), `right_hand`, `left_hand` (Sharpa Wave, 22 joints), RGB-D `head_camera`, `left_camera`, `right_camera` (480×360, on the flanges); the two differ in the base pose | 152, 40 |
 | `bidex/bidex-astribot-s1-sharpa` | `right_arm`, `left_arm` (Astribot S1, `astribot_arm_<side>_joint_1..7`), `right_hand`, `left_hand` (Sharpa Wave, 22 joints), RGB-D `head_camera` (in the head), `left_camera`, `right_camera` (480×360, on the flanges) | 20 |

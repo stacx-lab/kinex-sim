@@ -32,7 +32,7 @@ rosbridge = { path = ".", editable = true }
 MUJOCO_GL = "egl"
 
 [tasks]
-test = "python -m pytest -q tests/unit simulators/abc/tests/unit simulators/libero/tests/unit simulators/robotwin/tests/unit simulators/robodojo/tests/unit simulators/robocasa/tests/unit simulators/behavior/tests/unit simulators/behavior-g1/tests/unit simulators/behavior-dex/tests/unit simulators/handson/tests/unit simulators/bidex/tests/unit"
+test = "python -m pytest -q tests/unit simulators/abc/tests/unit simulators/libero/tests/unit simulators/robotwin/tests/unit simulators/robodojo/tests/unit simulators/robocasa/tests/unit simulators/behavior/tests/unit simulators/handson/tests/unit simulators/bidex/tests/unit"
 
 [feature.abc.pypi-dependencies]
 mujoco = "~=3.8.0"
@@ -242,21 +242,11 @@ zarr = "==2.18.7"
 [feature.handson-native.tasks]
 smoke = "env PYTHONPATH=src:simulators/handson:.runtime/handson python -m pytest -q -p no:cacheprovider simulators/handson/tests/native"
 
-# BEHAVIOR's world nodes: the shared ROS environment plus their tasks. OmniGibson runs in a
-# separate Python 3.11 interpreter (rosbridge.core.worker): behavior-native for the R1Pro,
-# behavior-g1-native for the G1 with Sharpa hands and behavior-dex-native for the R1Pro with
-# Sharpa hands, so each has its own editable OmniGibson.
+# BEHAVIOR's world node: the shared ROS environment plus its tasks. OmniGibson runs in a separate
+# Python 3.11 interpreter, behavior-native (rosbridge.core.worker).
 [feature.behavior.tasks]
 build = "python -m rosbridge.provisioning.workspace --simulator behavior"
 test-ros = "bash -c 'source .workspaces/behavior/install/local_setup.bash && python -m pytest -q simulators/behavior/tests/ros'"
-
-[feature.behavior-g1.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator behavior-g1"
-test-ros = "bash -c 'source .workspaces/behavior-g1/install/local_setup.bash && python -m pytest -q simulators/behavior-g1/tests/ros'"
-
-[feature.behavior-dex.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator behavior-dex"
-test-ros = "bash -c 'source .workspaces/behavior-dex/install/local_setup.bash && python -m pytest -q simulators/behavior-dex/tests/ros'"
 
 # Isaac Sim 5.1 ships Python 3.11 wheels only. Direct requirements of OmniGibson (with the
 # optional-workflows patch) and BDDL, pinned to RoboEnv's resolved behavior-devices lock;
@@ -318,16 +308,6 @@ pytest = "==9.1.1"
 [feature.behavior-native.tasks]
 smoke = "env PYTHONPATH=src:simulators/behavior:.runtime/behavior python -m pytest -q -p no:cacheprovider simulators/behavior/tests/native"
 
-# The G1's lower body runs GR00T WholeBodyControl's ONNX policies.
-[feature.g1.pypi-dependencies]
-onnxruntime = "==1.22.1"
-
-[feature.g1.tasks]
-smoke = "env PYTHONPATH=src:simulators/behavior:.runtime/behavior-g1 python -m pytest -q -p no:cacheprovider simulators/behavior-g1/tests/native"
-
-[feature.dex.tasks]
-smoke = "env PYTHONPATH=src:simulators/behavior:.runtime/behavior-dex python -m pytest -q -p no:cacheprovider simulators/behavior-dex/tests/native"
-
 [environments]
 default = { features = [], solve-group = "jazzy" }
 abc = { features = ["abc"] }
@@ -341,7 +321,3 @@ handson = { features = ["handson"], solve-group = "jazzy" }
 handson-native = { features = ["isaaclab", "handson-native"], no-default-feature = true }
 behavior = { features = ["behavior"], solve-group = "jazzy" }
 behavior-native = { features = ["omnigibson", "behavior-native"], no-default-feature = true }
-behavior-g1 = { features = ["behavior-g1"], solve-group = "jazzy" }
-behavior-g1-native = { features = ["omnigibson", "g1"], no-default-feature = true }
-behavior-dex = { features = ["behavior-dex"], solve-group = "jazzy" }
-behavior-dex-native = { features = ["omnigibson", "dex"], no-default-feature = true }

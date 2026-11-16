@@ -8,7 +8,7 @@ import pytest
 from rosbridge.assets import AssetStore
 from rosbridge.catalog import resolve, simulator, tasks
 from rosbridge_behavior import assets
-from rosbridge_behavior.backend import BehaviorSim
+from rosbridge_behavior.backend import R1ProSim
 from rosbridge_behavior.r1pro import R1Pro
 
 
@@ -21,8 +21,7 @@ def test_catalog_holds_the_100_challenge_activities():
     assert resolve("behavior")[2]["native_task"] == "turning_on_radio"
     assert resolve("behavior/putting_away_Halloween_decorations")[2]["id"] == \
         "behavior/putting-away-halloween-decorations"
-    with pytest.raises(ValueError, match="Ambiguous"):  # behavior-g1 runs the same activities
-        resolve("turning_on_radio")
+    assert resolve("turning_on_radio")[2]["id"] == "behavior/turning-on-radio"
 
 
 def test_manifest_runs_omnigibson_in_a_native_worker():
@@ -115,8 +114,8 @@ def fake_r1pro():
 
 
 def test_r1pro_channels_follow_the_native_action_and_grippers_report_the_smooth_command():
-    embodiment, robot = R1Pro.__new__(R1Pro), fake_r1pro()
-    layout = embodiment.layout(robot)
+    r1pro, robot = R1Pro.__new__(R1Pro), fake_r1pro()
+    layout = r1pro.layout(robot)
     assert len(layout.joint_names) == 23 and layout.joint_names[14] == "left_gripper"
     groups = {g.name: g for g in layout.groups}
     assert groups["base"].velocity and (groups["base"].lower, groups["base"].upper) == ((-1.,) * 3, (1.,) * 3)
@@ -125,14 +124,14 @@ def test_r1pro_channels_follow_the_native_action_and_grippers_report_the_smooth_
     q[24:26], q[26:28] = .05, (0., .01)
     robot.get_joint_positions, robot.get_joint_velocities = lambda: q, lambda: np.full(28, .025)
     episode = SimpleNamespace(robot=robot, odometry=lambda: ((1., 2., .5), (.1, 0., .2)))
-    positions, velocities = embodiment.state(episode)
+    positions, velocities = r1pro.state(episode)
     assert positions[[0, 1, 2]].tolist() == [1., 2., .5] and velocities[2] == .2
     assert positions[14] == pytest.approx(1.) and positions[22] == pytest.approx(-.8)
     assert velocities[14] == pytest.approx(1.)
 
 
 def test_a_following_overview_turns_after_the_robot_the_short_way():
-    sim = BehaviorSim.__new__(BehaviorSim)
+    sim = R1ProSim.__new__(R1ProSim)
     sim.period, sim.steps, sim._followed = .1, 0, None
 
     def heading(degrees):

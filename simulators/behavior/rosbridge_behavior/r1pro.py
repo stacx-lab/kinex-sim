@@ -11,7 +11,6 @@ import numpy as np
 import yaml
 
 from rosbridge.core import ActionLayout, CommandGroup
-from .backend import Overview
 from .environment import values
 
 # Device name: OmniGibson controller group, in the robot's controller order.
@@ -24,11 +23,6 @@ EVAL_HEAD_HORIZONTAL_APERTURE = 40.
 
 class R1Pro:
     parts = PARTS
-    scalar_grippers = True  # the smooth gripper command; R1ProSharpa's hands are joint devices
-    pose_key = None
-    frequencies = {"action_frequency": 30, "rendering_frequency": 30, "physics_frequency": 120}
-    # RoboEnv's BEHAVIOR overview: 2.6 m out, the eye 2.4 m and the target 0.9 m above the floor.
-    overview = Overview(2.6, 2.4, .9)
 
     def __init__(self):
         # Read without importing OmniGibson, which fixes its data path on import (environment.boot).
@@ -58,9 +52,6 @@ class R1Pro:
         og.sim.play()
         robot.sensors[self.cameras["head_camera"]].horizontal_aperture = EVAL_HEAD_HORIZONTAL_APERTURE
 
-    def start_pose(self, pose):
-        return pose["position"], pose["orientation"]
-
     def layout(self, robot):
         """Channels in the native action order; grippers are scalars named after their device."""
         if list(robot.controller_order) != list(self.parts.values()):
@@ -77,7 +68,7 @@ class R1Pro:
             if part == "base":
                 names += [robot.dof_names_ordered[i] for i in dofs]
                 groups.append(CommandGroup(device, channels, (-1.,) * 3, (1.,) * 3, velocity=True))
-            elif part.startswith("gripper") and self.scalar_grippers:
+            elif part.startswith("gripper"):
                 names.append(device)
                 groups.append(CommandGroup(device, channels, (-1.,), (1.,), scalar=True))
                 # The smooth controller maps [-1, 1] onto the mean finger range.
@@ -86,9 +77,6 @@ class R1Pro:
                 names += [robot.dof_names_ordered[i] for i in dofs]
                 groups.append(CommandGroup(device, channels, tuple(lower[dofs]), tuple(upper[dofs])))
         return ActionLayout(tuple(names), tuple(groups))
-
-    def reset(self, episode):
-        pass
 
     def state(self, episode):
         """Joints in radians; grippers as the smooth command their mean finger opening reaches;
@@ -101,7 +89,7 @@ class R1Pro:
                 pose, twist = episode.odometry()
                 positions += list(pose)
                 velocities += list(twist)
-            elif part.startswith("gripper") and self.scalar_grippers:
+            elif part.startswith("gripper"):
                 low, high = self.grips[device]
                 positions.append(2 * (q[dofs].mean() - low) / (high - low) - 1)
                 velocities.append(2 * dq[dofs].mean() / (high - low))
@@ -109,6 +97,3 @@ class R1Pro:
                 positions += list(q[dofs])
                 velocities += list(dq[dofs])
         return np.asarray(positions), np.asarray(velocities)
-
-    def action(self, episode, command):
-        return np.asarray(command, dtype=np.float32)

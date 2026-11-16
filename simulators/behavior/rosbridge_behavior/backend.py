@@ -1,18 +1,17 @@
-"""BEHAVIOR-1K activities on an embodiment in OmniGibson; runs in the native worker.
+"""BEHAVIOR-1K activities on the R1Pro in OmniGibson; runs in the native worker.
 
 OmniGibson needs Isaac Sim 5.1 on Python 3.11, so the world node proxies this class through
-rosbridge.core.worker. The episode follows the official evaluator (environment.py); an
-embodiment maps rosbridge channels to native actions (r1pro.py, r1pro_sharpa.py, g1_sharpa.py).
+rosbridge.core.worker. The episode follows the official evaluator (environment.py), and r1pro.py
+maps rosbridge channels to the evaluator's action vector.
 """
 import secrets
-from typing import NamedTuple
 
 import numpy as np
 
 from rosbridge.catalog import resolve
 from rosbridge.core.devices import device_inventory, spectator_views
 from rosbridge.project import project_root
-from .assets import check_dex_task, check_g1_task, check_task
+from .assets import check_task
 from .environment import Episode, boot, rotation, values
 
 OPTICAL = np.diag([1., -1., -1.])  # USD cameras look along -z with +y up; ROS optical is +z, +y down
@@ -24,6 +23,9 @@ OVERVIEWS = {"front_left": np.pi / 4, "rear_left": 3 * np.pi / 4}
 FOLLOW_S = 1.  # the overviews turn after the robot this slowly, so gait sway does not shake them
 FOLLOW_GAP_S = .25  # after a longer pause in the overviews, as after a cut, they face the heading
 WALL_MARGIN = .2  # an overview stays this far (m) in front of what it would otherwise stand behind
+# RoboEnv's BEHAVIOR overview: 2.6 m out horizontally from the base, the eye 2.4 m and the point it looks at 0.9 m
+# above the base's height at the episode start.
+OVERVIEW_DISTANCE, OVERVIEW_EYE, OVERVIEW_TARGET = 2.6, 2.4, .9
 
 
 def inside(offset, contains, step):
@@ -36,37 +38,28 @@ def inside(offset, contains, step):
     return 1.
 
 
-class Overview(NamedTuple):
-    """An embodiment's overview spectators: `distance` m out horizontally from the base, with
-    their eye and the point they look at `eye` and `target` m above the base's height at the
-    episode start."""
-    distance: float
-    eye: float
-    target: float
-
-
 def pose_matrix(position, quaternion_xyzw):
     matrix = np.eye(4)
     matrix[:3, :3], matrix[:3, 3] = rotation(quaternion_xyzw), values(position)
     return matrix
 
 
-class BehaviorSim:
-    simulator = "behavior"
+class R1ProSim:
     default_task = "turning_on_radio"
-    check_task = staticmethod(check_task)
+    period = 1 / 30  # the evaluator's action frequency (eval_utils.generate_basic_environment_config)
 
-    def __init__(self, embodiment, *, max_steps=None, early_stop=False):
-        self.embodiment = embodiment
+    def __init__(self, *, max_steps=None, early_stop=False):
+        from .r1pro import R1Pro
+
+        self.r1pro = R1Pro()
         self.requested_max_steps = self.max_steps = max_steps
         self.early_stop = early_stop
-        self.period = 1. / embodiment.frequencies["action_frequency"]
         self.episode = self.task = None
         self.spectators, self._spectators, self._frames = (), {}, {}
 
     @property
     def cameras(self):
-        return tuple(self.embodiment.cameras)
+        return tuple(self.r1pro.cameras)
 
     @property
     def devices(self):
@@ -85,22 +78,21 @@ class BehaviorSim:
         Isaac hosts one environment per process, so a reset reloads the live one. A failure
         after the reload starts leaves the episode done until a reset succeeds.
         """
-        native = resolve(self.simulator, task=task)[2]["native_task"]
-        self.check_task(project_root() / ".runtime" / self.simulator, native)
+        native = resolve("behavior", task=task)[2]["native_task"]
+        check_task(project_root() / ".runtime/behavior", native)
         if self.episode is not None and native != self.task:
             raise ValueError("a BEHAVIOR worker serves one task; start another run for another task")
         if self.episode is None:
-            boot(self.simulator)
+            boot()
             self.task = native
-            self.episode = Episode(native, self.embodiment, self.requested_max_steps)
-            self.layout = self.embodiment.layout(self.episode.robot)
+            self.episode = Episode(native, self.r1pro, self.requested_max_steps)
+            self.layout = self.r1pro.layout(self.episode.robot)
             self.max_steps = self.episode.max_steps
         self.done = True
         self.episode.load(seed)
         # The evaluator's TaskMetric takes the goal options' satisfaction here, once the instance has loaded and
         # before the policy acts: its partial credit counts only literals the episode newly satisfies.
         self.initial_goal_options = self.episode.env.task.get_goal_option_satisfaction(0)
-        self.embodiment.reset(self.episode)
         self.episode.origin = self.episode.base_pose()
         self.seed, self.steps, self.done = seed, 0, False
         self.success = bool(self.episode.env.task.success[0])
@@ -119,12 +111,12 @@ class BehaviorSim:
         return self.steps * self.period
 
     def state(self):
-        return self.embodiment.state(self.episode)
+        return self.r1pro.state(self.episode)
 
     def step(self, action):
         if self.done:
             raise RuntimeError("episode is done")
-        self.success = self.episode.step(self.embodiment.action(self.episode, np.asarray(action, float)))
+        self.success = self.episode.step(np.asarray(action, dtype=np.float32))  # the evaluator's action vector
         self.steps, self._frames = self.steps + 1, {}
         self.reward = float(self.success)
         self.done = self.steps >= self.max_steps or (self.early_stop and self.success)
@@ -148,7 +140,7 @@ class BehaviorSim:
     def _sensor(self, camera):
         if camera not in self.cameras:
             raise KeyError(camera)
-        return self.episode.robot.sensors[self.embodiment.cameras[camera]]
+        return self.episode.robot.sensors[self.r1pro.cameras[camera]]
 
     def intrinsics(self, camera):
         """Isaac's symmetric pinhole with square pixels: the optical axis through the image
@@ -228,11 +220,12 @@ class BehaviorSim:
         anything between it and the robot."""
         from omnigibson.utils.sampling_utils import raytest
 
-        view, robot = self.embodiment.overview, self.episode.robot
+        robot = self.episode.robot
         position, quaternion = robot.base_footprint_link.get_position_orientation()
-        target = np.r_[values(position)[:2], self.episode.origin[0][2] + view.target]
+        target = np.r_[values(position)[:2], self.episode.origin[0][2] + OVERVIEW_TARGET]
         angle = bearing + self._heading(quaternion)
-        offset = np.array([view.distance * np.cos(angle), view.distance * np.sin(angle), view.eye - view.target])
+        offset = np.array([OVERVIEW_DISTANCE * np.cos(angle), OVERVIEW_DISTANCE * np.sin(angle),
+                           OVERVIEW_EYE - OVERVIEW_TARGET])
         hit = raytest(target.tolist(), (target + offset).tolist(),
                       ignore_bodies=[link.prim_path for link in robot.links.values()])
         if hit["hit"]:
@@ -292,29 +285,3 @@ class BehaviorSim:
             self.episode = None
             og.shutdown()
 
-
-class R1ProSim(BehaviorSim):
-    def __init__(self, **options):
-        from .r1pro import R1Pro
-
-        super().__init__(R1Pro(), **options)
-
-
-class G1SharpaSim(BehaviorSim):
-    simulator = "behavior-g1"
-    check_task = staticmethod(check_g1_task)
-
-    def __init__(self, **options):
-        from .g1_sharpa import G1Sharpa
-
-        super().__init__(G1Sharpa(), **options)
-
-
-class R1ProSharpaSim(BehaviorSim):
-    simulator = "behavior-dex"
-    check_task = staticmethod(check_dex_task)
-
-    def __init__(self, **options):
-        from .r1pro_sharpa import R1ProSharpa
-
-        super().__init__(R1ProSharpa(), **options)

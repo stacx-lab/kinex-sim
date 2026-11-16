@@ -271,8 +271,6 @@ pixi run --frozen -e robotwin smoke && pixi run --frozen -e robotwin test-ros
 pixi run --frozen -e robodojo-native smoke && pixi run --frozen -e robodojo test-ros
 pixi run --frozen -e robocasa smoke && pixi run --frozen -e robocasa test-ros
 pixi run --frozen -e behavior-native smoke && pixi run --frozen -e behavior test-ros
-pixi run --frozen -e behavior-g1-native smoke && pixi run --frozen -e behavior-g1 test-ros
-pixi run --frozen -e behavior-dex-native smoke && pixi run --frozen -e behavior-dex test-ros
 pixi run --frozen -e handson-native smoke && pixi run --frozen -e handson test-ros
 pixi run --frozen -e bidex smoke && pixi run --frozen -e bidex test-ros
 pixi run --frozen -e abc python -m pytest -q tests/integration
@@ -282,8 +280,6 @@ rosbridge demo robotwin
 rosbridge demo robodojo
 rosbridge demo robocasa
 rosbridge demo behavior --timeout 1800
-rosbridge demo behavior-g1 --timeout 1800
-rosbridge demo behavior-dex --timeout 1800
 rosbridge demo handson --timeout 1800
 rosbridge demo bidex
 ```

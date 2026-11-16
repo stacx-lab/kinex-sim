@@ -1,24 +1,18 @@
-"""Pinned BEHAVIOR data bundles and the dataset key, linked into each simulator's data root.
+"""Pinned BEHAVIOR data bundles and the dataset key, linked into the simulator's data root.
 
 The three archives of behavior-1k/zipped-datasets at a pinned revision are verified by their
 SHA-256 and size. With ROSBRIDGE_ASSET_SEED, RoboEnv's extracted depot
 (<seed>/behavior/datasets/<dataset>) is verified file by file against RoboEnv's receipts
 (<seed>/behavior/<dataset>.json) and adopted instead of downloading. The BEHAVIOR Data Bundle
-is encrypted; OmniGibson decrypts it with a key that requires accepting its license.
-behavior-g1 adds the G1 with Sharpa hands and behavior-dex the R1Pro with Sharpa hands, each
-imported once per source and adapter revision. Every activity shares the data, so one
-preparation serves every task until a pin changes.
+is encrypted; OmniGibson decrypts it with a key that requires accepting its license. Every
+activity shares the data, so one preparation serves every task until a pin changes.
 """
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
-import importlib
 import json
 import os
 from pathlib import Path
 import shlex
 import shutil
-import subprocess
-import sys
 import tempfile
 
 import yaml
@@ -118,49 +112,19 @@ def key(store):
     return path
 
 
-def link_data(runtime, store, robots=None):
-    """The data root OmniGibson reads (environment.data_root): datasets and the key. Extra
-    robot models join the robot assets in an overlay of links."""
+def link_data(runtime, store):
+    """The data root OmniGibson reads (environment.data_root): datasets and the key."""
     accept_license()
     root = Path(runtime) / "datasets"
     for name in ARCHIVES:
-        data = dataset(store, name)
-        if name != "omnigibson-robot-assets" or robots is None:
-            link_asset(data, root / name)
-            continue
-        overlay = root / name
-        if overlay.is_symlink():
-            overlay.unlink()
-        for entry in data.iterdir():
-            if entry.name != "models":
-                link_asset(entry, overlay / entry.name)
-        for model in (*(data / "models").iterdir(), *robots):
-            link_asset(model, overlay / "models" / model.name)
+        link_asset(dataset(store, name), root / name)
     link_asset(key(store), root / KEY)
     return root
 
 
-# Extra robot models: the pin naming each in a data root's marker, and its importer module.
-MODELS = {"g1": "g1_model", "dex": "dex_model"}
-
-
-def model_key(runtime, pin):
-    """A model import's cache key: the prepared sources, the robot assets it may build on, the
-    importer and the Sharpa helpers it shares."""
-    from . import sharpa
-
-    importer = importlib.import_module(f"{__package__}.{MODELS[pin]}")
-    digest = hashlib.sha256((Path(runtime) / ".prepared.json").read_bytes())
-    digest.update(ARCHIVES["omnigibson-robot-assets"][2].encode())
-    for module in (importer, sharpa):
-        digest.update(Path(module.__file__).read_bytes())
-    return digest.hexdigest()
-
-
-def pins(runtime, model=None):
-    """What a prepared data root links: the pinned archives and an extra robot model's import."""
-    archives = {name: checksum for name, (_, _, checksum, _) in ARCHIVES.items()}
-    return {**archives, model: model_key(runtime, model)} if model else archives
+def pins():
+    """What a prepared data root links: the pinned archives."""
+    return {name: checksum for name, (_, _, checksum, _) in ARCHIVES.items()}
 
 
 def prepare(runtime, task, store=None):
@@ -170,85 +134,16 @@ def prepare(runtime, task, store=None):
         pass
     store = store or AssetStore()
     link_data(runtime, store)
-    write_json(Path(runtime) / MARKER, pins(runtime))
+    write_json(Path(runtime) / MARKER, pins())
     check_task(runtime, task)
     print(f"[assets] {task} ready; cache: {store.root}", flush=True)
 
 
-def import_model(runtime, store, pin):
-    """An extra robot model imported into OmniGibson, keyed by model_key."""
-    model = importlib.import_module(f"{__package__}.{MODELS[pin]}")
-    runtime, key = Path(runtime), model_key(runtime, pin)
-    data = store.cached("behavior", model.MODEL, key)
-    if data is not None:
-        return data / model.MODEL
-    parent = store.root / "behavior" / model.MODEL
-    parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".import-", dir=parent) as temporary:
-        staging = Path(temporary)
-        for entry in (runtime / "datasets").iterdir():
-            (staging / "data").mkdir(exist_ok=True)
-            (staging / "data" / entry.name).symlink_to(entry.resolve())
-        print(f"[assets] importing {model.TITLE} into OmniGibson", flush=True)
-        subprocess.run([sys.executable, "-m", model.__name__, str(runtime),
-                        str(staging / "data"), str(staging / "model" / model.MODEL)], check=True)
-
-        def verify(directory):
-            for name in model_files(model.MODEL):
-                if not (directory / model.MODEL / name).is_file():
-                    raise ValueError(f"the {model.TITLE} import produced no {name}")
-        return store.adopt("behavior", model.MODEL, key, staging / "model", verify=verify) / model.MODEL
-
-
-def model_files(name):
-    return f"usd/{name}.usda", f"{name}.yaml", "drives.json"
-
-
-def prepare_model(runtime, task, store, pin):
-    check = {"g1": check_g1_task, "dex": check_dex_task}[pin]
-    try:
-        return check(runtime, task)  # one preparation serves every task
-    except RuntimeError:
-        pass
-    store = store or AssetStore()
-    link_data(runtime, store, robots=[])  # the import reads the data root
-    link_data(runtime, store, robots=[import_model(runtime, store, pin)])
-    write_json(Path(runtime) / MARKER, pins(runtime, pin))
-    check(runtime, task)
-    title = importlib.import_module(f"{__package__}.{MODELS[pin]}").TITLE
-    print(f"[assets] {task} ready with {title}; cache: {store.root}", flush=True)
-
-
-def prepare_g1(runtime, task, store=None):
-    prepare_model(runtime, task, store, "g1")
-
-
-def prepare_dex(runtime, task, store=None):
-    prepare_model(runtime, task, store, "dex")
-
-
-def check_model_task(runtime, task, pin):
-    model = importlib.import_module(f"{__package__}.{MODELS[pin]}")
-    check_task(runtime, task, pin)
-    directory = Path(runtime) / "datasets/omnigibson-robot-assets/models" / model.MODEL
-    if not all((directory / name).is_file() for name in model_files(model.MODEL)):
-        raise RuntimeError(f"{model.TITLE} is not prepared. Run: {LICENSE}=YES rosbridge prepare "
-                           f"{Path(runtime).name} --task {shlex.quote(task)}")
-
-
-def check_g1_task(runtime, task):
-    check_model_task(runtime, task, "g1")
-
-
-def check_dex_task(runtime, task):
-    check_model_task(runtime, task, "dex")
-
-
-def check_task(runtime, task, model=None):
+def check_task(runtime, task):
     """Fail before booting Isaac Sim; never download during a reset."""
     root = Path(runtime) / "datasets"
     try:
-        if json.loads((Path(runtime) / MARKER).read_text()) != pins(runtime, model):
+        if json.loads((Path(runtime) / MARKER).read_text()) != pins():
             raise ValueError("the data root links other pins")
         instances = root / "2026-challenge-task-instances"
         metadata = yaml.safe_load((instances / "metadata/available_tasks.yaml").read_text())
@@ -261,6 +156,5 @@ def check_task(runtime, task, model=None):
             return
     except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
         pass
-    simulator = Path(runtime).name
     raise RuntimeError(f"BEHAVIOR assets for {task!r} are not prepared. Run: "
-                       f"{LICENSE}=YES rosbridge prepare {simulator} --task {shlex.quote(task)}")
+                       f"{LICENSE}=YES rosbridge prepare behavior --task {shlex.quote(task)}")

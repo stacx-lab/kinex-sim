@@ -8,5 +8,5 @@ class BehaviorWorker(WorkerBackend):
     close_timeout_s = 120.
 
     def measures(self):
-        """The episode's q_score, as BEHAVIOR's evaluator computes it (BehaviorSim.measures)."""
+        """The episode's q_score, as BEHAVIOR's evaluator computes it (R1ProSim.measures)."""
         return self._call("measures")

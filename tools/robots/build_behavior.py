@@ -23,10 +23,9 @@ def mount(sim, parent, child):
     return rigs.relative(sim.link_pose(parent), child)
 
 
-def body(sim, source, wrist="wrist, looking along the fingers"):
-    """The R1Pro's devices and files but for its end effectors: world, base, torso, both arms
-    and the three cameras, measured in sim with source the URDF's joints by name; wrist says
-    where the wrist cameras sit."""
+def body(sim, source):
+    """The R1Pro's devices and files but for its grippers: world, base, torso, both arms and the
+    three cameras, measured in sim with source the URDF's joints by name."""
     robot = sim.episode.robot
     home = dict(zip(robot.dof_names_ordered, robot.reset_joint_pos.tolist()))  # the evaluator's reset posture
     devices = {
@@ -72,8 +71,8 @@ def body(sim, source, wrist="wrist, looking along the fingers"):
             "flange is the link7 frame.")
     for name, parent, frame, where in (
             ("head_camera", "torso:top", "torso_link4", "on the head, looking ahead and down"),
-            ("left_camera", "left_arm:flange", "left_arm_link7", f"on the left {wrist}"),
-            ("right_camera", "right_arm:flange", "right_arm_link7", f"on the right {wrist}")):
+            ("left_camera", "left_arm:flange", "left_arm_link7", "on the left wrist, looking along the fingers"),
+            ("right_camera", "right_arm:flange", "right_arm_link7", "on the right wrist, looking along the fingers")):
         sensor = sim._sensor(name)
         devices[name] = rigs.camera(
             name,
