@@ -5,7 +5,9 @@ in Isaac Sim 5.1 and Isaac Lab, as its official PhysX evaluator builds them: Cor
 (`t01`–`t50`) and Transfer-16 (`eval_comb01..06`, `eval_gen01..07`, `eval_flex01..03`).
 Upstream is pinned to `c9598b53fc2a01355e74837de397bd7b2b1ab602`, with Isaac Lab v2.3.2
 (`isaac-sim/IsaacLab@37ddf626`) as a nested source. See the [design and CLI
-guide](README.md) for shared lifecycle and timing contracts.
+guide](README.md) for shared lifecycle and timing contracts, and [HandsOn: known
+environment issues](handson-known-issues.md) for what is known to be wrong or surprising in
+the tasks, and which of it rosbridge corrects.
 
 ```bash
 rosbridge prepare handson
@@ -35,7 +37,8 @@ SHA-256 pins of the bundled robot and rendering assets, and those links.
 ## Upstream corrections
 
 Preparation corrects three upstream defects whose correction leaves the scored task
-bit-identical. Every other upstream defect stays as the evaluator has it.
+bit-identical. Every other upstream defect stays as the evaluator has it; [known
+issues](handson-known-issues.md) gives the rule, the evidence and the rest.
 - **Kit's present thread** (`patches/handson/0001`): Isaac Lab's headless app turns it off under
   the extension's pre-Kit-107 name, `omni.renderer.core`, so every world, idle or not, kept
   presenting about 300 frames a second, each a GPU interrupt; with several worlds per GPU a
@@ -89,8 +92,9 @@ success, or at a task failure, whose cause the wait reply and the record name:
 A step that succeeds and fails at once is a success, as the evaluator scores it. The other
 27 tasks can only succeed or time out. Without `--early-stop` the episode runs to its horizon
 and reports no failure; `success` is the native `succeed` of its last step, and some states
-make it unreachable without failing (in `t02` a cable seated before the plug, in `t31` an
-interrupted brew). Tasks whose success does not latch can also lose a success before the
+make it unreachable without failing, even with `--early-stop`: in `t02` a cable seated before
+the plug, in `t20` the left hand touching the pen first, in `t31` an interrupted brew, and in
+`t45` and `eval_comb06` a lost left-hand contact. Tasks whose success does not latch can also lose a success before the
 horizon. `t10_lift_carton` scores support, lift and hold, recording grip force as a
 diagnostic, as the evaluator does.
 
