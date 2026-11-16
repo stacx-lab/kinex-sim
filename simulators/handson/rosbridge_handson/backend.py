@@ -118,6 +118,8 @@ def native_stop(returned, reason, timed_out):
 class HandsOnSim:
     default_task = "t24_place_ball_in_bowl"
     period = 1 / 30
+    # A three-view capture costs seconds, so a subscribed camera renders twice per simulated second, not at 30 Hz.
+    camera_rate_hz = 2.
 
     def __init__(self, *, max_steps=None, early_stop=False):
         self.requested_max_steps = self.max_steps = max_steps

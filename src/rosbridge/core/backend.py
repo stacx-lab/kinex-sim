@@ -89,6 +89,10 @@ class SimulatorBackend(Protocol):
     tip_pose(group) returns the measured tip pose there, which a stop holds and
     a group's first trajectory starts from.
 
+    Optionally, camera_rate_hz sets how many times per simulated second a
+    subscribed camera renders (default 30), for a simulator whose renders are
+    expensive. A new subscriber still gets a frame at once.
+
     Optionally, measures() returns the backend's own measures of the episode as
     JSON fields, such as BEHAVIOR's q_score; the episode record adds them.
     """

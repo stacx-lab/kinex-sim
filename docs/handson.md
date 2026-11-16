@@ -195,8 +195,11 @@ target slewing. The rig `handson/handson-rokae-wuji`:
 
 Cameras are RGB and render through upstream's three-view RTX capture: its exposure per
 sensor, and wrist views that hide the wrist's own cables. One capture renders all three
-views at a camera sample, six path-traced passes each (about 14 s on a shared L40S); it never
-steps physics. The cameras are the evaluator's for the task and seed:
+views at a camera sample, six path-traced passes each (about 4 s, 14 s on a shared L40S); it
+never steps physics. A subscribed camera therefore samples at 2 Hz of simulation time, not
+30 Hz. A new subscriber still gets the current frame at once, so a Kinex read (subscribe, take
+one frame, unsubscribe) renders the current step whenever it reads. The cameras are the
+evaluator's for the task and seed:
 - **Head camera:** the calibrated K of the Gemini 336 (854×480, fx 463.39, fy 463.00, an
   off-center principal point (431.77, 239.92)), rendered with its lens distortion zeroed, so
   its profile is an undistorted pinhole whose rays Kinex computes locally.

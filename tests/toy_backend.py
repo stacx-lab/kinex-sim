@@ -56,6 +56,11 @@ class ToyBackend:
         self.closed = True
 
 
+class SlowCameraToy(ToyBackend):
+    """A backend whose cameras sample twice per simulated second, as an expensive renderer's would."""
+    camera_rate_hz = 2.
+
+
 class PoseToy(ToyBackend):
     """A planar arm commanded by its tip pose: joints x and y place the tip at (x, y, 0), unrotated."""
     layout = ActionLayout(("x", "y"), (CommandGroup("reach", (0, 1), (-2., -2.), (2., 2.), tip="tip"),))
