@@ -46,9 +46,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: world
-description: Simulation clock of the BEHAVIOR house. Furniture, objects and the activity's
-  BDDL goal are not devices; the mobile robot is not localized in this frame. This device
-  exposes no task instructions or evaluator results.
+description: World clock of the BEHAVIOR house.
 source: default
 calibrated_at: null
 method: unknown

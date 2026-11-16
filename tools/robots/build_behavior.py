@@ -29,24 +29,17 @@ def body(sim, source):
     robot = sim.episode.robot
     home = dict(zip(robot.dof_names_ordered, robot.reset_joint_pos.tolist()))  # the evaluator's reset posture
     devices = {
-        "world": rigs.world(
-            "Simulation clock of the BEHAVIOR house. Furniture, objects and the activity's BDDL goal "
-            "are not devices; the mobile robot is not localized in this frame. This device exposes "
-            "no task instructions or evaluator results."),
+        "world": rigs.world("World clock of the BEHAVIOR house."),
         "base": rigs.locomotion(
             "base",
-            "R1Pro holonomic wheeled base carrying the torso. Commands are the official BEHAVIOR "
-            "evaluator's normalized base action (vx, vy, wz in [-1, 1]), which its controller scales "
-            "to 0.75 m/s and 1 rad/s in the base frame. The base frame is base_link at the floor; "
-            "odometry starts at the episode-start pose.",
+            "R1Pro holonomic wheeled base carrying the torso; a velocity is the evaluator's normalized "
+            "base action, which its controller scales to 0.75 m/s and 1 rad/s.",
             {axis: (-1., 1.) for axis in ("vx", "vy", "wz")},
             {"parent": None, "translation_m": None, "rotation_xyzw": None},
             timeout_s=VELOCITY_TIMEOUT_S),
         "torso": rigs.joint(
             "torso",
-            "R1Pro four-joint torso on the base. Geometry is the sibling torso.urdf with top "
-            "(torso_link4), where the arms and head camera mount, as its tip link; commands are "
-            "absolute native joint positions in radians.",
+            "R1Pro four-joint torso on the base; the arms and head camera mount on its top link.",
             [f"torso_joint{i}" for i in range(1, 5)], [home[f"torso_joint{i}"] for i in range(1, 5)],
             rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)), part="torso", tip="top",
             model="torso.urdf"),
@@ -59,10 +52,8 @@ def body(sim, source):
         joints = [f"{side}_arm_joint{i}" for i in range(1, 8)]
         devices[f"{side}_arm"] = rigs.joint(
             f"{side}_arm",
-            f"R1Pro seven-joint {side} arm on the torso. Geometry is the sibling arm.urdf with "
-            f"flange ({side}_arm_link7) as the tip link; measured links are on TF as "
-            f"{side}_arm/<link>, and helpers.joint_model('{side}_arm') computes FK/IK from it. "
-            "Commands are absolute native joint positions, the evaluator's arm action.",
+            f"R1Pro seven-joint {side} arm on the torso; its flange carries the {side} gripper and "
+            "wrist camera.",
             joints, [home[joint] for joint in joints],
             rigs.pose_frame("torso:top", rigs.urdf_origin(source[f"{side}_arm_base_joint"])))
         files[f"devices/{side}_arm/arm.urdf"] = rigs.source_arm(
@@ -75,10 +66,7 @@ def body(sim, source):
             ("right_camera", "right_arm:flange", "right_arm_link7", "on the right wrist, looking along the fingers")):
         sensor = sim._sensor(name)
         devices[name] = rigs.camera(
-            name,
-            f"RGB-D camera {where} (BEHAVIOR's {sensor.name.split(':')[1]} sensor at the evaluator's "
-            "full resolution). Image and registered depth calibration and the optical-frame mount "
-            "are in the profile.",
+            name, f"RGB-D camera {where}.",
             sim.intrinsics(name), rigs.pose_frame(parent, mount(sim, frame, sim.camera_pose(name))),
             tuple(sensor.clipping_range))
     return devices, files
@@ -98,12 +86,8 @@ def main():
         hand = link(f"{side}_gripper_link")
         devices[f"{side}_gripper"] = rigs.gripper(
             f"{side}_gripper",
-            f"R1Pro {side} parallel two-finger gripper on the {side}_arm flange. The grip joint "
-            f"{side}_gripper is the evaluator's smooth gripper command (-1 closed, 1 open): both "
-            f"fingers target {lower} + {(upper - lower) / 2} (v + 1) m. Grasping is assisted: an "
-            "object between closing fingers is held by a constraint. The TCP is the native eef "
-            "frame between the fingertips, +z approaching. A closed grip alone does not prove a "
-            "grasp.",
+            f"R1Pro {side} parallel two-finger gripper on the {side}_arm flange. An object between "
+            "closing fingers is held by assisted grasping; a closed grip alone does not prove a grasp.",
             f"{side}_gripper",
             "Smooth native gripper command (data) from -1 (closed) to 1 (open), held until "
             "replaced or stopped; out-of-range targets are ignored, so verify joint_state.",

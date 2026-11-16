@@ -52,10 +52,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: R1Pro seven-joint right arm on the torso. Geometry is the sibling arm.urdf with
-  flange (right_arm_link7) as the tip link; measured links are on TF as right_arm/<link>,
-  and helpers.joint_model('right_arm') computes FK/IK from it. Commands are absolute native
-  joint positions, the evaluator's arm action.
+description: R1Pro seven-joint right arm on the torso; its flange carries the right gripper
+  and wrist camera.
 source: introspected
 calibrated_at: null
 method: introspection

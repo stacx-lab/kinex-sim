@@ -51,9 +51,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: R1Pro four-joint torso on the base. Geometry is the sibling torso.urdf with top
-  (torso_link4), where the arms and head camera mount, as its tip link; commands are absolute
-  native joint positions in radians.
+description: R1Pro four-joint torso on the base; the arms and head camera mount on its top
+  link.
 source: introspected
 calibrated_at: null
 method: introspection

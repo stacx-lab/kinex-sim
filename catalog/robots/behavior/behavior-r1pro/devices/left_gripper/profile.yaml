@@ -47,11 +47,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: 'R1Pro left parallel two-finger gripper on the left_arm flange. The grip joint
-  left_gripper is the evaluator''s smooth gripper command (-1 closed, 1 open): both fingers
-  target 0.0 + 0.025 (v + 1) m. Grasping is assisted: an object between closing fingers is
-  held by a constraint. The TCP is the native eef frame between the fingertips, +z approaching.
-  A closed grip alone does not prove a grasp.'
+description: R1Pro left parallel two-finger gripper on the left_arm flange. An object between
+  closing fingers is held by assisted grasping; a closed grip alone does not prove a grasp.
 source: introspected
 calibrated_at: null
 method: introspection

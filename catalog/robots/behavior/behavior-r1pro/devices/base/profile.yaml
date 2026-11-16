@@ -47,10 +47,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: locomotion
-description: R1Pro holonomic wheeled base carrying the torso. Commands are the official BEHAVIOR
-  evaluator's normalized base action (vx, vy, wz in [-1, 1]), which its controller scales
-  to 0.75 m/s and 1 rad/s in the base frame. The base frame is base_link at the floor; odometry
-  starts at the episode-start pose.
+description: R1Pro holonomic wheeled base carrying the torso; a velocity is the evaluator's
+  normalized base action, which its controller scales to 0.75 m/s and 1 rad/s.
 source: introspected
 calibrated_at: null
 method: introspection
