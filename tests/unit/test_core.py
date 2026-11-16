@@ -74,6 +74,42 @@ def test_velocity_groups_start_at_rest_and_expire():
                                                       scalar=True, velocity=True),))
 
 
+def test_pose_groups_hold_no_target_until_commanded_then_track_tip_poses():
+    from rosbridge.core.devices import device_inventory
+    layout = ActionLayout(("j1", "j2", "finger"), (
+        CommandGroup("arm", (0, 1), (-1.,)*2, (1.,)*2, tip="palm"),
+        CommandGroup("hand", (2,), (0.,), (1.,))))
+    assert [d.kind for d in device_inventory(layout, {})] == ["joint", "joint"]
+    measured = np.array([0.1, 0.2, 0.3, 0., 0., 0., 1.])
+    turned = [0.5, 0.2, 0.3, 0., 0., 1., 0.]  # half a turn about z from measured
+    b = CommandBuffer(layout, [0.4, -0.4, 0.5])
+    assert b.poses() == {"arm": None} and b.action(0.1).tolist() == [0.4, -0.4, 0.5]
+    b.stop("arm", measured)  # never commanded: the simulator keeps holding it as it was
+    assert b.poses() == {"arm": None}
+    b.set_pose_trajectory("arm", 1.0, [2.0], [[0.5, 0.2, 0.3, 0., 0., 2., 0.]], lambda: measured)
+    b.action(2.0)
+    halfway = b.poses()["arm"]
+    assert halfway[:3] == pytest.approx([0.3, 0.2, 0.3])  # from the measured tip, linearly
+    assert halfway[3:] == pytest.approx([0., 0., np.sqrt(.5), np.sqrt(.5)])  # slerp of a unit quaternion
+    b.action(3.0)
+    assert b.poses()["arm"] == pytest.approx(turned)  # then holds the last pose
+    b.set_pose_trajectory("arm", 4.0, [1.0], [measured], lambda: pytest.fail("a held target needs no measure"))
+    b.action(4.5)
+    b.stop("arm", measured)  # commanded: holds the measured tip
+    assert b.action(5.0)[:2].tolist() == [0.4, -0.4] and b.poses()["arm"] == pytest.approx(measured)
+    for bad in ([0.] * 7, [0.] * 6, [float("nan")] + [0.] * 6):
+        with pytest.raises(CommandError):
+            b.set_pose_trajectory("arm", 6.0, [1.0], [bad], lambda: measured)
+    with pytest.raises(CommandError, match="pose targets, not joint"):
+        b.set_trajectory("arm", 6.0, [1.0], [[0., 0.]])
+    with pytest.raises(CommandError, match="joint targets, not pose"):
+        b.set_pose_trajectory("hand", 6.0, [1.0], [measured], lambda: measured)
+    b.close()
+    with pytest.raises(CommandError):
+        b.set_pose_trajectory("arm", 7.0, [1.0], [measured], lambda: measured)
+    with pytest.raises(ValueError):
+        ActionLayout(("j",), (CommandGroup("bad", (0,), (0.,), (1.,), scalar=True, tip="palm"),))
+
 def test_realtime_catches_up_without_skipping():
     now = [0.0]
     p = Pacer("realtime", 0.1, clock=lambda: now[0])

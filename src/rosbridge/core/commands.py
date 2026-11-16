@@ -16,13 +16,36 @@ class CommandError(ValueError):
     pass
 
 
-class Trajectory:
-    """Piecewise-linear joint targets; starts from the target held on arrival."""
+def linear(a, b, s):
+    return a + s * (b - a)
 
-    def __init__(self, start_s, start_q, times, points):
+
+def slerp(a, b, s):
+    """Unit quaternions [x, y, z, w] from a to b along the shorter arc."""
+    dot = float(np.dot(a, b))
+    if dot < 0:
+        b, dot = -b, -dot
+    if dot > 1 - 1e-9:
+        q = linear(a, b, s)
+    else:
+        angle = np.arccos(dot)
+        q = (np.sin((1 - s) * angle) * a + np.sin(s * angle) * b) / np.sin(angle)
+    return q / np.linalg.norm(q)
+
+
+def pose_blend(a, b, s):
+    """Poses [x, y, z, qx, qy, qz, qw]: positions linearly, rotations by slerp."""
+    return np.r_[linear(a[:3], b[:3], s), slerp(a[3:], b[3:], s)]
+
+
+class Trajectory:
+    """Piecewise joint targets or tip poses, interpolated by blend; starts from the target held on arrival."""
+
+    def __init__(self, start_s, start_q, times, points, blend=linear):
         if times[0] > 0:
             times, points = [0.0, *times], [start_q, *points]
         self.start_s, self.times, self.points = start_s, list(times), [np.asarray(p) for p in points]
+        self.blend = blend
 
     @property
     def end_s(self):
@@ -36,13 +59,14 @@ class Trajectory:
             return self.points[-1]
         i = bisect.bisect_right(self.times, dt) - 1
         a = (dt - self.times[i]) / (self.times[i + 1] - self.times[i])
-        return self.points[i] + a * (self.points[i + 1] - self.points[i])
+        return self.blend(self.points[i], self.points[i + 1], a)
 
 
 class CommandBuffer:
     """Retain the last valid target per command group of the backend layout.
 
-    Velocity groups start at rest and return to rest VELOCITY_TIMEOUT_S after their last command.
+    Velocity groups start at rest and return to rest VELOCITY_TIMEOUT_S after their last command. Pose groups hold
+    a tip pose target, None until their first command; poses() gives each with the action.
     """
 
     def __init__(self, layout, initial):
@@ -51,16 +75,27 @@ class CommandBuffer:
         self._target = self._vector(initial, len(layout.joint_names), "initial action").copy()
         self._trajectory = dict.fromkeys(self._groups)
         self._expiry = {}
+        self._pose = {group.name: None for group in layout.groups if group.tip}
         for group in layout.groups:
             if group.velocity:
                 self._target[list(group.indices)] = 0.
         self._open = True
 
     def stop(self, group, values):
-        # Measured positions can fall outside command limits.
-        self._target[list(self._groups[group].indices)] = values
+        """Hold values: measured positions, which can fall outside command limits, or a pose group's measured tip
+        pose. A pose group never commanded keeps no target: the simulator holds it as it was."""
+        if group in self._pose:
+            if self._pose[group] is not None or self._trajectory[group] is not None:
+                self._pose[group] = self._unit_pose(values, f"{group} hold")
+        else:
+            self._target[list(self._groups[group].indices)] = values
         self._trajectory[group] = None
         self._expiry.pop(group, None)
+
+    def poses(self):
+        """Each pose group's tip pose target [x, y, z, qx, qy, qz, qw] in its device base, or None before its first
+        command, as the last action() sampled it."""
+        return {name: None if pose is None else pose.copy() for name, pose in self._pose.items()}
 
     def close(self):
         self._open = False
@@ -77,12 +112,34 @@ class CommandBuffer:
             raise CommandError(f"{what} has non-finite values")
         return v
 
-    def _group(self, name, values):
+    @classmethod
+    def _unit_pose(cls, value, what):
+        pose = cls._vector(value, 7, what)
+        norm = np.linalg.norm(pose[3:])
+        if norm < 1e-6:
+            raise CommandError(f"{what} needs a unit quaternion")
+        return np.r_[pose[:3], pose[3:] / norm]
+
+    @staticmethod
+    def _times(start_s, times, points):
+        if not np.isfinite(start_s) or not np.isfinite(times).all():
+            raise CommandError("trajectory times must be finite")
+        if not times or len(times) != len(points):
+            raise CommandError("trajectory needs one time per point and at least one point")
+        if times[0] < 0 or any(b <= a for a, b in zip(times, times[1:])):
+            raise CommandError("trajectory times must be >= 0 and strictly increasing")
+
+    def _open_group(self, name):
         if not self._open:
             raise CommandError("episode is done")
         if name not in self._groups:
             raise CommandError(f"unknown command group: {name}")
-        group = self._groups[name]
+        return self._groups[name]
+
+    def _group(self, name, values):
+        group = self._open_group(name)
+        if group.tip:
+            raise CommandError(f"{name} takes {group.tip} pose targets, not joint targets")
         q = self._vector(values, len(group.indices), f"{name} target")
         lo, hi = np.asarray(group.lower), np.asarray(group.upper)
         bad = np.flatnonzero((q < lo - LIMIT_TOLERANCE) | (q > hi + LIMIT_TOLERANCE))
@@ -106,24 +163,36 @@ class CommandBuffer:
         """times: seconds from start_s, strictly increasing and >= 0."""
         if name in self._groups and self._groups[name].velocity:
             raise CommandError(f"{name} accepts velocities, not trajectories")
-        if not np.isfinite(start_s) or not np.isfinite(times).all():
-            raise CommandError("trajectory times must be finite")
-        if not times or len(times) != len(points):
-            raise CommandError("trajectory needs one time per point and at least one point")
-        if times[0] < 0 or any(b <= a for a, b in zip(times, times[1:])):
-            raise CommandError("trajectory times must be >= 0 and strictly increasing")
+        self._times(start_s, times, points)
         points = [self._group(name, p).copy() for p in points]
         current = self._trajectory[name]
         start_q = (current.sample(start_s) if current is not None
                    else self._target[list(self._groups[name].indices)].copy())
         self._trajectory[name] = Trajectory(start_s, start_q, times, points)
 
+    def set_pose_trajectory(self, name, start_s, times, poses, measured):
+        """Tip poses [x, y, z, qx, qy, qz, qw] in the device base at times, seconds from start_s, strictly
+        increasing and >= 0. It starts from the pose target held on arrival; before a group's first command, from
+        measured(), its measured tip pose."""
+        group = self._open_group(name)
+        if not group.tip:
+            raise CommandError(f"{name} takes joint targets, not pose targets")
+        self._times(start_s, times, poses)
+        points = [self._unit_pose(pose, f"{name} {group.tip} pose") for pose in poses]
+        current = self._trajectory[name]
+        start = (current.sample(start_s) if current is not None else self._pose[name] if self._pose[name] is not None
+                 else self._unit_pose(measured(), f"{name} measured {group.tip} pose"))
+        self._trajectory[name] = Trajectory(start_s, start, times, points, pose_blend)
+
     def action(self, t):
-        """Native action for the step that ends at sim time t."""
+        """Native action for the step that ends at sim time t; poses() holds the pose groups' targets for it."""
         for name, trajectory in self._trajectory.items():
             if trajectory is None:
                 continue
-            self._target[list(self._groups[name].indices)] = trajectory.sample(t)
+            if name in self._pose:
+                self._pose[name] = trajectory.sample(t)
+            else:
+                self._target[list(self._groups[name].indices)] = trajectory.sample(t)
             if t >= trajectory.end_s:
                 self._trajectory[name] = None
         for name, expiry in list(self._expiry.items()):

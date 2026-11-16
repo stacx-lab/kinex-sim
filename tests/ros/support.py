@@ -37,8 +37,9 @@ class Graph:
         self.stop_client = self.node.create_client(Trigger, "world/stop")
         self.tmp_path = tmp_path
         try:
-            if backend == "toy":
+            if backend in ("toy", "pose_toy"):
                 self.owner = self.start([sys.executable, "-m", "tests.ros.toy_server", "--ros-args",
+                                         "-p", f"backend:={backend}",
                                          "-p", f"mode:={mode}", "-p", f"max_steps:={max_steps}",
                                          "-p", f"task:={task}",
                                          "-p", f"early_stop:={str(early_stop).lower()}"])

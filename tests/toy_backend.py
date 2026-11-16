@@ -54,3 +54,30 @@ class ToyBackend:
     def close(self):
         assert threading.get_ident() == self.owner
         self.closed = True
+
+
+class PoseToy(ToyBackend):
+    """A planar arm commanded by its tip pose: joints x and y place the tip at (x, y, 0), unrotated."""
+    layout = ActionLayout(("x", "y"), (CommandGroup("reach", (0, 1), (-2., -2.), (2., 2.), tip="tip"),))
+    devices = device_inventory(layout, {})
+
+    def reset(self, task, seed, randomize):
+        super().reset(task, seed, randomize)
+        self.position, self.commanded = np.array([.5, -.5]), []
+
+    def state(self):
+        assert threading.get_ident() == self.owner
+        return self.position.copy(), np.zeros(2)
+
+    def step(self, action, poses):
+        assert threading.get_ident() == self.owner
+        pose = poses["reach"]
+        self.commanded.append(pose)
+        if pose is not None:  # its controller moves the tip to the target, within its reach
+            self.position = np.clip(pose[:2], -2., 2.)
+        self.steps += 1
+        self.time_s = self.steps * self.period
+
+    def tip_pose(self, group):
+        assert threading.get_ident() == self.owner and group == "reach"
+        return np.r_[self.position, 0., 0., 0., 0., 1.]

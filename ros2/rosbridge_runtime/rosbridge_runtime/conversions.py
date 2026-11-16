@@ -85,3 +85,27 @@ def trajectory(msg, joint_names):
     times = [seconds(p.time_from_start) for p in msg.points]
     start = seconds(msg.header.stamp)
     return (start if start > 0 else None), times, points
+
+
+def pose_trajectory(msg):
+    """MultiDOFJointTrajectory of one tip link -> (start_s or None, times, poses [x, y, z, qx, qy, qz, qw])."""
+    poses = []
+    for p in msg.points:
+        if len(p.transforms) != 1:
+            raise ValueError("every pose trajectory point needs one transform, the tip's")
+        t, q = p.transforms[0].translation, p.transforms[0].rotation
+        poses.append([t.x, t.y, t.z, q.x, q.y, q.z, q.w])
+    times = [seconds(p.time_from_start) for p in msg.points]
+    start = seconds(msg.header.stamp)
+    return (start if start > 0 else None), times, poses
+
+
+def pose_state(t, frame, tip, pose):
+    """A tip pose [x, y, z, qx, qy, qz, qw] in frame as a MultiDOFJointState."""
+    from geometry_msgs.msg import Quaternion, Transform, Vector3
+    from sensor_msgs.msg import MultiDOFJointState
+    x, y, z, qx, qy, qz, qw = map(float, pose)
+    msg = MultiDOFJointState(joint_names=[tip], transforms=[
+        Transform(translation=Vector3(x=x, y=y, z=z), rotation=Quaternion(x=qx, y=qy, z=qz, w=qw))])
+    msg.header.stamp, msg.header.frame_id = t, frame
+    return msg

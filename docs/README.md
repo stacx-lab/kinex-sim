@@ -130,7 +130,11 @@ evaluator state are not published.
 Arms accept `trajectory_msgs/msg/JointTrajectory` on `<arm>/joint_target`:
 position-only points over every arm joint, strictly increasing times ending within
 120 seconds, and a start that is now or later. Joint names are unique within a
-device; two arms may keep the same native names. Grippers accept a
+device; two arms may keep the same native names. An arm the simulator commands by the
+pose of its tip link, as HandsOn's arms are, takes instead a
+`trajectory_msgs/msg/MultiDOFJointTrajectory` of tip poses in `<arm>/base` on
+`<arm>/pose_target`, timed alike, and reports the measured tip on `<arm>/pose_state`
+(`sensor_msgs/msg/MultiDOFJointState`). Grippers accept a
 `std_msgs/msg/Float64` position on `<gripper>/target`, in each simulator's native
 command units (LIBERO's finger metres; the normalized 0..1 opening of ABC, RoboTwin
 and RoboDojo; RoboCasa's integrated -1..1 command; BEHAVIOR's smooth -1..1 R1Pro command).
@@ -239,7 +243,8 @@ To add a simulator, implement `SimulatorBackend` (`src/rosbridge/core/backend.py
 and register a lazy `rosbridge.backends` entry point (a `WorkerBackend` subclass
 for a native worker). Supply an `ActionLayout` whose commands are positions in
 feedback units (or, for a base's velocity group, body velocities whose feedback is
-odometry), a `device_inventory` naming its devices by Kinex device type (`joint`,
+odometry; for a pose group, its tip pose, passed to `step(action, poses)` with
+`tip_pose(group)` measuring it), a `device_inventory` naming its devices by Kinex device type (`joint`,
 `gripper`, `locomotion`, `rgb`, `rgbd`), each camera's image size and intrinsics
 (`intrinsics(camera)`: width, height, fx, fy, cx, cy) and `SpectatorView` settings, and
 declare the inventory in the manifest's `[devices]` table. A manifest's `install`

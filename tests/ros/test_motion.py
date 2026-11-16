@@ -2,10 +2,12 @@
 import math
 import pytest
 from builtin_interfaces.msg import Duration
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64
+from sensor_msgs.msg import JointState, MultiDOFJointState
+from std_msgs.msg import Float64, Header
 from std_srvs.srv import Trigger
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from geometry_msgs.msg import Quaternion, Transform, Twist, Vector3
+from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
+                                 MultiDOFJointTrajectoryPoint)
 from rosbridge_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph
 
@@ -58,6 +60,59 @@ def test_arm_target_validates_replaces_and_stops(tmp_path):
         graph.spin(.1)
         held = position()
         assert .2 < held[0] < .3 and .1 < held[1] < .2
+    finally:
+        graph.close()
+
+
+def poses(*targets, frame='reach/base', tip='tip', **point):
+    """A tip trajectory of (x, y, quaternion xyzw) targets one second apart."""
+    return MultiDOFJointTrajectory(header=Header(frame_id=frame), joint_names=[tip], points=[
+        MultiDOFJointTrajectoryPoint(transforms=[Transform(translation=Vector3(x=x, y=y),
+                                                           rotation=Quaternion(x=q[0], y=q[1], z=q[2], w=q[3]))],
+                                     time_from_start=Duration(sec=i + 1), **point)
+        for i, (x, y, q) in enumerate(targets)])
+
+
+def test_pose_target_moves_the_tip_validates_and_stops(tmp_path):
+    graph = Graph(tmp_path, backend='pose_toy')
+    try:
+        palms = []
+        graph.node.create_subscription(MultiDOFJointState, 'reach/pose_state', palms.append, STREAM_QOS)
+        states, publisher, stop = endpoints(graph, 'reach', 'pose_target', MultiDOFJointTrajectory)
+        position = lambda: list(states[-1].position)
+        assert graph.wait(.3).success
+        graph.spin(.1)
+        assert position() == pytest.approx([.5, -.5])  # uncommanded, the simulator holds the arm
+        # pose_state reports the measured tip in the device base, stamped with joint_state.
+        palm = palms[-1]
+        assert (palm.header.frame_id, list(palm.joint_names), palm.header.stamp) == (
+            'reach/base', ['tip'], states[-1].header.stamp)
+        assert (palm.transforms[0].translation.x, palm.transforms[0].translation.y) == (.5, -.5)
+        upright = (0., 0., 0., 1.)
+        send(graph, publisher, poses((1., 0., upright), (1.5, .5, (0., 0., 0., 2.))))
+        assert graph.wait(1.).success
+        graph.spin(.1)
+        assert position() == pytest.approx([1., 0.])  # interpolated from the measured tip
+        for invalid in (poses((0., 0., upright), frame='world'), poses((0., 0., upright), tip='palm'),
+                        poses((0., 0., (0., 0., 0., 0.))), poses((math.nan, 0., upright)),
+                        poses((0., 0., upright), velocities=[Twist()])):
+            send(graph, publisher, invalid)
+        result = graph.wait(1.)
+        assert result.success
+        for reason in ('pose targets must be expressed in reach/base', 'pose targets must name the tip link tip once',
+                       'reach tip pose needs a unit quaternion', 'reach tip pose has non-finite values',
+                       'only pose trajectories are supported'):
+            assert f'/reach/pose_target: {reason}' in result.message
+        graph.spin(.1)
+        assert position() == pytest.approx([1.5, .5])  # the active trajectory went on
+        send(graph, publisher, poses((-1., -1., upright)))
+        assert graph.wait(.5).success
+        assert graph.call(stop, Trigger.Request()).success
+        graph.spin(.1)
+        held = position()
+        assert graph.wait(1.).success
+        graph.spin(.1)
+        assert position() == pytest.approx(held) and -1. < held[0] < 1.5  # stop holds the measured tip
     finally:
         graph.close()
 

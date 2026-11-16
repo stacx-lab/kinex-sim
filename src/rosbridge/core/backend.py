@@ -13,6 +13,10 @@ class CommandGroup:
 
     A velocity group is a mobile base: it commands body velocities in its own
     units and expires to zero; its feedback is odometry, not a hold target.
+    A pose group names the tip link of a joint device that takes pose targets:
+    the tip's pose in the device base, [x, y, z, qx, qy, qz, qw], which the
+    simulator's own Cartesian control executes. Its feedback stays joint positions,
+    and its limits bound nothing it is commanded.
     """
 
     name: str
@@ -21,6 +25,7 @@ class CommandGroup:
     upper: tuple[float, ...]
     scalar: bool = False
     velocity: bool = False
+    tip: str | None = None
 
 
 @dataclass(frozen=True)
@@ -30,7 +35,8 @@ class ActionLayout:
     Commands are positions in feedback units, so a measured state is a valid
     hold target. Joint names are unique within a group; separate devices may
     share native names such as joint1. A velocity group's channels are the
-    planar odometry pose (x, y, yaw) and body twist (vx, vy, wz).
+    planar odometry pose (x, y, yaw) and body twist (vx, vy, wz). A pose group's
+    channels carry no command: its tip pose target travels in step's poses.
     """
 
     joint_names: tuple[str, ...]
@@ -48,6 +54,7 @@ class ActionLayout:
                     or len(group.indices) != len(group.upper)
                     or (group.scalar and len(group.indices) != 1)
                     or (group.velocity and (group.scalar or len(group.indices) != 3))
+                    or (group.tip is not None and (not group.tip or group.scalar or group.velocity))
                     or not all(0 <= i < len(self.joint_names) for i in group.indices)):
                 raise ValueError(f"invalid command group: {group.name}")
             if len({self.joint_names[i] for i in group.indices}) != len(group.indices):
@@ -75,6 +82,12 @@ class SimulatorBackend(Protocol):
     stays None otherwise, so done without it is the step limit ("timeout"). A
     backend whose only early stop is success may leave `stop` unset: done with
     success then names it.
+
+    A backend whose layout has pose groups is stepped as step(action, poses):
+    poses maps each pose group to its tip's target pose in the device base,
+    [x, y, z, qx, qy, qz, qw], or to None until the group's first command. Its
+    tip_pose(group) returns the measured tip pose there, which a stop holds and
+    a group's first trajectory starts from.
 
     Optionally, measures() returns the backend's own measures of the episode as
     JSON fields, such as BEHAVIOR's q_score; the episode record adds them.

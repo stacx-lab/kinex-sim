@@ -14,6 +14,7 @@ joint and gripper devices run in Kinex. rosbridge builds `Wait` from its own cop
 |---|---|
 | `world` | `time` (`/clock`, Clock), `wait` (`/world/wait`, Wait), `stop` (`/world/stop`) |
 | `joint` (arm, torso) | `joint_state` (`/<arm>/joint_state`, JointState), `joint_target` (`/<arm>/joint_target`, JointTrajectory), `stop` |
+| `joint` commanded by its tip pose (HandsOn's arms) | `joint_state`, `pose_target` (`/<arm>/pose_target`, MultiDOFJointTrajectory in `<arm>/base`), `pose_state` (`/<arm>/pose_state`, MultiDOFJointState), `stop` |
 | `gripper` | `joint_state`, `target` (`/<gripper>/target`, Float64 position), `stop` |
 | `locomotion` (base) | `velocity` (`/<base>/velocity`, Twist), `odometry` (`/<base>/odometry`, Odometry), `stop` |
 | `rgb` (camera) | `image` (`/<camera>/image`), `camera_info`, in frame `<camera>/base` |

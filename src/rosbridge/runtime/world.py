@@ -103,8 +103,12 @@ class WorldRuntime:
         if self.ended or not self.pacer.ready(self.waits.pending):
             return False
         action = self.commands.action(self.time_s + self.sim.period)
+        poses = self.commands.poses()  # pose groups' tip targets for the same step
         try:
-            self.sim.step(action)
+            if poses:
+                self.sim.step(action, poses)
+            else:
+                self.sim.step(action)
         except Exception as failure:
             # A step that fails, as BEHAVIOR's physics can when the robot is driven into furniture, ends the episode;
             # the world goes on answering.

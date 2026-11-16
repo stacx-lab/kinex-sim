@@ -179,8 +179,11 @@ class WorkerBackend:
     def state(self):
         return self._call("state")
 
-    def step(self, action):
-        return self._call("step", action)
+    def step(self, action, poses=None):
+        return self._call("step", action) if poses is None else self._call("step", action, poses)
+
+    def tip_pose(self, group):
+        return self._call("tip_pose", group)
 
     def intrinsics(self, camera):
         return self._call("intrinsics", camera)

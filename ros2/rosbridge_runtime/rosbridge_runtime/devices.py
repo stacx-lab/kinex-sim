@@ -4,10 +4,10 @@ from nav_msgs.msg import Odometry
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.event_handler import PublisherEventCallbacks
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from sensor_msgs.msg import CameraInfo, Image, JointState
+from sensor_msgs.msg import CameraInfo, Image, JointState, MultiDOFJointState
 from std_msgs.msg import Float64
 from std_srvs.srv import Trigger
-from trajectory_msgs.msg import JointTrajectory
+from trajectory_msgs.msg import JointTrajectory, MultiDOFJointTrajectory
 
 from . import conversions as conv
 
@@ -20,7 +20,8 @@ FRAME_QOS = QoSProfile(depth=1, durability=DurabilityPolicy.VOLATILE,
 
 
 class Actuator:
-    """An arm (`joint_target`) or gripper (`target`) with `joint_state` and `stop`."""
+    """An arm (`joint_target`, or `pose_target` of its tip link with the measured `pose_state`) or gripper
+    (`target`) with `joint_state` and `stop`."""
     stopped = 'holding the measured position'
 
     def __init__(self, spec, node):
@@ -39,12 +40,19 @@ class Actuator:
         if self.group.scalar:
             self.command = node.create_subscription(Float64, f'{name}/target', self.target, 10,
                                                     callback_group=callbacks)
+        elif self.group.tip:
+            self.pose_state = node.create_publisher(MultiDOFJointState, f'{name}/pose_state', STREAM_QOS)
+            self.command = node.create_subscription(MultiDOFJointTrajectory, f'{name}/pose_target',
+                                                    self.pose_target, 10, callback_group=callbacks)
         else:
             self.command = node.create_subscription(JointTrajectory, f'{name}/joint_target', self.joint_target, 10,
                                                     callback_group=callbacks)
 
     def publish(self, stamp, positions, velocities):
         self.state.publish(conv.joint_state(stamp, self.names, positions[self.indices], velocities[self.indices]))
+        if self.group.tip:
+            self.pose_state.publish(conv.pose_state(stamp, f'{self.spec.name}/base', self.group.tip,
+                                                    self.node.sim.tip_pose(self.group.name)))
 
     def _admit(self, apply):
         def run():
@@ -75,7 +83,27 @@ class Actuator:
             world.commands.set_trajectory(self.group.name, world.time_s if start is None else start, times, points)
         self._admit(apply)
 
+    def pose_target(self, msg):
+        def apply():
+            world, frame, tip = self.node.world, f'{self.spec.name}/base', self.group.tip
+            if msg.header.frame_id != frame:
+                raise ValueError(f'pose targets must be expressed in {frame}')
+            if list(msg.joint_names) != [tip]:
+                raise ValueError(f'pose targets must name the tip link {tip} once')
+            if any(p.velocities or p.accelerations for p in msg.points):
+                raise ValueError('only pose trajectories are supported')
+            start, times, poses = conv.pose_trajectory(msg)
+            if times and times[-1] > 120:  # the command buffer refuses one without points
+                raise ValueError('trajectory must end within 120 seconds')
+            if start is not None and start < world.time_s:
+                raise ValueError('trajectory start is in the past')
+            world.commands.set_pose_trajectory(self.group.name, world.time_s if start is None else start, times,
+                                               poses, lambda: self.node.sim.tip_pose(self.group.name))
+        self._admit(apply)
+
     def _hold(self):
+        if self.group.tip:
+            return self.node.sim.tip_pose(self.group.name)
         return self.node.sim.state()[0][self.indices]
 
     async def stop(self, request, response):
