@@ -46,6 +46,7 @@ class Graph:
             else:
                 self.owner = self.start(["ros2", "launch", "rosbridge_runtime", "sim.launch.py",
                                          f"backend:={backend}", f"mode:={mode}",
+                                         *([f"max_steps:={max_steps}"] if max_steps else []),
                                          *(["spectator_rate_hz:=10.0"] if spectators else [])])
             # Some backends build scenes or start renderers for minutes before serving.
             self.until(self.wait_client.service_is_ready, startup_s)

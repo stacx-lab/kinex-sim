@@ -37,6 +37,16 @@ def test_abc_observations_without_spectators(tmp_path):
         graph.close()
 
 
+
+def test_the_launch_files_max_steps_ends_the_episode(tmp_path):
+    graph = Graph(tmp_path, backend="abc", max_steps=3)  # ros2 launch ... max_steps:=3
+    try:
+        result = graph.wait(1.)
+        assert not result.success and "time limit" in result.message
+        assert result.time_s == pytest.approx(3 * .034, abs=1e-6)
+    finally:
+        graph.close()
+
 @pytest.mark.parametrize('mode', ['stepped', 'realtime'])
 def test_world_publishes_spectator_streams(tmp_path, mode):
     graph = Graph(tmp_path, backend='abc', mode=mode, spectators=True)
