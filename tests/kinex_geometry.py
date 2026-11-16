@@ -64,7 +64,7 @@ class Rig:
         profile = self.profiles[name]
         if profile["type"] == "gripper":
             profile = {"type": "joint", "name": name,
-                       "model": {**profile["model"], "tip_link": link}}
+                       "model": {**profile["model"], "tip_links": []}}
         return xyzq(JointModel(profile, self.directory / name).fk(list(positions), link))
 
     def flange(self, arm, positions):

@@ -65,7 +65,7 @@ model:
   format: urdf
   path: hand.urdf
   base_link: base_link
-  tip_link: null
+  tip_links: []
 limits: native
 home:
   left_thumb_CMC_FE: 0.0

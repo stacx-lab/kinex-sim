@@ -59,7 +59,8 @@ model:
   format: urdf
   path: torso.urdf
   base_link: base_link
-  tip_link: top
+  tip_links:
+  - top
 limits: native
 home:
   mobilebase0_joint_torso_height: 0.0

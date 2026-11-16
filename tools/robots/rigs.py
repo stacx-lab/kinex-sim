@@ -41,7 +41,8 @@ def clean(value, digits=12):
     return 0.0 if value == 0 else value
 
 
-def device(name, kind, description, operations, *, nodes=(), observation=None, **facts):
+def device(name, kind, description, operations, *, nodes=(), observation=None, layout=None, **facts):
+    """A device profile; layout is an rgb camera's (mono or stereo)."""
     runtime = {"domain_id": 0}
     if observation:
         runtime["observation"] = observation
@@ -49,8 +50,8 @@ def device(name, kind, description, operations, *, nodes=(), observation=None, *
                     "ready_timeout_s": 30})
     return {"name": name, "runtime": runtime, "operations": operations, "loaded": False,
             "meta": {"created_at": CREATED, "updated_at": CREATED}, "type": kind,
-            "description": description, "source": "introspected", "calibrated_at": None,
-            "method": "introspection", **facts}
+            **({"layout": layout} if layout else {}), "description": description,
+            "source": "introspected", "calibrated_at": None, "method": "introspection", **facts}
 
 
 def world(description):
@@ -98,7 +99,7 @@ def joint(name, description, joints, home, base, *, units="radians", part="arm",
     }
     return device(name, "joint", description, ops, nodes=("links.py",),
                   model={"format": "urdf", "path": model, "base_link": "base_link",
-                         "tip_link": tip},
+                         "tip_links": [tip] if tip else []},
                   limits="native", home={joint: clean(q) for joint, q in zip(joints, home)},
                   stop={"behavior": "hold", "affected_devices": [name]},
                   frames={"base": base})
@@ -194,7 +195,7 @@ def camera(name, description, intrinsics, base, depth_range=None):
                           "scale_m_per_unit": 0.001, "invalid_value": 0, "valid_range_m": span,
                           "reliable_range_m": dict(span), "registration": "color"}
     facts["frames"] = {"base": base}
-    return device(name, "rgbd" if rgbd else "rgb", description, ops, **facts)
+    return device(name, "rgbd" if rgbd else "rgb", description, ops, layout=None if rgbd else "mono", **facts)
 
 
 def workspace(identifier, name, kind, model):

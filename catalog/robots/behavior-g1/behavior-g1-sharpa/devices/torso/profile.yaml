@@ -62,7 +62,8 @@ model:
   format: urdf
   path: torso.urdf
   base_link: base_link
-  tip_link: top
+  tip_links:
+  - top
 limits: native
 home:
   waist_yaw_joint: 0.0

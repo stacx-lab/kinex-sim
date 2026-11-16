@@ -63,7 +63,8 @@ model:
   format: urdf
   path: arm.urdf
   base_link: base_link
-  tip_link: palm
+  tip_links:
+  - palm
 limits: native
 home:
   joint1_left: 1.5707963

@@ -61,7 +61,8 @@ model:
   format: urdf
   path: torso.urdf
   base_link: base_link
-  tip_link: top
+  tip_links:
+  - top
 limits: native
 home:
   torso_joint1: 1.024999976158

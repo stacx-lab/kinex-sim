@@ -63,7 +63,8 @@ model:
   format: urdf
   path: arm.urdf
   base_link: base_link
-  tip_link: flange
+  tip_links:
+  - flange
 limits: native
 home:
   left_shoulder_pitch_joint: 0.0

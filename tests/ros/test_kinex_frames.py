@@ -46,7 +46,7 @@ def test_urdf_links_and_kinex_frames_without_simulator(tmp_path):
 <joint name="hinge" type="revolute"><parent link="base"/><child link="rotor"/>
 <axis xyz="0 0 1"/><limit lower="-3.141592653589793" upper="3.141592653589793"/></joint>
 <joint name="end" type="fixed"><parent link="rotor"/><child link="tip"/><origin xyz="1 0 0"/></joint></robot>''')
-    model = {"format": "urdf", "path": "arm.urdf", "base_link": "base", "tip_link": "tip"}
+    model = {"format": "urdf", "path": "arm.urdf", "base_link": "base", "tip_links": ["tip"]}
 
     async def run():
         name = "arm_" + uuid.uuid4().hex

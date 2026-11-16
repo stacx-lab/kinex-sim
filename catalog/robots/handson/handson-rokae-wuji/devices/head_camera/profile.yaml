@@ -37,6 +37,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: rgb
+layout: mono
 description: Fixed RGB head camera (Gemini 336 calibration) above the station, rendered by
   HandsOn's RTX capture as an undistorted pinhole with its calibrated, off-center principal
   point. Calibration and the optical-frame mount are in the profile.
