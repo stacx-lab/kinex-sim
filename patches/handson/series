@@ -1,1 +1,12 @@
-# No patches: rosbridge drives the pinned upstream through its own native hooks.
+# One git patch filename per line, applied in order to .runtime/handson after the nested
+# Isaac Lab is exported into third_party/IsaacLab:
+# 0001 Isaac Lab's headless rendering app turns Kit's present thread off under the extension's
+#      pre-107 name (omni.renderer.core), which Kit 107 (Isaac Sim 5.1) ignores; the present
+#      thread then blits about 300 frames/s per idle world, each raising a GPU interrupt.
+0001-isaaclab-present-thread-off.patch
+# 0002 eval_gen06_spray_shoe's spray cone imports as an Xform named gen7_spray_cone with a child
+#      Mesh of the same name. Setup hid every prim with that name (eval_gen06_spray_shoe_scene.py:
+#      239-242), but the spray's show call un-hides only the first match, the Xform
+#      (abc_collection_env.py:15520-15533 via spray_visual_prim, scene:198-203), so the mesh stayed
+#      hidden and no spray was ever visible. The patch hides only the prim the spray toggles.
+0002-gen06-spray-cone-mesh-visible.patch

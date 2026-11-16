@@ -28,8 +28,26 @@ worker sees one GPU, the first in `CUDA_VISIBLE_DEVICES`, and renders on its Vul
 HandsOn bundles its robot, task and rendering assets in git, so nothing is downloaded:
 preparation clones upstream (6.5 GB with history), exports it into `.runtime/handson`
 (4.2 GB), installs `handson` and Isaac Lab's `isaaclab` package editable without
-dependencies, and checks every task's budget and upstream's SHA-256 pins of the bundled
-robot and rendering assets.
+dependencies, links three of Isaac Sim's MDL modules beside upstream's archived materials (see
+[Upstream corrections](#upstream-corrections)), and checks every task's budget, upstream's
+SHA-256 pins of the bundled robot and rendering assets, and those links.
+
+## Upstream corrections
+
+Preparation corrects three upstream defects whose correction leaves the scored task
+bit-identical. Every other upstream defect stays as the evaluator has it.
+- **Kit's present thread** (`patches/handson/0001`): Isaac Lab's headless app turns it off under
+  the extension's pre-Kit-107 name, `omni.renderer.core`, so every world, idle or not, kept
+  presenting about 300 frames a second, each a GPU interrupt; with several worlds per GPU a
+  host can lock up. The patch uses `omni.kit.renderer.core`.
+- **Materials:** three archived MDL files import Isaac Sim's `OmniGlass_Opacity`,
+  `OmniPBR_ClearCoat` and `OmniPBRBase` by relative name, which MDL resolves only beside the
+  importing file, so glass and some plastics in `t15`, `t27`, `t29`, `t30` and `t37` rendered
+  opaque red. Preparation links the three modules there from the pinned Isaac Sim, and the
+  asset check requires the links; nothing NVIDIA ships is copied into the repository.
+- **`eval_gen06_spray_shoe`'s spray cone** (`patches/handson/0002`): setup hid the cone and its
+  same-named child mesh, but showing a spray un-hides only the cone, so no spray was ever
+  visible. The patch hides only the prim the spray toggles.
 
 ## Episodes
 
