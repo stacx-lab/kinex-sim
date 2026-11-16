@@ -3,7 +3,9 @@
 Simulators with left/right arm and gripper devices run it with their observation
 camera; a rig with hands instead curls the right hand by `hand`, joint index to offset
 in radians. `offsets` are the left and right arms' first-joint swings, clear of the scene.
-Joint names come from measured joint states, so native names are kept.
+Joint names come from measured joint states, so native names are kept. A rig whose arms take
+other commands, such as HandsOn's palm poses, overrides arms, positions, target, moved, error
+and invalid.
 """
 import json
 import time
@@ -21,18 +23,18 @@ from rosbridge_runtime.devices import FRAME_QOS, STREAM_QOS
 
 
 class ControlDemo(Node):
+    tolerance = 0.03  # how close an arm comes to its goal, in the units of error()
+
     def __init__(self, name, camera, depth, hand=None, offsets=(0.2, 0.15)):
         super().__init__(name)
         self.camera, self.depth, self.hand, self.offsets, self.last = camera, depth, hand, offsets, {}
         self.effector = "right_hand" if hand else "right_gripper"
         self.info_count = 0
         self.create_subscription(Clock, "/clock", lambda msg: self.last.update(clock=msg), STREAM_QOS)
-        for device in ("left_arm", "right_arm", self.effector):
-            self.create_subscription(JointState, f"{device}/joint_state",
-                                     lambda msg, d=device: self.last.update({d: msg}), STREAM_QOS)
+        self.create_subscription(JointState, f"{self.effector}/joint_state",
+                                 lambda msg: self.last.update({self.effector: msg}), STREAM_QOS)
         self.create_subscription(CameraInfo, f"{camera}/camera_info", self.on_info, STREAM_QOS)
-        self.targets = {side: self.create_publisher(JointTrajectory, f"{side}_arm/joint_target", 1)
-                        for side in ("left", "right")}
+        self.arms()
         self.gripper = (self.create_publisher(JointTrajectory, "right_hand/joint_target", 1) if hand
                         else self.create_publisher(Float64, "right_gripper/target", 1))
         self.world = WorldClockClient(self)
@@ -82,6 +84,14 @@ class ControlDemo(Node):
         self.wait(lambda: self.last.get("clock") and self.sim_time() + 1e-9 >= result.time_s)
         self.spin(0.1)  # allow observation callbacks to drain
 
+    def arms(self):
+        """Each arm's state as self.last["<side>_arm"] and its command publisher as self.targets[side]."""
+        for side in ("left", "right"):
+            self.create_subscription(JointState, f"{side}_arm/joint_state",
+                                     lambda msg, d=f"{side}_arm": self.last.update({d: msg}), STREAM_QOS)
+        self.targets = {side: self.create_publisher(JointTrajectory, f"{side}_arm/joint_target", 1)
+                        for side in ("left", "right")}
+
     def positions(self, side):
         return list(self.last[f"{side}_arm"].position)
 
@@ -89,6 +99,17 @@ class ControlDemo(Node):
         self.targets[side].publish(JointTrajectory(
             joint_names=list(self.last[f"{side}_arm"].name),
             points=[JointTrajectoryPoint(positions=positions, time_from_start=Duration(sec=1))]))
+
+    def moved(self, side, start, offset):
+        """The goal offset from start: a swing of the first joint."""
+        return [start[0] + offset, *start[1:]]
+
+    def error(self, side, goal):
+        return abs(self.positions(side)[0] - goal[0])
+
+    def invalid(self, side):
+        """A target the arm refuses."""
+        self.target(side, [99.0] * 6)
 
     def grip_position(self):
         """The gripper's opening, or for a hand how far it is open: 1 minus its least curled fraction."""
@@ -119,7 +140,7 @@ class ControlDemo(Node):
         self.hand_start = list(self.last[self.effector].position)
         opened = self.grip_position()
         start = self.positions("left")
-        goal = [start[0] + self.offsets[0], *start[1:]]
+        goal = self.moved("left", start, self.offsets[0])
         self.target("left", goal)
         self.grip(0.0)
         self.spin(0.1)
@@ -127,7 +148,7 @@ class ControlDemo(Node):
         infos_start = self.info_count
         self.advance()
         elapsed_wall, elapsed_sim = time.monotonic() - wall_start, self.sim_time() - sim_start
-        if elapsed_sim <= 0 or abs(self.positions("left")[0] - goal[0]) > 0.03:
+        if elapsed_sim <= 0 or self.error("left", goal) > self.tolerance:
             raise AssertionError("left arm did not reach its target with an advancing clock")
         # Fingers stop on each other before a squeezing target, so compare with the open state.
         if self.grip_position() > opened - 0.5:
@@ -141,21 +162,21 @@ class ControlDemo(Node):
                                   or (depth.width, depth.height) != (image.width, image.height)):
             raise AssertionError("invalid registered depth image")
         rtf = elapsed_sim / elapsed_wall
-        self.target("left", [99.0] * 6)
+        self.invalid("left")
         self.spin(0.1)
         self.advance(0.17)
-        if abs(self.positions("left")[0] - goal[0]) > 0.03:
+        if self.error("left", goal) > self.tolerance:
             raise AssertionError("an invalid target changed the held target")
         right = self.positions("right")
-        right_goal = [right[0] + self.offsets[1], *right[1:]]
+        right_goal = self.moved("right", right, self.offsets[1])
         self.target("right", right_goal)
         self.target("left", start)
         self.grip(1.0)
         self.spin(0.1)
         self.advance()
-        if abs(self.positions("right")[0] - right_goal[0]) > 0.03:
+        if self.error("right", right_goal) > self.tolerance:
             raise AssertionError("right arm trajectory did not reach its endpoint")
-        if abs(self.positions("left")[0] - start[0]) > 0.03 or self.grip_position() < 0.8:
+        if self.error("left", start) > self.tolerance or self.grip_position() < 0.8:
             raise AssertionError(f"return motion or {self.effector} opening failed")
         print(json.dumps({"result": "PASS",
                           "control_test": f"arm trajectories, {self.effector} cycle, target rejection, "
@@ -167,9 +188,9 @@ class ControlDemo(Node):
                           "camera_info_count": self.info_count}), flush=True)
 
 
-def main(name, camera, depth=True, hand=None, offsets=(0.2, 0.15)):
+def main(name, camera, depth=True, hand=None, offsets=(0.2, 0.15), demo=ControlDemo):
     rclpy.init()
-    node = ControlDemo(name, camera, depth, hand, offsets)
+    node = demo(name, camera, depth, hand, offsets)
     try:
         node.run()
     finally:

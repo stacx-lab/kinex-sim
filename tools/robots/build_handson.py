@@ -23,6 +23,7 @@ import rigs  # noqa: E402
 from handson.evaluation.camera_contracts import current  # noqa: E402
 from rosbridge_handson.backend import SIDES  # noqa: E402
 from rosbridge_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, lens  # noqa: E402
+from rosbridge_handson.workspace import HELD  # noqa: E402
 
 PACKAGE = ROOT / ".runtime/handson/handson/handson"
 
@@ -44,6 +45,8 @@ def main():
         "frame transforms independently. This device exposes no task instructions or evaluator "
         "results.")}
     files = {}
+    held = (f" The single-arm tasks {', '.join('_'.join(task.split('_')[:2]) for task in HELD)} hold the left "
+            "arm and hand at home: their workspaces declare no commands for them.")
     for side in SIDES:
         model = mujoco.MjModel.from_xml_path(str(PACKAGE / f"sim/envs/xmls/rokae_wuji1_{side}.xml"))
         data = mujoco.MjData(model)
@@ -54,11 +57,14 @@ def main():
             f"ROKAE AR5 seven-joint {side} arm of the HandsOn station. Geometry is the sibling "
             f"arm.urdf with palm ({palm}, the pose HandsOn's EEF52 actions command) as the tip link; "
             f"measured links are on TF as {side}_arm/<link>, and helpers.joint_model('{side}_arm') "
-            "computes FK/IK from it. Commands are absolute joint positions in place of HandsOn's "
-            "palm-pose IK; the task's native controller settings and drives apply.",
+            "computes FK/IK from it. Commands are palm poses, which HandsOn's own arm IK executes with "
+            "the task's palm limits, guards and drives; an arm not yet commanded holds its posture."
+            + (held if side == "left" else ""),
             [f"joint{i}_{side}" for i in range(1, 8)], home(side),
             rigs.pose_frame("world:base", rigs.body_world(data, model.body(f"link0_{side}").id)),
-            tip="palm")
+            tip="palm", pose="HandsOn's own arm IK (damped least squares, one iteration per step from "
+            "the measured joints) and the task's palm limits execute them, so a pose may be reached "
+            "only in part or over several steps.")
         files[f"devices/{side}_arm/arm.urdf"] = rigs.mujoco_chain(
             model, [f"link{i}_{side}" for i in range(1, 8)] + [f"attachment_{side}", f"{side}_hand_mount", palm],
             f"rokae_ar5_{side}_arm",
@@ -71,7 +77,7 @@ def main():
             "(finger1) to the little finger (finger5), as HandsOn's hand20 actions. Geometry is the "
             "sibling hand.urdf from the palm to the fingertips, with no single tip link; commands are "
             "absolute joint positions that the native controller slews toward, and contact is "
-            "physical.",
+            "physical." + (held if side == "left" else ""),
             joints, [float(np.clip(0., *model.joint(joint).range)) for joint in joints],
             rigs.frame(f"{side}_arm:palm", (0, 0, 0), (0, 0, 0, 1)), part="hand", tip=None, model="hand.urdf")
         files[f"devices/{side}_hand/hand.urdf"] = rigs.mujoco_tree(

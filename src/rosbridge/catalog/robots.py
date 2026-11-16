@@ -4,7 +4,8 @@ Each robot is a complete workspace skeleton whose profiles carry its calibration
 Files shared by several robots are symlinks; export copies their content. A simulator
 whose devices differ by task or seed, such as HandsOn's cameras, names a `workspace`
 hook in its manifest: "module:function" under its python_path, called with its runtime
-directory, the native task and the seed, which returns profile changes by device.
+directory, the native task and the seed, which returns profile changes by device as
+JSON merge patches (RFC 7386).
 """
 import importlib
 from pathlib import Path
@@ -26,9 +27,12 @@ def list_robots(project=None):
 
 
 def merge(profile, changes):
-    """Change a profile in place: mappings merge key by key, other values replace."""
+    """Change a profile in place by a JSON merge patch: mappings merge key by key, None removes, other values
+    replace."""
     for key, value in changes.items():
-        if isinstance(value, dict) and isinstance(profile.get(key), dict):
+        if value is None:
+            profile.pop(key, None)
+        elif isinstance(value, dict) and isinstance(profile.get(key), dict):
             merge(profile[key], value)
         else:
             profile[key] = value

@@ -3,9 +3,12 @@ import numpy as np
 import psutil
 import pytest
 from builtin_interfaces.msg import Duration
-from sensor_msgs.msg import CameraInfo, Image, JointState
+from geometry_msgs.msg import Quaternion, Transform, Vector3
+from sensor_msgs.msg import CameraInfo, Image, JointState, MultiDOFJointState
+from std_msgs.msg import Header
 from std_srvs.srv import Trigger
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
+                                 MultiDOFJointTrajectoryPoint)
 
 from rosbridge_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
@@ -34,6 +37,21 @@ def trajectory(names, positions, nanosec=500_000_000):
         JointTrajectoryPoint(positions=list(positions), time_from_start=Duration(nanosec=nanosec))])
 
 
+def pose(state):
+    """A pose_state's palm [x, y, z, qx, qy, qz, qw]."""
+    t, q = state.transforms[0].translation, state.transforms[0].rotation
+    return [t.x, t.y, t.z, q.x, q.y, q.z, q.w]
+
+
+def palm(target):
+    """A left palm pose target [x, y, z, qx, qy, qz, qw] in left_arm/base, reached in 0.5 s."""
+    x, y, z, qx, qy, qz, qw = target
+    return MultiDOFJointTrajectory(header=Header(frame_id="left_arm/base"), joint_names=["palm"], points=[
+        MultiDOFJointTrajectoryPoint(transforms=[Transform(translation=Vector3(x=x, y=y, z=z),
+                                                           rotation=Quaternion(x=qx, y=qy, z=qz, w=qw))],
+                                     time_from_start=Duration(nanosec=500_000_000))])
+
+
 @pytest.mark.parametrize("mode", ["stepped"])
 def test_handson_graph_serves_the_kinex_devices_from_a_native_worker(tmp_path, monkeypatch, mode):
     # The graph is stopped by signal, before the worker removes its episode's files; pytest prunes these.
@@ -44,31 +62,33 @@ def test_handson_graph_serves_the_kinex_devices_from_a_native_worker(tmp_path, m
         native = workers(graph)
         assert len(native) == 1 and "handson-native" in native[0].exe()
         for kind, topic, key in ((JointState, "left_arm/joint_state", "arm"),
+                                 (MultiDOFJointState, "left_arm/pose_state", "palm"),
                                  (JointState, "right_hand/joint_state", "hand"),
                                  (CameraInfo, "head_camera/camera_info", "info"),
                                  (Image, "world/spectator/third_person/image_raw", "spectator")):
             node.create_subscription(kind, topic, lambda msg, k=key: last.update({k: msg}), STREAM_QOS)
-        arm_target = node.create_publisher(JointTrajectory, "left_arm/joint_target", 1)
+        arm_target = node.create_publisher(MultiDOFJointTrajectory, "left_arm/pose_target", 1)
         hand_target = node.create_publisher(JointTrajectory, "right_hand/joint_target", 1)
         stop = node.create_client(Trigger, "left_arm/stop")
         graph.until(lambda: arm_target.get_subscription_count() and hand_target.get_subscription_count()
                     and stop.service_is_ready())
         assert graph.wait(.2, WAIT_S).success
-        graph.until(lambda: all(k in last for k in ("arm", "hand", "info", "spectator")))
+        graph.until(lambda: all(k in last for k in ("arm", "palm", "hand", "info", "spectator")))
         assert last["arm"].name == [f"joint{i}_left" for i in range(1, 8)]
         assert last["hand"].name[:4] == [f"right_finger1_joint{j}" for j in range(1, 5)]
         assert (last["info"].width, last["info"].height, last["info"].header.frame_id) == (
             854, 480, "head_camera/base")
         assert (last["spectator"].width, last["spectator"].height) == (960, 720)
-        arm, hand = list(last["arm"].position), list(last["hand"].position)
-        arm[0] -= .1  # lifts the left hand: joint1 swings it vertically
+        assert last["palm"].header.frame_id == "left_arm/base" and list(last["palm"].joint_names) == ["palm"]
+        goal, hand = pose(last["palm"]), list(last["hand"].position)
+        goal[1] -= .05  # lifts the left palm 5 cm: world up is -y in left_arm/base
         hand[4] += .5  # index finger flexion
-        arm_target.publish(trajectory(last["arm"].name, arm))
+        arm_target.publish(palm(goal))  # upstream's own IK moves the arm
         hand_target.publish(trajectory(last["hand"].name, hand))
         graph.spin(.1)
         assert graph.wait(1., WAIT_S).success
         graph.spin(.1)
-        assert abs(last["arm"].position[0] - arm[0]) < .03
+        assert np.linalg.norm(np.subtract(pose(last["palm"])[:3], goal[:3])) < .01
         assert abs(last["hand"].position[4] - hand[4]) < .1
         assert graph.call(stop, Trigger.Request()).success
         image, _ = graph.frame("left_camera", timeout=WAIT_S)

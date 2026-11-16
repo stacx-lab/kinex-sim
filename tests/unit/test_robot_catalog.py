@@ -20,6 +20,9 @@ OPERATIONS = {
     "rgbd": {"image": "sensor_msgs/msg/Image", "depth": "sensor_msgs/msg/Image",
              "camera_info": "sensor_msgs/msg/CameraInfo"},
 }
+# A joint device commanded by the pose of its one tip link serves pose_target in place of joint_target.
+POSE = {"joint_state": "sensor_msgs/msg/JointState", "pose_state": "sensor_msgs/msg/MultiDOFJointState",
+        "pose_target": "trajectory_msgs/msg/MultiDOFJointTrajectory", "stop": "std_srvs/srv/Trigger"}
 WORLD = {"time": ("/clock", "rosgraph_msgs/msg/Clock"),
          "wait": ("/world/wait", "kinex_interfaces/srv/Wait"),
          "stop": ("/world/stop", "std_srvs/srv/Trigger")}
@@ -59,8 +62,11 @@ def test_every_rig_exports_unloaded_profiles_on_rosbridge_endpoints(tmp_path, id
     for name, profile in profiles.items():
         assert profile["name"] == name and profile["loaded"] is False
         assert profile["runtime"]["domain_id"] == 83
+        operations = POSE if "pose_target" in profile["operations"] else OPERATIONS.get(profile["type"])
+        if operations is POSE:
+            assert profile["type"] == "joint" and len(profile["model"]["tip_links"]) == 1
         expected = WORLD if name == "world" else {
-            op: (f"/{name}/{op}", kind) for op, kind in OPERATIONS[profile["type"]].items()}
+            op: (f"/{name}/{op}", kind) for op, kind in operations.items()}
         assert {op: (spec["endpoint"], spec["type"]) for op, spec in profile["operations"].items()} == expected
         assert all(isinstance(op["description"], str) and op["description"]
                    for op in profile["operations"].values())
@@ -198,7 +204,7 @@ HANDSON = PROJECT / ".runtime/handson/handson/handson/evaluation/camera_contract
 def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path):
     rig = PROJECT / "catalog/robots/handson/handson-rokae-wuji/devices"
     nominal = {name: yaml.safe_load((rig / name / "profile.yaml").read_text()) for name in
-               ("head_camera", "left_camera", "right_arm")}
+               ("head_camera", "left_camera", "right_arm", "left_arm")}
 
     def profiles(task, seed):
         directory = tmp_path / f"{task}-{seed}"
@@ -215,6 +221,20 @@ def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path
         assert 0 < max(map(abs, offset)) < .005
         assert first[camera]["color"]["distortion"] == {"model": "none"}
     assert first["right_arm"] == second["right_arm"] == {**nominal["right_arm"], "loaded": False}
+    # Upstream holds a single-arm task's left arm and hand at home in some tasks; there they take no commands.
+    held = profiles("eval-gen01-cover-lunchbox", 0)
+    assert list(held["left_arm"]["operations"]) == ["joint_state", "pose_state"]
+    assert held["left_arm"]["operations"]["joint_state"] == nominal["left_arm"]["operations"]["joint_state"]
+    assert held["right_arm"]["operations"] == nominal["right_arm"]["operations"]
+    assert list(first["left_arm"]["operations"]) == ["joint_state", "pose_target", "pose_state", "stop"]
     # t05 renders its wrists through its own profile.
     assert profiles("t05-fill-cup", 0)["left_camera"]["color"]["projection"]["fx"] == pytest.approx(269.564, abs=1e-3)
     assert first["left_camera"]["color"]["projection"]["fx"] == pytest.approx(272.135, abs=1e-3)
+
+
+def test_a_workspace_hook_changes_profiles_by_json_merge_patch():
+    from rosbridge.catalog.robots import merge
+    profile = {"operations": {"state": {"type": "a"}, "target": {"type": "b"}}, "frames": {"base": {"parent": None}}}
+    merge(profile, {"operations": {"target": None, "state": {"type": "c"}}, "description": "held"})
+    assert profile == {"operations": {"state": {"type": "c"}}, "frames": {"base": {"parent": None}},
+                       "description": "held"}

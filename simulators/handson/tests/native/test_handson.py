@@ -9,19 +9,22 @@ import sys
 
 import numpy as np
 import pytest
+import yaml
 
 from rosbridge.catalog import tasks
+from rosbridge.catalog.robots import setup
 from rosbridge.core.worker import WorkerBackend
-from tests.kinex_geometry import Rig, compose, requires_kinex, rt
+from tests.kinex_geometry import Rig, compose, requires_kinex, rt, xyzq
 
 # The default task: both arms move freely.
 TASK, STEPS = "t24_place_ball_in_bowl", 150
-ALL = [t["native_task"] for t in tasks(name="handson").values()]
-SELECTED = ALL if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["t12_load_and_start_microwave"]
+ALL = {t["native_task"]: t["id"] for t in tasks(name="handson").values()}
+# A bimanual task and one whose left arm and hand upstream holds.
+SELECTED = list(ALL) if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["t12_load_and_start_microwave",
+                                                                    "eval_gen01_cover_lunchbox"]
 SIDES = (("right", 0), ("left", 27))
 CURL = [4, 6, 7, 8, 10, 11]  # index and middle finger flexion, in the hand's finger-major order
-# joint1 swings a hand vertically and the arms mirror each other: these lift both hands clear of the table.
-LIFT = {"right": .1, "left": -.1}
+IDLE = {"right_arm": None, "left_arm": None}  # arms not yet commanded
 
 
 class Native(WorkerBackend):
@@ -31,6 +34,19 @@ class Native(WorkerBackend):
 
 def native(**options):
     return Native(python=sys.executable, env=dict(os.environ), **options)
+
+
+def lifted(sim, side, height):
+    """The measured palm pose in its arm base, height metres higher in the world."""
+    palm = np.asarray(sim.native("tip_pose", f"{side}_arm"), dtype=float)
+    rotation, _ = sim.native("link_pose", side, f"link0_{side}")
+    palm[:3] += np.asarray(rotation).T @ [0., 0., height]
+    return palm
+
+
+def angle(a, b):
+    """The rotation between two unit quaternions, in radians."""
+    return 2 * np.arccos(min(1., abs(float(np.dot(a, b)))))
 
 
 @pytest.fixture(scope="module")
@@ -49,24 +65,33 @@ def test_native_period_layout_and_devices(sim):
         assert names[offset:offset + 7] == tuple(f"joint{i}_{side}" for i in range(1, 8))
         assert names[offset + 7:offset + 27] == tuple(f"{side}_finger{f}_joint{j}"
                                                       for f in range(1, 6) for j in range(1, 5))
+    assert [group.tip for group in sim.layout.groups] == ["palm", None, "palm", None]
     assert [(d.name, d.kind) for d in sim.devices] == [
         ("right_arm", "joint"), ("right_hand", "joint"), ("left_arm", "joint"), ("left_hand", "joint"),
         ("head_camera", "rgb"), ("left_camera", "rgb"), ("right_camera", "rgb")]
 
 
-def test_arms_and_hands_track_absolute_targets(sim):
-    target = sim.state()[0]
-    for side, offset in SIDES:
-        target[offset] += LIFT[side]
-        target[[offset + 7 + i for i in CURL]] += .5
-    for _ in range(45):
-        sim.step(target)
-    assert sim.steps == 45 and sim.time_s == pytest.approx(1.5)
-    measured = sim.state()[0]
+def test_palms_track_pose_targets_and_hands_joint_targets(sim):
+    start = {side: np.asarray(sim.native("tip_pose", f"{side}_arm")) for side, _ in SIDES}
+    action = sim.state()[0]
+    for _ in range(15):
+        sim.step(action, IDLE)  # upstream's idle: the arms hold
+    for side, _ in SIDES:
+        np.testing.assert_allclose(sim.native("tip_pose", f"{side}_arm")[:3], start[side][:3], atol=2e-3)
+    # Upstream's IK lifts both palms clear of the table; the hands curl two fingers.
+    poses = {f"{side}_arm": lifted(sim, side, .05) for side, _ in SIDES}
     for _, offset in SIDES:
-        assert measured[offset] == pytest.approx(target[offset], abs=.02)
+        action[[offset + 7 + i for i in CURL]] += .5
+    for _ in range(45):
+        sim.step(action, poses)
+    assert sim.steps == 60 and sim.time_s == pytest.approx(2.)
+    measured = sim.state()[0]
+    for side, offset in SIDES:
+        palm, target = np.asarray(sim.native("tip_pose", f"{side}_arm")), poses[f"{side}_arm"]
+        np.testing.assert_allclose(palm[:3], target[:3], atol=5e-3)
+        assert angle(palm[3:], target[3:]) < np.radians(2)
         hand = [offset + 7 + i for i in CURL]
-        np.testing.assert_allclose(measured[hand], target[hand], atol=.1)
+        np.testing.assert_allclose(measured[hand], action[hand], atol=.1)
 
 
 def test_cameras_render_the_contract_and_leave_physics_unchanged(sim):
@@ -88,13 +113,13 @@ def test_cameras_render_the_contract_and_leave_physics_unchanged(sim):
 @requires_kinex
 def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
     rig = Rig(TASK, tmp_path, seed=0)  # the workspace of the episode the fixture loaded
-    target = sim.state()[0]
+    action = sim.state()[0]
     for _, offset in SIDES:
-        target[[offset + 1, offset + 3]] += .2
-        target[[offset + 7 + i for i in CURL]] += .3
+        action[[offset + 7 + i for i in CURL]] += .3
     for _ in range(2):
+        poses = {f"{side}_arm": lifted(sim, side, .03) for side, _ in SIDES}
         for _ in range(15):
-            sim.step(target)
+            sim.step(action, poses)
         q = sim.state()[0]
         palms = {}
         for side, offset in SIDES:
@@ -102,6 +127,10 @@ def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
             measured = sim.native("link_pose", side, f"{side}_palm_link")
             np.testing.assert_allclose(palm[0], measured[0], atol=1e-4)
             np.testing.assert_allclose(palm[1], measured[1], atol=1e-4)
+            # A pose target is the palm in the arm base, which Isaac places at the arm's profile mount.
+            in_world = compose(rig.mount(f"{side}_arm"), xyzq(list(sim.native("tip_pose", f"{side}_arm"))))
+            np.testing.assert_allclose(in_world[0], measured[0], atol=1e-4)
+            np.testing.assert_allclose(in_world[1], measured[1], atol=1e-4)
             hand = compose(palm, rig.mount(f"{side}_hand"))
             for finger in range(1, 6):
                 link = f"{side}_finger{finger}_link4"
@@ -121,22 +150,29 @@ def test_rig_matches_native_palms_fingers_and_cameras(tmp_path, sim):
 def test_episode_ends_at_its_step_limit_and_serves_one_episode(sim):
     hold = sim.state()[0]
     while not sim.done:
-        sim.step(hold)
+        sim.step(hold, IDLE)
     assert sim.steps == STEPS and sim.time_s == pytest.approx(STEPS / 30)
     with pytest.raises(RuntimeError, match="done"):
-        sim.step(hold)
+        sim.step(hold, IDLE)
     with pytest.raises(ValueError, match="one episode"):
         sim.reset(TASK, 0)
     assert sim.native("measures") == {"native_seed": 0}
 
 
 @pytest.mark.parametrize("task", SELECTED)
-def test_catalog_task_loads_and_steps(task):
+def test_catalog_task_loads_steps_and_commands_the_arms_upstream_drives(task, tmp_path):
     sim = native()
     try:
         sim.reset(task, 0)
+        held = sim.native("held_arms")
+        setup(ALL[task], tmp_path, seed=0)
+        operations = {name: yaml.safe_load((tmp_path / ".kinex/devices" / name / "profile.yaml").read_text())
+                      ["operations"] for name in ("right_arm", "right_hand", "left_arm", "left_hand")}
+        for side, _ in SIDES:
+            assert ("pose_target" in operations[f"{side}_arm"]) == (side not in held), side
+            assert ("joint_target" in operations[f"{side}_hand"]) == (side not in held), side
         assert not sim.done and sim.max_steps > 0
-        sim.step(sim.state()[0])
+        sim.step(sim.state()[0], IDLE)
         assert sim.steps == 1 and np.isfinite(sim.state()[0]).all() and sim.reward in (0., 1.)
     finally:
         sim.close()

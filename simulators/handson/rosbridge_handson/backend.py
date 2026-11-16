@@ -6,9 +6,10 @@ pre-screen accepted (seeds.json, written by tools/handson_seeds.py). A reset rep
 PhysX branch of upstream's official evaluator (handson/evaluation/native.py:run_episode)
 at that native seed: the frozen task contract, the seeded setting, native construction,
 reset, the stable-origin settle gate and the seeded instruction, written to PROMPT.json
-in the run directory. Every 1/30 s step passes the hands' absolute joint targets through
-the native action path and replaces only its palm-pose IK with the arms' absolute joint
-targets, so native hand slewing, arm step limits and success and failure predicates apply.
+in the run directory. Every 1/30 s step passes upstream's own command: each arm's palm pose
+target, which upstream's EEF52 actions command (the <side>_palm_link world pose), and the
+hand's absolute joint targets. The task's own arm IK, palm-pose limits and guards, hand
+slewing and success and failure predicates apply; an arm not yet commanded is upstream's idle.
 An early-stop run ends where the evaluator ends a trial (evaluation/rollout.py): at its
 first success, or at a task failure the native environment or the evaluator reports.
 
@@ -55,6 +56,20 @@ def world_pose(position, quaternion):
     from handson.evaluation.cameras import pose_matrix
     from handson.sim.isaaclab.compat import quat_isaaclab_to_wxyz
     return pose_matrix(values(position), quat_isaaclab_to_wxyz(values(quaternion)))
+
+
+def matrix(pose):
+    """The 4x4 transform of a pose [x, y, z, qx, qy, qz, qw]."""
+    from scipy.spatial.transform import Rotation
+    result = np.eye(4)
+    result[:3, :3], result[:3, 3] = Rotation.from_quat(pose[3:]).as_matrix(), pose[:3]
+    return result
+
+
+def pose(transform):
+    """[x, y, z, qx, qy, qz, qw] of a 4x4 transform."""
+    from scipy.spatial.transform import Rotation
+    return np.r_[transform[:3, 3], Rotation.from_matrix(transform[:3, :3]).as_quat()]
 
 
 def hydra_texture(product):
@@ -202,9 +217,8 @@ class HandsOnSim:
         env._time_limit = self.max_steps * self.period
         env.hz = 0  # the world paces wall time; upstream would sleep to 30 Hz
         self._index()
-        # Arms take absolute joint targets in place of the palm-pose IK; the rest of the native path stays.
-        self._arm = {side: env._joint_targets[side][:, env._arm_joint_ids[side]].clone() for side in SIDES}
-        env._compute_arm_joint_target = lambda side, robot, pose, commanded: (self._arm[side], "rosbridge")
+        # Arm pose targets are palm poses in the arm base (link0), which Isaac places in the world here.
+        self._base = {side: self._body(side, f"link0_{side}") for side in SIDES}
         self.steps, self.done, self.success, self.reward = 0, False, False, 0.
         if self.spectators:
             self._open_spectators()
@@ -221,7 +235,8 @@ class HandsOnSim:
                 self._ids[side] += ids
                 self._slices[side].append(slice(offset, len(names)))
                 groups.append(CommandGroup(f"{side}_{part}", tuple(range(offset, len(names))),
-                                           tuple(limits[ids, 0]), tuple(limits[ids, 1])))
+                                           tuple(limits[ids, 0]), tuple(limits[ids, 1]),
+                                           tip="palm" if part == "arm" else None))
         self.layout = ActionLayout(tuple(names), tuple(groups))
 
     @property
@@ -235,15 +250,19 @@ class HandsOnSim:
                                      for side, robot in zip(SIDES, robots)])
                      for field in ("joint_pos", "joint_vel"))
 
-    def step(self, action):
-        import torch
+    def step(self, action, poses):
+        """action: the hands' joint targets; poses: each arm's palm pose target in its base, or None."""
         if self.done:
             raise RuntimeError("episode is done")
         action, command = np.asarray(action, dtype=float), {}
         for side in SIDES:
-            robot, (arm, hand) = self.env._robots[side], (action[part] for part in self._slices[side])
-            self._arm[side] = torch.tensor([arm], device=robot.device, dtype=robot.data.joint_pos.dtype)
-            command[side] = np.r_[np.zeros(7), hand]  # a zero palm pose is "not commanded"
+            target = poses[f"{side}_arm"]
+            palm = np.zeros(7)  # upstream's "not commanded"
+            if target is not None:
+                world = pose(self._base[side] @ matrix(target))
+                # Upstream's commands are xyz and quaternion wxyz with w >= 0, as EEF52 decodes a rotation vector.
+                palm = np.r_[world[:3], np.copysign(1., world[6]) * world[[6, 3, 4, 5]]]
+            command[side] = np.r_[palm, action[self._slices[side][1]]]
         _, _, terminated, truncated, info = self.env.step(command)
         self.steps += 1
         self.success = bool(info.get("succeed"))
@@ -257,12 +276,39 @@ class HandsOnSim:
     def measures(self):
         return {"native_seed": self.native_seed}
 
-    def link_pose(self, side, link):
-        """A robot body's world pose (rotation, translation), for geometry checks."""
+    def tip_pose(self, group):
+        """An arm's measured palm pose [x, y, z, qx, qy, qz, qw] in its base."""
+        from handson.eef52 import measured_palm_pose
+        from handson.evaluation.cameras import pose_matrix
+        side = group.removesuffix("_arm")
+        palm, _ = measured_palm_pose(self.env, side)
+        return pose(np.linalg.inv(self._base[side]) @ pose_matrix(palm[:3], palm[3:]))
+
+    def held_arms(self):
+        """The arms whose targets upstream's control path never asks for in this task, for checks: it applies the
+        current targets once, without a physics step."""
+        raw, asked = getattr(self.env, "_raw", self.env), set()  # t22's evaluator steps a view of its environment
+        compute = raw._compute_arm_joint_target
+
+        def probe(side, *args):
+            asked.add(side)
+            return compute(side, *args)
+        raw._compute_arm_joint_target = probe
+        try:
+            raw._apply_joint_targets()
+        finally:
+            del raw._compute_arm_joint_target
+        return [side for side in SIDES if side not in asked]
+
+    def _body(self, side, link):
         robot = self.env._robots[side]
         state = robot.data.body_state_w[0, list(robot.body_names).index(link)]
-        matrix = world_pose(state[:3], state[3:7])
-        return matrix[:3, :3], matrix[:3, 3]
+        return world_pose(state[:3], state[3:7])
+
+    def link_pose(self, side, link):
+        """A robot body's world pose (rotation, translation), for geometry checks."""
+        transform = self._body(side, link)
+        return transform[:3, :3], transform[:3, 3]
 
     # Cameras ----------------------------------------------------------------------------
 

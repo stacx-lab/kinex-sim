@@ -76,8 +76,9 @@ def world(description):
 
 
 def joint(name, description, joints, home, base, *, units="radians", part="arm", tip="flange",
-          model="arm.urdf"):
-    """A joint device; tip is its FK/IK link, None for trees such as hands."""
+          model="arm.urdf", pose=None):
+    """A joint device; tip is its FK/IK link, None for trees such as hands. With pose, the device takes pose
+    targets of its tip, which pose says the simulator executes, instead of joint targets."""
     count = len(joints)
     over = f"all {count} {part} joints" if count > 1 else f"the {part} joint"
     ops = {
@@ -86,17 +87,34 @@ def joint(name, description, joints, home, base, *, units="radians", part="arm",
             "world-clock acquisition stamp; do not infer motion completion from a sent command.",
             "topic", "output", f"/{name}/joint_state", "sensor_msgs/msg/JointState",
             qos(durability="transient_local")),
-        "joint_target": operation(
+    }
+    if pose:
+        ops["pose_target"] = operation(
+            f"Trajectory of {tip} poses in {name}/base: header.frame_id {name}/base, joint_names [{tip}] "
+            "and one transform per point, translation in metres and a unit quaternion (xyzw), timed "
+            "from receipt by strictly increasing time_from_start and finishing within 120 seconds; "
+            "velocities and accelerations must be empty. A zero header stamp selects now; a nonzero "
+            "stamp must not start in the past. Poses are absolute, interpolated at the native control "
+            "period (positions linearly, rotations by slerp) from the held target, or from the measured "
+            f"{tip} before the first command. {pose} Replacement clears pending references; invalid "
+            f"trajectories are ignored, so verify the measured {tip} on TF.",
+            "topic", "input", f"/{name}/pose_target", "trajectory_msgs/msg/MultiDOFJointTrajectory")
+        ops["pose_state"] = operation(
+            f"Measured {tip} pose in {name}/base (joint_names [{tip}]), with the world-clock acquisition "
+            f"stamp of joint_state: the pose TF gives {name}/{tip} at that stamp.",
+            "topic", "output", f"/{name}/pose_state", "sensor_msgs/msg/MultiDOFJointState",
+            qos(durability="transient_local"))
+    else:
+        ops["joint_target"] = operation(
             f"Joint trajectory over {over} in {units}, timed from receipt by "
             "strictly increasing time_from_start and finishing within 120 seconds; velocities, "
             "accelerations and effort must be empty. A zero header stamp selects now; a nonzero "
             "stamp must not start in the past. Points are absolute native joint positions, "
             "linearly interpolated at the native control period. Replacement clears pending "
             "references; invalid trajectories are ignored, so verify measured joint_state.",
-            "topic", "input", f"/{name}/joint_target", "trajectory_msgs/msg/JointTrajectory"),
-        "stop": operation(f"Stop {part} motion and hold the measured posture.", "service", "input",
-                          f"/{name}/stop", "std_srvs/srv/Trigger"),
-    }
+            "topic", "input", f"/{name}/joint_target", "trajectory_msgs/msg/JointTrajectory")
+    ops["stop"] = operation(f"Stop {part} motion and hold the measured posture.", "service", "input",
+                            f"/{name}/stop", "std_srvs/srv/Trigger")
     return device(name, "joint", description, ops, nodes=("links.py",),
                   model={"format": "urdf", "path": model, "base_link": "base_link",
                          "tip_links": [tip] if tip else []},

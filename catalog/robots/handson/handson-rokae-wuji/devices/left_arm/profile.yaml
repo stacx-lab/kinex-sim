@@ -19,21 +19,38 @@ operations:
       reliability: reliable
       durability: transient_local
     timeout_s: 10
-  joint_target:
-    description: Joint trajectory over all 7 arm joints in radians, timed from receipt by
-      strictly increasing time_from_start and finishing within 120 seconds; velocities, accelerations
-      and effort must be empty. A zero header stamp selects now; a nonzero stamp must not
-      start in the past. Points are absolute native joint positions, linearly interpolated
-      at the native control period. Replacement clears pending references; invalid trajectories
-      are ignored, so verify measured joint_state.
+  pose_target:
+    description: 'Trajectory of palm poses in left_arm/base: header.frame_id left_arm/base,
+      joint_names [palm] and one transform per point, translation in metres and a unit quaternion
+      (xyzw), timed from receipt by strictly increasing time_from_start and finishing within
+      120 seconds; velocities and accelerations must be empty. A zero header stamp selects
+      now; a nonzero stamp must not start in the past. Poses are absolute, interpolated at
+      the native control period (positions linearly, rotations by slerp) from the held target,
+      or from the measured palm before the first command. HandsOn''s own arm IK (damped least
+      squares, one iteration per step from the measured joints) and the task''s palm limits
+      execute them, so a pose may be reached only in part or over several steps. Replacement
+      clears pending references; invalid trajectories are ignored, so verify the measured
+      palm on TF.'
     transport: topic
     direction: input
-    endpoint: /left_arm/joint_target
-    type: trajectory_msgs/msg/JointTrajectory
+    endpoint: /left_arm/pose_target
+    type: trajectory_msgs/msg/MultiDOFJointTrajectory
     qos:
       depth: 1
       reliability: reliable
       durability: volatile
+    timeout_s: 10
+  pose_state:
+    description: 'Measured palm pose in left_arm/base (joint_names [palm]), with the world-clock
+      acquisition stamp of joint_state: the pose TF gives left_arm/palm at that stamp.'
+    transport: topic
+    direction: output
+    endpoint: /left_arm/pose_state
+    type: sensor_msgs/msg/MultiDOFJointState
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: transient_local
     timeout_s: 10
   stop:
     description: Stop arm motion and hold the measured posture.
@@ -51,11 +68,13 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: ROKAE AR5 seven-joint left arm of the HandsOn station. Geometry is the sibling
-  arm.urdf with palm (left_palm_link, the pose HandsOn's EEF52 actions command) as the tip
-  link; measured links are on TF as left_arm/<link>, and helpers.joint_model('left_arm') computes
-  FK/IK from it. Commands are absolute joint positions in place of HandsOn's palm-pose IK;
-  the task's native controller settings and drives apply.
+description: 'ROKAE AR5 seven-joint left arm of the HandsOn station. Geometry is the sibling
+  arm.urdf with palm (left_palm_link, the pose HandsOn''s EEF52 actions command) as the tip
+  link; measured links are on TF as left_arm/<link>, and helpers.joint_model(''left_arm'')
+  computes FK/IK from it. Commands are palm poses, which HandsOn''s own arm IK executes with
+  the task''s palm limits, guards and drives; an arm not yet commanded holds its posture.
+  The single-arm tasks eval_comb01, eval_gen01, eval_gen03, eval_gen06, eval_gen07 hold the
+  left arm and hand at home: their workspaces declare no commands for them.'
 source: introspected
 calibrated_at: null
 method: introspection

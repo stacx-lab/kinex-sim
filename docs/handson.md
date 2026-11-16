@@ -144,33 +144,54 @@ free. Every run's detail goes to `seeds.json.log.jsonl`, which is not committed.
 | Device | Interfaces |
 |---|---|
 | `world` | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
-| `right_arm`, `left_arm` | `<arm>/joint_state`, `<arm>/joint_target`, `<arm>/stop` |
+| `right_arm`, `left_arm` | `<arm>/joint_state`, `<arm>/pose_target`, `<arm>/pose_state`, `<arm>/stop` |
 | `right_hand`, `left_hand` | `<hand>/joint_state`, `<hand>/joint_target`, `<hand>/stop` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/camera_info` |
 
-Arms keep upstream's joint names `joint1_<side>`..`joint7_<side>` (radians, native
-limits). An arm target is absolute joint positions and replaces only the native palm-pose
-IK of HandsOn's EEF52 action. The native controller still applies the task contract's arm
-settings and its stiff PD drives. They hold a free arm on its target, but they neither
-compensate a load nor pass through objects, so an arm that carries or presses on something
-settles short of its joint target. Examples:
-- `joint1_<side>` swings a hand vertically, positive raising the right hand and negative the
-  left, since the arms mirror each other. Lowering it alone presses the hand into the table:
-  in `t24`, −0.2 rad on `joint1_right` reaches 61%.
-- In `t12`, the right arm's `joint1_right` and `joint4_right` reach 60–85% of a 0.1 rad step
-  either way.
+Arms are commanded as upstream's EEF52 actions command them: by the pose of the palm,
+`<side>_palm_link`, the arm's tip link `palm`. A `pose_target` is a
+`MultiDOFJointTrajectory` of palm poses in `<side>_arm/base` (the arm's `link0_<side>`,
+mounted in `world:base`, which is Isaac's world), timed from receipt. rosbridge interpolates
+it at 30 Hz, positions linearly and rotations by slerp, and each step hands upstream the
+palm's world pose with the hand's targets, unchanged. Everything after that is upstream's:
+- **IK:** the task's own arm IK, Isaac Lab's damped least squares (λ 0.04) by default, one
+  iteration per step from the measured joints, so a distant pose takes several steps, and
+  the redundant elbow is the IK's, not the client's;
+- **palm limits and guards** that rewrite the commanded palm before the IK, such as
+  `eval_flex02`'s, `t10`'s lift guard, and the tracker-jump rejection and 0.78 m reach of
+  `t21` and `eval_comb03`;
+- **task mechanisms** that read it, such as the laptop hinge of `t16` and `eval_comb02`,
+  whose brake releases only while the commanded right palm rises with the hand on the
+  display, and `t41`'s arm-rate bound;
+- **joint limits and drives:** the task contract's arm settings and stiff PD drives, which
+  hold a free arm but neither compensate a load nor pass through objects.
 
-HandsOn's palm-pose IK hides this, because it starts each step from the measured joints. A
-joint-target controller should close that loop on `joint_state` or on the palm pose itself.
+Upstream keeps frozen copies of its base environment for some Core tasks, each with the arm
+IK and control path its results were recorded on: `core_box_base` (`t03`, `t14`,
+`t24`–`t26`), `core_pitcher_base` (`t04`, `t19`, `t44`, `t50`), `core_peg_base` (`t09`) and
+`core_photograph_base` (`t23`). `t22` wraps the shared IK; the other 54 tasks use it as is.
+Every task solves the full palm pose by damped least squares. A pose may be reached only in
+part. `pose_state` reports the measured palm pose in
+`<side>_arm/base` with `joint_state`'s stamp, the pose TF gives `<side>_arm/palm`. An arm
+not yet commanded is upstream's idle: it holds its reset posture. A stop holds the measured
+palm. Upstream treats a zero palm pose as no new command, so a commanded arm never returns
+to idle.
+
+Single-arm tasks `eval_comb01`, `eval_gen01`, `eval_gen03`, `eval_gen06` and `eval_gen07`
+hold the left arm and hand at home and never ask for their targets
+(`bimanual_assembly_env.py:_apply_joint_targets`). Their workspaces from `rosbridge setup`
+declare no commands on those two devices, only their state, so Kinex refuses a command at
+once. The other single-arm tasks drive both arms upstream: those built on the frozen bases,
+which predate the hold, and the five Core tasks upstream exempts from it (`t11`, `t29`,
+`t33`, `t34`, `t47`).
 
 Hands are `joint` devices of 20 joints, `<side>_finger1_joint1`..`<side>_finger5_joint4`.
 The order is finger-major from the thumb, the order of EEF52's hand20 values. Targets are
 absolute joint positions in radians that pass through the native hand path, including its
 target slewing. The rig `handson/handson-rokae-wuji`:
 - holds the arm chains and hand trees from upstream's robot MJCF;
-- ends each arm at `palm` (`<side>_palm_link`), the pose EEF52 commands, so Kinex IK maps
-  palm poses to arm joints;
-- mounts each hand on its arm's `palm`.
+- ends each arm at `palm` (`<side>_palm_link`), the pose EEF52 and `pose_target` command;
+- mounts each hand and wrist camera on its arm's `palm`.
 
 Cameras are RGB and render through upstream's three-view RTX capture: its exposure per
 sensor, and wrist views that hide the wrist's own cables. One capture renders all three
@@ -187,9 +208,10 @@ steps physics. The cameras are the evaluator's for the task and seed:
   camera on its palm, both at their nominal mount composed with that offset.
 
 `rosbridge setup handson/TASK --seed K` exports the workspace of that task and seed: the rig
-with each camera's intrinsics and drawn mount (`rosbridge_handson.workspace`, from upstream's
-camera contracts without Isaac; it needs `rosbridge prepare handson`). The catalog rig itself
-holds the default profile at nominal mounts.
+with each camera's intrinsics and drawn mount, and in the five held tasks the left arm and
+hand without commands (`rosbridge_handson.workspace`, from upstream's camera contracts
+without Isaac; it needs `rosbridge prepare handson`). The catalog rig itself holds the
+default profile at nominal mounts.
 
 ## Recording and checks
 
@@ -207,5 +229,7 @@ pixi run -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handso
     python tools/robots/build_handson.py                # rewrites the catalog rig
 ```
 
-With `KINEX_PYTHON`, the native checks also compare the exported workspace of `t24` at seed 0
-(palm FK, fingertips and drawn camera mounts) with Isaac.
+The native checks drive both palms by pose and check, per task, that the exported workspace
+commands exactly the arms upstream drives. With `KINEX_PYTHON` they also compare the exported
+workspace of `t24` at seed 0 (palm FK, the arm base mounts, fingertips and drawn camera
+mounts) with Isaac.
