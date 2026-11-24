@@ -324,3 +324,14 @@ cleanup, foreground/detached shutdown and MP4/MCAP recording. Skipped checks are
 not validation evidence. See [ABC](abc.md), [LIBERO](libero.md), [RoboTwin](robotwin.md),
 [RoboDojo](robodojo.md), [RoboCasa](robocasa.md), [BEHAVIOR](behavior.md), [HandsOn](handson.md) and [BiDex-100](bidex.md)
 for device maps.
+
+## Releases
+
+`VERSION` is the only place the version is written; `pyproject.toml` reads it. To release, change
+it, commit, and push the tag `v<VERSION>`: the release workflow checks the tag against the file,
+runs the unit tests and publishes the GitHub release.
+
+```bash
+echo 1.2.0 > VERSION
+git commit -am "Release v1.2.0" && git tag v1.2.0 && git push origin main v1.2.0
+```
