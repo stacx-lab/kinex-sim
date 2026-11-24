@@ -7,11 +7,11 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from rosbridge.catalog.robots import list_robots, merge, setup
+from kinex_sim.catalog.robots import list_robots, merge, setup
 
 
 PROJECT = Path(__file__).resolve().parents[2]
-# The operations rosbridge serves for each device type.
+# The operations kinex-sim serves for each device type.
 OPERATIONS = {
     "joint": {"joint_state": "sensor_msgs/msg/JointState",
               "joint_target": "trajectory_msgs/msg/JointTrajectory", "stop": "std_srvs/srv/Trigger"},
@@ -56,14 +56,14 @@ def configured(robots):
 
 def task_of(robot):
     """The first catalog task on a robot: setup exports a task's workspace."""
-    from rosbridge.catalog import tasks
+    from kinex_sim.catalog import tasks
     return next(task["id"] for task in tasks(PROJECT).values() if task["robot"] == robot)
 
 
 def export(identifier, directory, **options):
     """A robot's workspace through its first task, without the simulator's task and seed changes."""
     with patch.dict("sys.modules", {"rclpy": None, "mujoco": None}), \
-            patch("rosbridge.catalog.robots.changes", lambda *args: {}):
+            patch("kinex_sim.catalog.robots.changes", lambda *args: {}):
         result = setup(task_of(identifier), directory, project=PROJECT, **options)
     root = Path(directory) / ".kinex"
     profiles = {path.parent.name: yaml.safe_load(path.read_text())
@@ -72,7 +72,7 @@ def export(identifier, directory, **options):
 
 
 @pytest.mark.parametrize("identifier,configuration", configured(list_robots(PROJECT)))
-def test_every_rig_exports_loaded_profiles_on_rosbridge_endpoints(tmp_path, identifier, configuration):
+def test_every_rig_exports_loaded_profiles_on_kinex_sim_endpoints(tmp_path, identifier, configuration):
     import json
     result, root, profiles = export(identifier, tmp_path, domain_id=83, configuration=configuration)
     assert result["loaded"] and result["configuration"] == configuration
@@ -100,7 +100,7 @@ def test_every_rig_exports_loaded_profiles_on_rosbridge_endpoints(tmp_path, iden
         assert all(isinstance(op["description"], str) and op["description"]
                    for op in profile["operations"].values())
         assert all("parent" in frame for frame in profile["frames"].values())
-        # Every operation is an endpoint of rosbridge's world node, so no device declares a node of its own.
+        # Every operation is an endpoint of kinex-sim's world node, so no device declares a node of its own.
         assert profile["runtime"]["nodes"] == []
         assert ("model" in profile) == (profile["type"] in ("joint", "gripper"))
         # An RGB camera states its layout; an RGB-D camera, which has none, states its depth stream.
@@ -111,7 +111,7 @@ def test_every_rig_exports_loaded_profiles_on_rosbridge_endpoints(tmp_path, iden
     assert not any(root.rglob("*.pyc")) and not any(path.is_symlink() for path in root.rglob("*"))
     assert result["robot"] == identifier and result["task"] == task_of(identifier)
     with pytest.raises(ValueError, match="already contains"), \
-            patch("rosbridge.catalog.robots.changes", lambda *args: {}):
+            patch("kinex_sim.catalog.robots.changes", lambda *args: {}):
         setup(task_of(identifier), tmp_path, project=PROJECT)
     with pytest.raises(ValueError, match="domain ID"):
         setup(task_of(identifier), tmp_path / "other", project=PROJECT, domain_id=-1)
@@ -160,7 +160,7 @@ def test_rigs_carry_their_calibration_in_profiles(tmp_path, variant, base):
 
 
 def test_every_task_names_an_exportable_rig_of_its_simulator():
-    from rosbridge.catalog import tasks
+    from kinex_sim.catalog import tasks
     robots = list_robots(PROJECT)
     for task in tasks(PROJECT).values():
         assert task["robot"] in robots and task["robot"].split("/")[0] == task["simulator"], task["id"]
@@ -168,7 +168,7 @@ def test_every_task_names_an_exportable_rig_of_its_simulator():
 
 def test_every_libero_task_names_an_exportable_rig():
     from collections import Counter
-    from rosbridge.catalog import tasks
+    from kinex_sim.catalog import tasks
     project = Path(__file__).resolve().parents[2]
     counts = Counter(task["robot"] for task in tasks(project, "libero").values())
     assert counts == {f"libero/libero-panda-{name}": count for name, count in
@@ -179,7 +179,7 @@ def test_every_libero_task_names_an_exportable_rig():
 
 def test_cli_filters_tasks_by_rig(capsys):
     import json
-    from rosbridge.cli.main import main
+    from kinex_sim.cli.main import main
     assert main(["tasks", "list", "--simulator", "libero", "--robot",
                  "libero/libero-panda-floor", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
@@ -189,8 +189,8 @@ def test_cli_filters_tasks_by_rig(capsys):
 
 
 def test_setup_takes_the_launch_seed_and_names_its_task(tmp_path, monkeypatch):
-    import rosbridge.catalog.robots as robots
-    from rosbridge.catalog import resolve
+    import kinex_sim.catalog.robots as robots
+    from kinex_sim.catalog import resolve
     task = resolve("robotwin", PROJECT)[2]
     result = setup(task["id"], tmp_path / "default", project=PROJECT)
     assert (result["task"], result["seed"], result["robot"]) == (task["id"], 0, task["robot"])
@@ -244,8 +244,8 @@ def test_a_handson_workspace_holds_the_cameras_its_task_and_seed_render(tmp_path
 def test_every_handson_task_renders_the_lenses_of_the_catalog_rig():
     """A task's cameras may change their pinhole, never whether they have a lens: the lens decides the geometry
     operations of the rig's profile."""
-    from rosbridge.catalog import resolve, tasks
-    from rosbridge.catalog.robots import changes
+    from kinex_sim.catalog import resolve, tasks
+    from kinex_sim.catalog.robots import changes
     rig = PROJECT / "catalog/robots/handson/handson-rokae-wuji/devices"
     models = {name: yaml.safe_load((rig / name / "profile.yaml").read_text())["color"]["distortion"]
               for name in ("head_camera", "left_camera", "right_camera")}
@@ -256,7 +256,7 @@ def test_every_handson_task_renders_the_lenses_of_the_catalog_rig():
 
 
 def test_a_workspace_hook_changes_profiles_by_json_merge_patch():
-    from rosbridge.catalog.robots import merge
+    from kinex_sim.catalog.robots import merge
     profile = {"operations": {"state": {"type": "a"}, "target": {"type": "b"}}, "frames": {"base": {"parent": None}}}
     merge(profile, {"operations": {"target": None, "state": {"type": "c"}}, "description": "held"})
     assert profile == {"operations": {"state": {"type": "c"}}, "frames": {"base": {"parent": None}},
@@ -319,7 +319,7 @@ def test_rig_builders_write_configurations_as_patches_that_merge_back():
 def test_setup_ships_a_rigs_library_programs_and_skills_with_its_configurations_on_top(tmp_path):
     """Kinex workspace content a rig ships, and a configuration's files over it; never over a workspace's own."""
     project = tmp_path / "project"
-    (project / "src/rosbridge").mkdir(parents=True)  # what project_root takes for a checkout
+    (project / "src/kinex_sim").mkdir(parents=True)  # what project_root takes for a checkout
     (project / "pixi.toml").touch()
     simulator = project / "simulators/toy"
     simulator.mkdir(parents=True)

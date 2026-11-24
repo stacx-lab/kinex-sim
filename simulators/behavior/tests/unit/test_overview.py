@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_behavior.backend import WALL_MARGIN, inside
+from kinex_sim_behavior.backend import WALL_MARGIN, inside
 
 
 def test_an_overview_stays_inside_the_robots_room():

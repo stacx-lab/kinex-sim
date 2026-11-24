@@ -2,7 +2,7 @@
 import pytest
 
 pytest.importorskip("mujoco")
-from rosbridge_abc.backend import rollout_stop  # noqa: E402
+from kinex_sim_abc.backend import rollout_stop  # noqa: E402
 
 
 @pytest.mark.parametrize("task_eval, expected", [

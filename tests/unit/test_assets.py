@@ -10,15 +10,15 @@ import zipfile
 
 import pytest
 
-from rosbridge.assets import AssetStore, asset_root, link_asset
+from kinex_sim.assets import AssetStore, asset_root, link_asset
 from tests.asset_helpers import package, ensure
 
 
 def test_asset_root_override(monkeypatch, tmp_path):
-    monkeypatch.delenv("ROSBRIDGE_ASSET_ROOT", raising=False)
-    monkeypatch.setattr("rosbridge.assets.cache.project_root", lambda: tmp_path)
+    monkeypatch.delenv("KINEX_SIM_ASSET_ROOT", raising=False)
+    monkeypatch.setattr("kinex_sim.assets.cache.project_root", lambda: tmp_path)
     assert asset_root() == tmp_path / ".runtime/assets"
-    monkeypatch.setenv("ROSBRIDGE_ASSET_ROOT", str(tmp_path / "disk"))
+    monkeypatch.setenv("KINEX_SIM_ASSET_ROOT", str(tmp_path / "disk"))
     assert asset_root() == tmp_path / "disk"
 
 

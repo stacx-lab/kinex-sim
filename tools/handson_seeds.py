@@ -13,7 +13,7 @@ Each candidate resets HandsOnSim at its native seed in a process of its own, as 
 episode per process), on one of --gpus (--per-gpu processes each), then closes it; each costs about a launch's
 startup. A slot starts a reset only while its GPU has --min-free-gb free, and one start at a time per GPU, so other
 jobs keep their memory. A task takes candidates in order while its accepted and running candidates are fewer than
---count (rosbridge_handson.seeds.Screen). A candidate whose reset fails for another reason runs once more; a second
+--count (kinex_sim_handson.seeds.Screen). A candidate whose reset fails for another reason runs once more; a second
 error, or --max-candidates seeds without --count accepted, leaves the task incomplete, and the screen exits 1.
 
 The table (--output) is rewritten after every verdict and read back on a rerun, which screens only what is
@@ -32,7 +32,7 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "simulators/handson"))
-from rosbridge_handson.seeds import SEEDS, Screen  # noqa: E402
+from kinex_sim_handson.seeds import SEEDS, Screen  # noqa: E402
 
 MARK = "handson-seed: "
 # A task body that moves farther than this while the settle gate settles the scene has left its place. Across the gate,
@@ -70,8 +70,8 @@ def one(task, seed):
     process."""
     import torch  # noqa: F401  first, as the backend imports it
     from handson.evaluation import task_contracts
-    from rosbridge_handson.backend import HandsOnSim, SettleGateRejected
-    os.environ.pop("ROSBRIDGE_RUN_DIR", None)  # receipts go to a temporary directory
+    from kinex_sim_handson.backend import HandsOnSim, SettleGateRejected
+    os.environ.pop("KINEX_SIM_RUN_DIR", None)  # receipts go to a temporary directory
     readings, initialize = [], task_contracts.initialize
 
     def gate(env, *args):
@@ -129,7 +129,7 @@ def main():
     args = parser.parse_args()
     if args.one:  # a worker of this tool
         return one(args.one[0], int(args.one[1]))
-    from rosbridge.catalog import resolve, tasks as catalog
+    from kinex_sim.catalog import resolve, tasks as catalog
     names = ([resolve("handson", task=task)[2]["native_task"] for task in args.tasks] if args.tasks else
              [task["native_task"] for task in catalog(name="handson").values()])
     revision = tomllib.loads((ROOT / "simulators/handson/simulator.toml").read_text())["source_revision"]

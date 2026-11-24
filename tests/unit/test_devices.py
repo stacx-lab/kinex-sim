@@ -1,6 +1,6 @@
 import pytest
-from rosbridge.core.devices import DeviceSpec, SampleSchedule, SpectatorView, device_inventory, spectator_views
-from rosbridge.catalog import resolve
+from kinex_sim.core.devices import DeviceSpec, SampleSchedule, SpectatorView, device_inventory, spectator_views
+from kinex_sim.catalog import resolve
 from tests.toy_backend import ToyBackend
 
 
@@ -42,7 +42,7 @@ def test_sampling_uses_sim_time_and_skips_gaps():
 
 
 def test_cameras_sample_at_30_hz_unless_the_backend_sets_its_rate():
-    from rosbridge.core.devices import SampleSchedule, camera_rate
+    from kinex_sim.core.devices import SampleSchedule, camera_rate
     from tests.toy_backend import SlowCameraToy, ToyBackend
     assert camera_rate(ToyBackend()) == 30. and camera_rate(SlowCameraToy()) == 2.
 

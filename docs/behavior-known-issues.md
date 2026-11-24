@@ -1,14 +1,14 @@
 # BEHAVIOR: known environment issues
 
-This page lists the problems known in BEHAVIOR-1K's 100 activities of the 2026 challenge as rosbridge runs them: the `behavior` simulator, BEHAVIOR's R1Pro with grippers and assisted grasping as the official evaluator configures it, with upstream pinned at `a8247a8cc1633fe1ca0cc66aa07243d46c64f155`. [BEHAVIOR](behavior.md) describes how rosbridge runs the simulator, including the patches preparation applies. Problems of a harness that runs agents, outside this repository, are not listed.
+This page lists the problems known in BEHAVIOR-1K's 100 activities of the 2026 challenge as kinex-sim runs them: the `behavior` simulator, BEHAVIOR's R1Pro with grippers and assisted grasping as the official evaluator configures it, with upstream pinned at `a8247a8cc1633fe1ca0cc66aa07243d46c64f155`. [BEHAVIOR](behavior.md) describes how kinex-sim runs the simulator, including the patches preparation applies. Problems of a harness that runs agents, outside this repository, are not listed.
 
-Most entries were found while rosbridge also ran the R1Pro with Sharpa hands (`behavior-dex`, since removed) and are measured on whichever R1Pro the entry names; both share the evaluator's base, torso, arms, cameras and house. Entries about the hands alone left with that simulator: handles a hand cannot grip, a toy beyond a hand's reach, and whether hands can solve each activity.
+Most entries were found while kinex-sim also ran the R1Pro with Sharpa hands (`behavior-dex`, since removed) and are measured on whichever R1Pro the entry names; both share the evaluator's base, torso, arms, cameras and house. Entries about the hands alone left with that simulator: handles a hand cannot grip, a toy beyond a hand's reach, and whether hands can solve each activity.
 
-## What rosbridge fixes
+## What kinex-sim fixes
 
-rosbridge reproduces the pinned evaluator: its physics, transition rules, success, horizon and partial credit, so that results compare with upstream's. By that rule:
+kinex-sim reproduces the pinned evaluator: its physics, transition rules, success, horizon and partial credit, so that results compare with upstream's. By that rule:
 
-1. **rosbridge's own protocol** (how it drives, ends and reports an episode) is fixed wherever it departs from the evaluator's or hides what the evaluator would show.
+1. **kinex-sim's own protocol** (how it drives, ends and reports an episode) is fixed wherever it departs from the evaluator's or hides what the evaluator would show.
 2. **An upstream defect** is corrected at preparation only when the correction leaves the scored task bit-identical (physics, success, partial credit and simulation time), restores what upstream evidently intends or protects the host, and admits no other reading. `0003-goal-option-literals.patch`, which evaluates each distinct goal literal once, is one: the same `q_score`, without hours of repeated evaluation.
 3. **Any other upstream defect** is left as the evaluator has it, documented here and worth reporting upstream, even when it makes an activity impossible.
 
@@ -18,7 +18,7 @@ Three changes on `main` predate this rule and change what is scored: the slicer 
 
 **Evidence.** Each entry says how it is known:
 
-- *measured*: a native run in Isaac Sim through rosbridge's backend;
+- *measured*: a native run in Isaac Sim through kinex-sim's backend;
 - *read*: source code or data files;
 - *inferred*: reasoning from measured or read facts, not itself run;
 - *recorded*: seen in an agent episode.
@@ -29,13 +29,13 @@ Unless stated otherwise, native runs used seed 0, which loads public test instan
 
 | Status | Meaning |
 |---|---|
-| rosbridge | Fixed in rosbridge's protocol (rule 1) |
+| kinex-sim | Fixed in kinex-sim's protocol (rule 1) |
 | prepared | Corrected at preparation (rule 2) |
-| departs | rosbridge changes the evaluator's rule; kept as an exception to rule 3 |
-| upstream | Needs a change in BEHAVIOR-1K or OmniGibson; rosbridge leaves it as the evaluator has it (rule 3) |
+| departs | kinex-sim changes the evaluator's rule; kept as an exception to rule 3 |
+| upstream | Needs a change in BEHAVIOR-1K or OmniGibson; kinex-sim leaves it as the evaluator has it (rule 3) |
 | open | A protocol fix (rule 1) is due and not made, or no fix is proposed |
 | unknown | The cause is not established |
-| no longer applies | The cause is gone from rosbridge |
+| no longer applies | The cause is gone from kinex-sim |
 | left as is | Known and deliberately unchanged, with the reason |
 | property | Not a defect: how the environment works, worth knowing |
 
@@ -52,12 +52,12 @@ Nothing has been reported to BEHAVIOR-1K yet. Section 9 lists the reports worth 
 | 2.5 | Lids and flaps fall shut or fall open | upstream |
 | 2.6 | Torso targets that stall are collisions | property |
 | 2.7 | "Car windows have no collision" | not reproduced |
-| 3.1 | The first removed visual particle crashed the world, and start poses were wrong | rosbridge |
+| 3.1 | The first removed visual particle crashed the world, and start poses were wrong | kinex-sim |
 | 3.2 | Particle removers followed a tool only when a camera was read | no longer applies; upstream |
 | 3.3 | A broken attachment joint aborted the process | no longer applies; upstream |
-| 3.4 | A physics failure ends the episode without a score | rosbridge (ends cleanly); open (no score) |
+| 3.4 | A physics failure ends the episode without a score | kinex-sim (ends cleanly); open (no score) |
 | 3.5 | Native worker segmentation fault | unknown |
-| 4.1 | Wait replies did not say that or why the episode ended | rosbridge |
+| 4.1 | Wait replies did not say that or why the episode ended | kinex-sim |
 | 4.2 | A tilted base looks upright in odometry and TF | open |
 | 4.3 | A client cannot read the episode's step limit | open |
 | 4.4 | Device texts do not say how cutting, toggling and removal work | property |
@@ -137,13 +137,13 @@ All six glass links of both car models have a collision mesh, and 34 to 42 of 54
 
 ### 3.1 The first removed visual particle crashed the world, and start poses were wrong
 
-- **Cause** (*measured*). An earlier version of rosbridge's `0004-particle-handle-updates.patch` stopped updating the physics handles after a visual particle was removed. Deleting any prim drops the handle of every articulation view, so the next joint read raised and joint or pose writes were silently discarded.
+- **Cause** (*measured*). An earlier version of kinex-sim's `0004-particle-handle-updates.patch` stopped updating the physics handles after a visual particle was removed. Deleting any prim drops the handle of every articulation view, so the next joint read raised and joint or pose writes were silently discarded.
 - **Symptoms.** The first particle a cleaning tool removed ended the episode, in the 11 activities whose goals remove visual particles. Restoring an instance lost the robot's start pose: `sweeping_garage` started 1.04 m and 2.02 rad off, `clean_a_patio` 4.8 m, `putting_dirty_dishes_in_sink` 1.4 m, `scrubbing_bathroom_floor` 0.10 m.
-- **Status.** rosbridge: the patch updates the handles once per batch of particles removed, visual ones included.
+- **Status.** kinex-sim: the patch updates the handles once per batch of particles removed, visual ones included.
 
 ### 3.2 Particle removers followed a tool only when a camera was read
 
-- **Cause** (*measured*). Particle removers and `link.aabb`, `link.visual_aabb`, `obj.aabb` read poses from Fabric, which Kit updates when it renders. While rosbridge stepped without rendering, a broom driven 1.03 m over three particles removed none; its removal volume read 1028 mm behind.
+- **Cause** (*measured*). Particle removers and `link.aabb`, `link.visual_aabb`, `obj.aabb` read poses from Fabric, which Kit updates when it renders. While kinex-sim stepped without rendering, a broom driven 1.03 m over three particles removed none; its removal volume read 1028 mm behind.
 - **Status.** No longer applies: every step is the evaluator's `env.step`, which renders. The defect remains upstream for any step that does not render.
 
 ### 3.3 A broken attachment joint aborted the process
@@ -155,7 +155,7 @@ All six glass links of both car models have a collision mesh, and 34 to 42 of 54
 ### 3.4 A physics failure ends the episode without a score
 
 - **Symptom.** PhysX reports `Illegal BroadPhaseUpdateData` and OmniGibson's own step asserts on the base's NaN orientation.
-- **Status.** rosbridge: a step that raises ends the episode with reason `error`; every later wait reply says `the episode ended because the simulation failed (<kind>)`, and the world goes on answering. The record carries the error and no `q_score`, since the failure may have broken the simulation. Open: a check of the robot's state after every step, ending the episode with its score before OmniGibson fails, was proposed and not merged.
+- **Status.** kinex-sim: a step that raises ends the episode with reason `error`; every later wait reply says `the episode ended because the simulation failed (<kind>)`, and the world goes on answering. The record carries the error and no `q_score`, since the failure may have broken the simulation. Open: a check of the robot's state after every step, ending the episode with its score before OmniGibson fails, was proposed and not merged.
 
 ### 3.5 Native worker segmentation fault
 
@@ -165,7 +165,7 @@ One recorded `canning_food` episode ended with signal 11. It was never reproduce
 
 ### 4.1 Wait replies did not say that or why the episode ended
 
-rosbridge: every wait reply at or after the end states it, for example `the episode ended because the time limit was reached`, `because the task succeeded` (with `--early-stop`), or `because the simulation failed (<kind>)`. Later waits are rejected.
+kinex-sim: every wait reply at or after the end states it, for example `the episode ended because the time limit was reached`, `because the task succeeded` (with `--early-stop`), or `because the simulation failed (<kind>)`. Later waits are rejected.
 
 ### 4.2 A tilted base looks upright
 
@@ -202,7 +202,7 @@ Device texts say what each device does, not the rules of the house: that only a 
 
 ### 6.1 Goal particles beyond a locked door
 
-- *Measured and read.* OmniGibson loads every door of the scene but the floors of the loaded rooms only, so a door can open onto no floor; rosbridge closes and locks such doors at load. OmniGibson's ground sampler tests that a pose is traversable, not that it lies in the covered object's room. `sweeping_garage` at seed 0 has a sand and a dust particle on the slab beyond the garage door, which is locked. `covered` holds while one particle is left, so the goal could not be reached. Instance 313 (seed 12) has one such particle, and so do 24 of 300 training instances.
+- *Measured and read.* OmniGibson loads every door of the scene but the floors of the loaded rooms only, so a door can open onto no floor; kinex-sim closes and locks such doors at load. OmniGibson's ground sampler tests that a pose is traversable, not that it lies in the covered object's room. `sweeping_garage` at seed 0 has a sand and a dust particle on the slab beyond the garage door, which is locked. `covered` holds while one particle is left, so the goal could not be reached. Instance 313 (seed 12) has one such particle, and so do 24 of 300 training instances.
 - **Status.** Departs: loading removes the goal particles that the room map places in a room that is not loaded, and the record names them in `particles_removed_out_of_loaded_rooms`. Among the public instances this changes `sweeping_garage` at seeds 0 and 12 only; no locked door is part of an activity. Upstream for the sampler.
 - **Limit of the rule.** It is correct for every public instance, checked on all 894 public particle places, but not by construction. It holds because the sampler's 7×7 erosion empties the three map cells between the door and the room boundary, and because the 0.1 m room map takes each cell's label from its first pixel. Instances resampled for a smaller robot, or a room map at another resolution, would break it.
 
@@ -240,7 +240,7 @@ No start fact points at the bound one, so no instruction derived from the BDDL c
 
 ### 8.1 Success fires at first contact
 
-The task succeeds at the first step all literals hold, for example with a cup still moving at 0.29 m/s. This is the evaluator's semantics and rosbridge keeps it; with `--early-stop` that step ends the episode. A stricter dwell measure belongs in a harness, as an extra recorded metric.
+The task succeeds at the first step all literals hold, for example with a cup still moving at 0.29 m/s. This is the evaluator's semantics and kinex-sim keeps it; with `--early-stop` that step ends the episode. A stricter dwell measure belongs in a harness, as an extra recorded metric.
 
 ### 8.2 `OnTop` depends on yaw under an overhang
 

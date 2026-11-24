@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from rosbridge.catalog import tasks
-from rosbridge_libero.backend import LiberoSim
-from rosbridge_libero.assets import configure, task_files
+from kinex_sim.catalog import tasks
+from kinex_sim_libero.backend import LiberoSim
+from kinex_sim_libero.assets import configure, task_files
 
 
 @pytest.mark.parametrize('task', [t['native_task'] for t in tasks(name='libero').values()])
@@ -80,7 +80,7 @@ def test_rendering_calibration_and_failed_capture_preserve_world(monkeypatch):
                 np.testing.assert_array_equal(images[camera], sim.render(camera))
                 pos, quat = sim.camera_pose(camera)
                 assert np.isfinite(pos).all() and np.linalg.norm(quat) == pytest.approx(1.)
-        from rosbridge.core.mujoco_rendering import SpectatorRenderer
+        from kinex_sim.core.mujoco_rendering import SpectatorRenderer
         old = sim.env
         with monkeypatch.context() as patch:
             def fail(*_):

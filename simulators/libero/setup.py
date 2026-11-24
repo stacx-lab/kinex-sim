@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_libero"
+package = "kinex_sim_libero"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["libero = rosbridge_libero.backend:LiberoSim"],
-        "console_scripts": ["control_demo = rosbridge_libero.demos.control:main"],
+        "kinex_sim.backends": ["libero = kinex_sim_libero.backend:LiberoSim"],
+        "console_scripts": ["control_demo = kinex_sim_libero.demos.control:main"],
     },
 )

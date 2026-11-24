@@ -2,7 +2,7 @@
 
 Isaac hosts one app per process and OmniGibson's shutdown ends it, so every check drives
 R1ProSim through a worker subprocess. Each activity loads its own house (minutes), so the
-every-task sweep runs only with ROSBRIDGE_ALL_TASKS=1.
+every-task sweep runs only with KINEX_SIM_ALL_TASKS=1.
 """
 import os
 import sys
@@ -10,11 +10,11 @@ import sys
 import numpy as np
 import pytest
 
-from rosbridge.catalog import tasks
-from rosbridge.core.worker import WorkerBackend
+from kinex_sim.catalog import tasks
+from kinex_sim.core.worker import WorkerBackend
 
 ALL = [t["native_task"] for t in tasks(name="behavior").values()]
-SELECTED = ALL if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["picking_up_trash"]
+SELECTED = ALL if os.environ.get("KINEX_SIM_ALL_TASKS") else ["picking_up_trash"]
 
 
 class Native(WorkerBackend):

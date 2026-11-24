@@ -1,4 +1,4 @@
-# rosbridge
+# kinex-sim
 
 Run public robotics simulators as managed ROS 2 graphs. One `world` node exposes every
 device's topics and services, described by exportable device profiles; world
@@ -10,8 +10,8 @@ Python 3.11 worker beside the ROS node.
 ```bash
 bash tools/bootstrap.sh
 source .venv/bin/activate
-rosbridge prepare abc
-rosbridge launch abc --execution-mode stepped --record ./recordings/abc
+kinex-sim prepare abc
+kinex-sim launch abc --execution-mode stepped --record ./recordings/abc
 ```
 
 - [Design and CLI guide](docs/README.md)
@@ -24,5 +24,5 @@ rosbridge launch abc --execution-mode stepped --record ./recordings/abc
 - [HandsOn dexterous manipulation with two ROKAE arms and Wuji hands](docs/handson.md)
 - [BiDex-100 bimanual dexterous manipulation with Franka or Astribot arms and Sharpa hands](docs/bidex.md)
 - [Devices, robot catalog and workspace export](docs/devices.md)
-- [Using rosbridge with Kinex](docs/kinex.md)
+- [Using kinex-sim with Kinex](docs/kinex.md)
 - [Adding a simulator](docs/adding-a-simulator.md)

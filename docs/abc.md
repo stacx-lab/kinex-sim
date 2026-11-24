@@ -10,12 +10,12 @@ ABC runs the native MuJoCo YAM dual-arm tasks from
 ```bash
 bash tools/bootstrap.sh
 source .venv/bin/activate
-rosbridge prepare abc --task put-plastic-bottles-in-bin
-rosbridge launch abc --execution-mode stepped
+kinex-sim prepare abc --task put-plastic-bottles-in-bin
+kinex-sim launch abc --execution-mode stepped
 # Prepare all 33 cataloged tasks:
-rosbridge prepare abc
-rosbridge tasks list --simulator abc
-rosbridge launch abc/put-markers-in-top-drawer
+kinex-sim prepare abc
+kinex-sim tasks list --simulator abc
+kinex-sim launch abc/put-markers-in-top-drawer
 ```
 
 The default task is `abc/put-plastic-bottles-in-bin`. Unambiguous native names such
@@ -49,7 +49,7 @@ The simulator hosts these devices on one `world` node:
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
 | `camera_top`, `camera_left`, `camera_right` | `<camera>/image`, `<camera>/depth`, `<camera>/camera_info` |
 
-Every task runs on the rig `abc/abc-yam`; `rosbridge setup abc/TASK`
+Every task runs on the rig `abc/abc-yam`; `kinex-sim setup abc/TASK`
 exports its workspace (arm URDFs measured from the MuJoCo model, mounts at
 (0.2525, ±0.31, 0.76), wrist cameras on the `link_6` flanges).
 
@@ -68,9 +68,9 @@ The cameras are `rgbd` devices, as in RoboEnv: `<camera>/depth` publishes
 lies within MuJoCo's clip range), with the same stamp as its image.
 
 ```bash
-rosbridge exec RUN_ID -- ros2 topic pub --once /left_gripper/target \
+kinex-sim exec RUN_ID -- ros2 topic pub --once /left_gripper/target \
   std_msgs/msg/Float64 '{data: 0.0}'
-rosbridge exec RUN_ID -- ros2 service call /world/wait \
+kinex-sim exec RUN_ID -- ros2 service call /world/wait \
   custom_interfaces/srv/Wait '{duration_s: 1.0}'
 ```
 
@@ -86,7 +86,7 @@ One ABC step is one native `env.step`, currently 17 physics substeps × 0.002 se
 A one-second wait therefore advances 1.020 simulation seconds in stepped mode.
 Both modes preserve physics, randomization, action limits and native evaluators.
 Upstream has no evaluator for `put_markers_in_{top,middle,bottom}_drawer` and
-`build_wood_block_tower`; rosbridge judges them with RoboEnv's rules (all five
+`build_wood_block_tower`; kinex-sim judges them with RoboEnv's rules (all five
 markers inside the closed drawer and released, or a released five-level tower,
 held for one second). These rules only read state.
 
@@ -129,7 +129,7 @@ rendering consumes time, so realtime throughput depends on the host and settings
 Blender rendering and MoveIt are outside this integration.
 Use `--record DIR` for managed MP4 recording, or `--record-type bag|both` for MCAP
 or both formats. Recording starts with initial spectator frames and finalizes on
-Ctrl-C or `rosbridge stop RUN_ID`; see the shared guide for output details.
+Ctrl-C or `kinex-sim stop RUN_ID`; see the shared guide for output details.
 
 ## Checks and example controller
 
@@ -137,8 +137,8 @@ Ctrl-C or `rosbridge stop RUN_ID`; see the shared guide for output details.
 pixi run --frozen -e abc test
 pixi run --frozen -e abc smoke
 pixi run --frozen -e abc test-ros
-rosbridge demo abc
-rosbridge demo abc --execution-mode realtime
+kinex-sim demo abc
+kinex-sim demo abc --execution-mode realtime
 ```
 
 The finite demo checks arm trajectories and return, gripper close/open,

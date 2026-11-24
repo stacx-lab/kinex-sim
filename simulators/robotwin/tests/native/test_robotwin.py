@@ -1,7 +1,7 @@
 """Pinned RoboTwin acceptance: timing, native gripper mapping, resets, rendering and every task.
 
 Each reset rebuilds the scene and runs upstream's expert dry run, so the every-task
-sweep runs only with ROSBRIDGE_ALL_TASKS=1.
+sweep runs only with KINEX_SIM_ALL_TASKS=1.
 """
 import os
 
@@ -9,12 +9,12 @@ import numpy as np
 import pytest
 import yaml
 
-from rosbridge.catalog import tasks
-from rosbridge.catalog.robots import setup
-from rosbridge_robotwin.backend import RoboTwinSim
+from kinex_sim.catalog import tasks
+from kinex_sim.catalog.robots import setup
+from kinex_sim_robotwin.backend import RoboTwinSim
 
 SEEDS = {t["native_task"]: t.get("seed", 0) for t in tasks(name="robotwin").values()}
-SELECTED = list(SEEDS) if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["handover_block", "shake_bottle"]
+SELECTED = list(SEEDS) if os.environ.get("KINEX_SIM_ALL_TASKS") else ["handover_block", "shake_bottle"]
 
 
 def physics(sim):
@@ -28,7 +28,7 @@ def sim():
     sim.configure_spectators()
     sim.reset("handover_block", 3)
     # Seed 3 is upstream's fourth evaluated scene, not its native seed 3.
-    from rosbridge_robotwin.backend import native_seed
+    from kinex_sim_robotwin.backend import native_seed
     assert sim.measures() == {"native_seed": native_seed("handover_block", 3)} and not sim.success
     yield sim
     sim.close()

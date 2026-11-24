@@ -8,9 +8,9 @@ import urllib.request
 import zipfile
 from types import SimpleNamespace
 import pytest
-from rosbridge_abc import assets as abc_assets
-from rosbridge.assets import AssetStore
-from rosbridge.catalog import tasks
+from kinex_sim_abc import assets as abc_assets
+from kinex_sim.assets import AssetStore
+from kinex_sim.catalog import tasks
 from tests.asset_helpers import package, ensure
 
 

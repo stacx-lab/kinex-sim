@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_bidex.backend import BiDexSim
+from kinex_sim_bidex.backend import BiDexSim
 from tests.kinex.geometry import Rig, compose, requires_kinex, rt
 
 pytestmark = requires_kinex
@@ -19,7 +19,7 @@ pytestmark = requires_kinex
     ("pick-up-peach-ood", 1, "astribot_arm_{}_tool_link", 1e-3),  # head and wrists
 ])
 def test_the_workspace_of_a_task_and_seed_matches_its_episode(tmp_path, task, seed, flange, tolerance):
-    rig = Rig(f"bidex/{task}", tmp_path, seed=seed)  # the workspace rosbridge setup exports for it
+    rig = Rig(f"bidex/{task}", tmp_path, seed=seed)  # the workspace kinex-sim setup exports for it
     sim = BiDexSim()
     try:
         sim.reset(task, seed)

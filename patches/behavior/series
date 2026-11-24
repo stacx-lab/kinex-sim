@@ -1,7 +1,7 @@
 # One git patch filename per line, applied in order to .runtime/behavior. Ported from RoboEnv:
 # 0001 OmniGibson's dataset-recording and LeRobot wrappers become optional imports and extras;
 # 0002 OMNIGIBSON_RENDER_GPU selects Isaac's Vulkan renderer apart from the CUDA physics device.
-# And rosbridge's own:
+# And kinex-sim's own:
 # 0003 BehaviorTask.get_goal_option_satisfaction (the evaluator's q_score) evaluates each distinct
 #      grounded goal literal once; a quantified goal repeats them across many options.
 # 0004 Macro particle systems update the physics handles once per batch of particles added or

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from rosbridge_behavior.environment import DOOR_LOCKED, doors_out, lock_doors_out, remove_particles_out
+from kinex_sim_behavior.environment import DOOR_LOCKED, doors_out, lock_doors_out, remove_particles_out
 
 
 class Rooms:

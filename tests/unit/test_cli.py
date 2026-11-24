@@ -7,14 +7,14 @@ import sys
 
 import pytest
 
-from rosbridge.storage import write_json
-from rosbridge.catalog import resolve, tasks
-from rosbridge.cli.main import main
-from rosbridge.project import project_root
-from rosbridge.provisioning.environment import overlay_command
-from rosbridge.runs.domains import DomainLease
-from rosbridge.runs import api
-from rosbridge.runs.records import SCHEMA, alive, identity, select
+from kinex_sim.storage import write_json
+from kinex_sim.catalog import resolve, tasks
+from kinex_sim.cli.main import main
+from kinex_sim.project import project_root
+from kinex_sim.provisioning.environment import overlay_command
+from kinex_sim.runs.domains import DomainLease
+from kinex_sim.runs import api
+from kinex_sim.runs.records import SCHEMA, alive, identity, select
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -33,7 +33,7 @@ def test_catalog_aliases_and_cli_json(capsys):
 
 def test_cli_imports_no_native_dependencies():
     code = '''import sys
-from rosbridge.cli.main import main
+from kinex_sim.cli.main import main
 assert main(["tasks", "list", "--simulator", "abc"]) == 0
 assert not any(x in sys.modules for x in ("rclpy", "mujoco", "numpy", "abc_sim"))
 '''
@@ -43,7 +43,7 @@ assert not any(x in sys.modules for x in ("rclpy", "mujoco", "numpy", "abc_sim")
 
 def test_project_resolution_outside_checkout(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ROSBRIDGE_PROJECT", str(ROOT))
+    monkeypatch.setenv("KINEX_SIM_PROJECT", str(ROOT))
     assert project_root() == ROOT
     with pytest.raises(ValueError, match="checkout"):
         project_root(tmp_path)
@@ -67,7 +67,7 @@ def test_domain_leases_are_exclusive_and_released():
 
 
 def test_cache_and_log_environment_is_checkout_local(tmp_path):
-    from rosbridge.storage import local_environment
+    from kinex_sim.storage import local_environment
     inherited = {key: "/nethome/small" for key in
                  ("XDG_CACHE_HOME", "UV_CACHE_DIR", "UV_PYTHON_INSTALL_DIR",
                   "PIXI_CACHE_DIR", "ROS_HOME", "ROS_LOG_DIR", "CUDA_CACHE_PATH")}
@@ -75,9 +75,9 @@ def test_cache_and_log_environment_is_checkout_local(tmp_path):
     env = local_environment(tmp_path, inherited)
     assert env["HOME"] == inherited["HOME"]
     for key in inherited.keys() - {"HOME", "UV_PYTHON_INSTALL_DIR"}:
-        assert Path(env[key]).is_relative_to(tmp_path / ".cache/rosbridge")
+        assert Path(env[key]).is_relative_to(tmp_path / ".cache/kinex-sim")
     assert env["UV_PYTHON_INSTALL_DIR"] == str(tmp_path / ".runtime/python")
-    assert env["ROSBRIDGE_PROJECT"] == str(tmp_path)
+    assert env["KINEX_SIM_PROJECT"] == str(tmp_path)
 
 
 def test_stale_owner_is_never_signalled(tmp_path, monkeypatch):
@@ -93,7 +93,7 @@ def test_stale_owner_is_never_signalled(tmp_path, monkeypatch):
 
 def test_default_selection_requires_one_live_run(tmp_path):
     for name in ("one", "two"):
-        path = tmp_path / ".cache/rosbridge/runs" / name / "run.json"
+        path = tmp_path / ".cache/kinex-sim/runs" / name / "run.json"
         path.parent.mkdir(parents=True)
         write_json(path, {"schema": SCHEMA, "uid": os.getuid(), "state": "ready", "owner": identity(os.getpid())})
     with pytest.raises(ValueError, match="2 live runs"):
@@ -102,7 +102,7 @@ def test_default_selection_requires_one_live_run(tmp_path):
 
 def test_describe_prints_the_task_description_of_the_live_run_on_a_domain(tmp_path, capsys):
     """describe reads the line the run's world node logged when its episode started; it opens nothing."""
-    (tmp_path / "src/rosbridge").mkdir(parents=True)
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
     (tmp_path / "pixi.toml").touch()
     description = {"task": "stack_bowls", "seed": 2, "instruction": "Stack the three bowls together.",
                    "detailed_instruction": "## Description\n\nNest all bowls.\n\n## Scoring\n\n- 100: stacked."}
@@ -110,7 +110,7 @@ def test_describe_prints_the_task_description_of_the_live_run_on_a_domain(tmp_pa
              "starting": "[sim_node-1] booting\n", "other": "[sim_node-1] [INFO] [1.0] [world]: task description: "
              + json.dumps(dict(description, task="pour_by_language")) + "\n"}
     for name, domain in (("started", 42), ("starting", 43), ("other", 44)):
-        folder = tmp_path / ".cache/rosbridge/runs" / name
+        folder = tmp_path / ".cache/kinex-sim/runs" / name
         folder.mkdir(parents=True)
         (folder / "graph.log").write_text(lines[name])
         write_json(folder / "run.json", {"schema": SCHEMA, "uid": os.getuid(), "id": name, "state": "ready",
@@ -131,7 +131,7 @@ def test_describe_prints_the_task_description_of_the_live_run_on_a_domain(tmp_pa
 def test_overlay_preserves_command_arguments(tmp_path):
     overlay = tmp_path / ".workspaces/fake/install/local_setup.bash"
     overlay.parent.mkdir(parents=True)
-    overlay.write_text("export ROSBRIDGE_TEST=1\n")
+    overlay.write_text("export KINEX_SIM_TEST=1\n")
     values = ["space here", "$(touch should-not-exist)", "`touch also-not`", "line1\nline2"]
     command = overlay_command(tmp_path, {"name": "fake"}, [sys.executable, "-c",
         "import json,sys; print(json.dumps(sys.argv[1:]))", *values])
@@ -151,7 +151,7 @@ def test_invalid_flags_fail_before_launch():
 
 
 def test_scene_options_are_those_the_simulator_declares(capsys):
-    from rosbridge.catalog import simulator
+    from kinex_sim.catalog import simulator
     robocasa, abc = (simulator(name, ROOT)[2] for name in ("robocasa", "abc"))
     assert api.scene_argument(robocasa, {}) is None
     assert api.scene_argument(robocasa, {"style_id": 7, "split": "target", "layout_id": 3}) == (
@@ -159,28 +159,28 @@ def test_scene_options_are_those_the_simulator_declares(capsys):
     with pytest.raises(ValueError, match=r"abc takes no --layout-id \(its scene options: none\)"):
         api.scene_argument(abc, {"layout_id": 3})
     # Refused before preparation is checked or a run is created.
-    before = set((ROOT / ".cache/rosbridge/runs").glob("*/run.json"))
+    before = set((ROOT / ".cache/kinex-sim/runs").glob("*/run.json"))
     assert main(["launch", "abc", "--style-id", "2", "--project", str(ROOT), "--json"]) == 1
     assert "abc takes no --style-id" in json.loads(capsys.readouterr().out)["error"]
-    assert set((ROOT / ".cache/rosbridge/runs").glob("*/run.json")) == before
+    assert set((ROOT / ".cache/kinex-sim/runs").glob("*/run.json")) == before
 
 
 def test_configurations_are_those_the_simulator_declares(capsys):
-    from rosbridge.catalog import check_configuration, simulator
+    from kinex_sim.catalog import check_configuration, simulator
     robodojo, abc = (simulator(name, ROOT)[2] for name in ("robodojo", "abc"))
     assert check_configuration(robodojo, None) is None and check_configuration(robodojo, "depth") == "depth"
     with pytest.raises(ValueError, match=r"robodojo has no configuration 'stereo' \(its configurations: depth, move\)"):
         check_configuration(robodojo, "stereo")
     # Refused before preparation is checked or a run is created.
-    before = set((ROOT / ".cache/rosbridge/runs").glob("*/run.json"))
+    before = set((ROOT / ".cache/kinex-sim/runs").glob("*/run.json"))
     assert main(["launch", "abc", "--config", "depth", "--project", str(ROOT), "--json"]) == 1
     assert "abc has no configuration 'depth' (its configurations: none)" in json.loads(
         capsys.readouterr().out)["error"]
-    assert set((ROOT / ".cache/rosbridge/runs").glob("*/run.json")) == before
+    assert set((ROOT / ".cache/kinex-sim/runs").glob("*/run.json")) == before
 
 
 def test_preparation_cannot_modify_a_running_environment(tmp_path):
-    from rosbridge.provisioning.setup import workspace_lock
+    from kinex_sim.provisioning.setup import workspace_lock
     with workspace_lock(tmp_path, "fake", shared=True):
         with workspace_lock(tmp_path, "fake", shared=True):
             with pytest.raises(ValueError, match="stop its runs"):

@@ -9,13 +9,13 @@ pinned as nested sources. See the [design and CLI guide](README.md) for shared
 lifecycle and timing contracts.
 
 ```bash
-rosbridge prepare robodojo
-rosbridge tasks list --simulator robodojo
-rosbridge launch robodojo/stack-bowls --execution-mode stepped --timeout 1800
-rosbridge setup robodojo/stack-bowls --directory ../my-robodojo-workspace
-rosbridge setup robodojo/stack-bowls --config depth --directory ../my-robodojo-depth-workspace
-rosbridge launch robodojo/stack-bowls --config depth --execution-mode stepped --timeout 1800
-rosbridge launch robodojo/stack-bowls --config move --execution-mode stepped --timeout 1800
+kinex-sim prepare robodojo
+kinex-sim tasks list --simulator robodojo
+kinex-sim launch robodojo/stack-bowls --execution-mode stepped --timeout 1800
+kinex-sim setup robodojo/stack-bowls --directory ../my-robodojo-workspace
+kinex-sim setup robodojo/stack-bowls --config depth --directory ../my-robodojo-depth-workspace
+kinex-sim launch robodojo/stack-bowls --config depth --execution-mode stepped --timeout 1800
+kinex-sim launch robodojo/stack-bowls --config move --execution-mode stepped --timeout 1800
 ```
 
 `robodojo` selects `pack_objects_into_box`. The twelve `*_random` variants are not
@@ -27,7 +27,7 @@ it is not a device.
 
 Isaac Sim 5.1 publishes Python 3.11 wheels only, while ROS Jazzy from RoboStack is
 Python 3.12. The world node therefore runs in the `robodojo` environment (the
-shared ROS environment) and proxies `rosbridge_robodojo.backend.RoboDojoSim`,
+shared ROS environment) and proxies `kinex_sim_robodojo.backend.RoboDojoSim`,
 which runs on the main thread of a worker process in `robodojo-native` (Python
 3.11, Isaac Sim 5.1, CUDA 12.8 torch 2.7, RoboEnv's pins). Calls are sequential
 over a private socket, so the ROS clock, waits and device semantics are the same
@@ -49,13 +49,13 @@ injected model client replaces the policy server; predicate diagnostics hooks;
 Isaac Lab's livestream dependency becomes an extra), and installs the forks as
 editable packages into `robodojo-native`. A fifth patch lets upstream's cuRobo planner read its
 `curobo_tmp.yml` template, with `${ASSETS_PATH}` replaced. Upstream's install script writes that
-same file as `curobo.yml` (`utils/update_embodiment_config_path.py`), but rosbridge never writes
+same file as `curobo.yml` (`utils/update_embodiment_config_path.py`), but kinex-sim never writes
 into the pinned asset store.
 
 Assets come from the `RoboDojo-Benchmark/RoboDojo` dataset at
 `1127bda94f172d757386945af3eb3a6754d1a4e6`: 15,365 files (41 GB) under
 `Assets/`, each pinned by LFS SHA-256 or git blob SHA-1 in the dataset listing.
-With `ROSBRIDGE_ASSET_SEED=DIR`, a depot laid out as `DIR/robodojo/<revision>/Assets` is
+With `KINEX_SIM_ASSET_SEED=DIR`, a depot laid out as `DIR/robodojo/<revision>/Assets` is
 verified file by file and moved into the store; otherwise files are downloaded
 once at a polite request rate. A seed of hard links to an earlier revision's files, with the
 changed files replaced, bumps the pin without copying.
@@ -96,7 +96,7 @@ measured pose in `<arm>/base`.
 `control_msgs/action/FollowJointTrajectory`: a goal's `multi_dof_trajectory` gives the `flange` poses,
 in `<arm>/base`, that the arm passes in turn at its own pace, so a caller chooses no times. It is the
 stepped, closed-loop counterpart of uni-robot-agent's `move` tool, and nothing plans a path around
-objects. The action is this backend's own (`rosbridge_robodojo.move`): it advances each goal inside its
+objects. The action is this backend's own (`kinex_sim_robodojo.move`): it advances each goal inside its
 step, and the world only carries the goal, its feedback and its result (see
 [Actions](adding-a-simulator.md#actions)):
 
@@ -126,7 +126,7 @@ on the frame the last goal finishes, so the wait costs no more budget than the m
 any other is refused.
 
 The joints run through `EvalEnv.take_action`, as joint targets do, so evaluation and scoring are
-unchanged. To solve them, rosbridge builds upstream's cuRobo planner for the arms, as upstream's
+unchanged. To solve them, kinex-sim builds upstream's cuRobo planner for the arms, as upstream's
 evaluation does by default (`need_planner`). RoboEnv's adapter, whose arms took joints only, skipped it.
 `robodojo-native` carries cuRobo's `[cu12]` extra (`cuda-core`), as upstream's install does, because the
 planner compiles its kernels through it.
@@ -179,9 +179,9 @@ a frame of the three views takes about 86 ms, where a render for each took 220 m
 
 ```bash
 pixi run --frozen -e robodojo-native smoke                       # native checks via worker processes
-ROSBRIDGE_ALL_TASKS=1 pixi run --frozen -e robodojo-native smoke  # every task boots Isaac (hours)
+KINEX_SIM_ALL_TASKS=1 pixi run --frozen -e robodojo-native smoke  # every task boots Isaac (hours)
 pixi run --frozen -e robodojo test-ros
-rosbridge demo robodojo --timeout 1800
+kinex-sim demo robodojo --timeout 1800
 ```
 
 The native checks run the backend in worker subprocesses because Isaac's shutdown

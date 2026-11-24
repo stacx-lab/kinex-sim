@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from sensor_msgs.msg import CameraInfo, Image, JointState
 
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
 
 

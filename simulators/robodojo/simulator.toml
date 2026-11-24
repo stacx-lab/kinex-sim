@@ -6,16 +6,16 @@ patches = "patches/robodojo"
 python_path = "simulators/robodojo"
 # RoboDojo is imported from the generated tree; its forks are editable installs.
 install = []
-asset_preparer = "rosbridge_robodojo.assets:prepare"
-asset_checker = "rosbridge_robodojo.assets:check_task"
+asset_preparer = "kinex_sim_robodojo.assets:prepare"
+asset_checker = "kinex_sim_robodojo.assets:check_task"
 default_task = "pack_objects_into_box"
-ros_package = "rosbridge_robodojo"
+ros_package = "kinex_sim_robodojo"
 task_catalog = "tasks.toml"
 # The world node runs in the ROS environment; Isaac Sim 5.1 (Python 3.11) runs the
-# native backend in a separate worker process (rosbridge.core.worker).
+# native backend in a separate worker process (kinex_sim.core.worker).
 environment = "robodojo"
 native_environment = "robodojo-native"
-native_backend = "rosbridge_robodojo.backend:RoboDojoSim"
+native_backend = "kinex_sim_robodojo.backend:RoboDojoSim"
 
 # RoboDojo's git submodules, pinned and exported into the generated tree.
 [[nested_sources]]

@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import pytest
 
-from rosbridge.core.worker import WorkerBackend
+from kinex_sim.core.worker import WorkerBackend
 from tests.kinex.geometry import Rig, compose, requires_kinex
 
 pytestmark = requires_kinex

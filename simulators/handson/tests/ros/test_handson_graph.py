@@ -13,7 +13,7 @@ from std_srvs.srv import Trigger
 from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
                                  MultiDOFJointTrajectoryPoint)
 
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
 
 # Isaac Sim boots, converts the task's MJCF scene and settles the recording origin before serving.
@@ -27,7 +27,7 @@ def workers(graph):
     found = []
     for process in psutil.process_iter(["cmdline"]):
         try:
-            if ("rosbridge.core.worker_main" in " ".join(process.info["cmdline"] or ())
+            if ("kinex_sim.core.worker_main" in " ".join(process.info["cmdline"] or ())
                     and process.environ().get("ROS_DOMAIN_ID") == str(graph.lease.domain)):
                 found.append(process)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -58,7 +58,7 @@ def palm(target):
 @pytest.mark.parametrize("mode", ["stepped"])
 def test_handson_graph_serves_its_devices_from_a_native_worker(tmp_path, monkeypatch, mode):
     # The graph is stopped by signal, before the worker removes its episode's files; pytest prunes these.
-    monkeypatch.setenv("ROSBRIDGE_RUN_DIR", str(tmp_path))
+    monkeypatch.setenv("KINEX_SIM_RUN_DIR", str(tmp_path))
     graph = Graph(tmp_path, backend="handson", mode=mode, spectators=True, startup_s=STARTUP_S)
     node, last = graph.node, {}
     try:

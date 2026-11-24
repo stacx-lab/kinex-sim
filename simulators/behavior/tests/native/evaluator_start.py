@@ -10,8 +10,8 @@ import sys
 
 import torch as th
 
-from rosbridge_behavior.backend import R1ProSim
-from rosbridge_behavior.environment import boot
+from kinex_sim_behavior.backend import R1ProSim
+from kinex_sim_behavior.environment import boot
 
 boot()
 import omnigibson as og  # noqa: E402

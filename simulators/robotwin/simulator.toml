@@ -6,10 +6,10 @@ patches = "patches/robotwin"
 python_path = "simulators/robotwin"
 # RoboTwin is a source tree, not an installable package; the backend imports it in place.
 install = []
-asset_preparer = "rosbridge_robotwin.assets:prepare"
-asset_checker = "rosbridge_robotwin.assets:check_task"
+asset_preparer = "kinex_sim_robotwin.assets:prepare"
+asset_checker = "kinex_sim_robotwin.assets:check_task"
 default_task = "handover_block"
-ros_package = "rosbridge_robotwin"
+ros_package = "kinex_sim_robotwin"
 environment = "robotwin"
 task_catalog = "tasks.toml"
 

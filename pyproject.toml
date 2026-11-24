@@ -3,7 +3,7 @@ requires = ["setuptools>=68,<80"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rosbridge"
+name = "kinex-sim"
 version = "0.3.0"
 description = "Public robotics simulators as managed ROS 2 graphs"
 requires-python = ">=3.12"
@@ -17,7 +17,7 @@ cli = ["numpy", "scipy"]
 dev = ["numpy", "pytest", "ruff"]
 
 [project.scripts]
-rosbridge = "rosbridge.cli.main:main"
+kinex-sim = "kinex_sim.cli.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

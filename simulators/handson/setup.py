@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_handson"
+package = "kinex_sim_handson"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["handson = rosbridge_handson.worker:HandsOnWorker"],
-        "console_scripts": ["control_demo = rosbridge_handson.demos.control:main"],
+        "kinex_sim.backends": ["handson = kinex_sim_handson.worker:HandsOnWorker"],
+        "console_scripts": ["control_demo = kinex_sim_handson.demos.control:main"],
     },
 )

@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_robodojo"
+package = "kinex_sim_robodojo"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["robodojo = rosbridge_robodojo.worker:RoboDojoWorker"],
-        "console_scripts": ["control_demo = rosbridge_robodojo.demos.control:main"],
+        "kinex_sim.backends": ["robodojo = kinex_sim_robodojo.worker:RoboDojoWorker"],
+        "console_scripts": ["control_demo = kinex_sim_robodojo.demos.control:main"],
     },
 )

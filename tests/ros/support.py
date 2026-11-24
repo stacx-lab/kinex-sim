@@ -14,8 +14,8 @@ from rclpy.node import Node
 from rosgraph_msgs.msg import Clock
 from std_srvs.srv import Trigger
 
-from rosbridge.runs.domains import DomainLease
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim.runs.domains import DomainLease
+from kinex_sim_runtime.devices import STREAM_QOS
 
 
 def seconds(stamp):
@@ -65,7 +65,7 @@ class Graph:
                                          *(["-p", f"scene:='{scene}'"] if scene else []),
                                          *(["-p", f"configuration:={configuration}"] if configuration else [])])
             else:
-                self.owner = self.start(["ros2", "launch", "rosbridge_runtime", "sim.launch.py",
+                self.owner = self.start(["ros2", "launch", "kinex_sim_runtime", "sim.launch.py",
                                          f"backend:={backend}", f"mode:={mode}",
                                          *([f"max_steps:={max_steps}"] if max_steps else []),
                                          *([f"scene:={scene}"] if scene else []),
@@ -116,7 +116,7 @@ class Graph:
         """A camera's current frame as a reader takes it: subscribe, then the first
         image and, with depth, the equally stamped depth. Returns (image, depth or None)."""
         from sensor_msgs.msg import Image
-        from rosbridge_runtime.devices import FRAME_QOS
+        from kinex_sim_runtime.devices import FRAME_QOS
         received = {"image": [], "depth": []}
         names = ("image", "depth") if depth else ("image",)
         subscriptions = [self.node.create_subscription(Image, f"{camera}/{name}",

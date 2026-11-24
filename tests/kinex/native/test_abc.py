@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_abc.backend import AbcSim
+from kinex_sim_abc.backend import AbcSim
 from tests.kinex.geometry import Rig, compose, requires_kinex, rt
 
 pytestmark = requires_kinex

@@ -9,11 +9,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from rosbridge.catalog import preparation_tasks
-from rosbridge.provisioning import setup
+from kinex_sim.catalog import preparation_tasks
+from kinex_sim.provisioning import setup
 
 spec = importlib.util.spec_from_file_location(
-    "prepare_sim", Path(__file__).resolve().parents[2] / "src/rosbridge/provisioning/source.py")
+    "prepare_sim", Path(__file__).resolve().parents[2] / "src/kinex_sim/provisioning/source.py")
 prepare = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prepare)
 
@@ -34,7 +34,7 @@ def test_patches_do_not_change_upstream(tmp_path):
     adapter.mkdir(parents=True)
     (adapter / "simulator.toml").write_text(
         f'name="fake"\nsource="third_party/fake"\npatches="patches/fake"\nsource_revision="{revision}"\n')
-    (tmp_path / "src/rosbridge").mkdir(parents=True)
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
     (tmp_path / "pixi.toml").write_text("")
     patches = tmp_path / "patches/fake"
     patches.mkdir(parents=True)
@@ -69,7 +69,7 @@ def test_patches_do_not_change_upstream(tmp_path):
 
 @pytest.fixture
 def project(tmp_path):
-    (tmp_path / "src/rosbridge").mkdir(parents=True)
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
     (tmp_path / "pixi.toml").touch()
     adapter = tmp_path / "simulators/fake"
     adapter.mkdir(parents=True)
@@ -110,14 +110,14 @@ def test_source_prepares_catalog_or_explicit_task_once(project, monkeypatch, tas
                                                    ("fake/second-task", None, "second_native")])
 def test_prepare_builds_once_and_checks_every_selected_task(project, monkeypatch, selection, task, expected):
     calls, checks = [], []
-    monkeypatch.setattr("rosbridge.provisioning.source.sync_source", lambda *args: None)
+    monkeypatch.setattr("kinex_sim.provisioning.source.sync_source", lambda *args: None)
     monkeypatch.setattr(setup, "activated", lambda *args: (sys.executable, {}))
     monkeypatch.setattr(setup, "build_identity", lambda *args: {"test": True})
     monkeypatch.setattr(setup.subprocess, "check_output", lambda *args, **kw: '{}')
 
     def run(command, **kwargs):
         calls.append(command)
-        if "rosbridge.provisioning.workspace" in command:
+        if "kinex_sim.provisioning.workspace" in command:
             (project / ".workspaces/fake").mkdir(parents=True)
 
     def doctor(selection, **kwargs):
@@ -127,9 +127,9 @@ def test_prepare_builds_once_and_checks_every_selected_task(project, monkeypatch
     monkeypatch.setattr(setup.subprocess, "run", run)
     monkeypatch.setattr(setup, "doctor", doctor)
     assert setup.prepare(selection, project=project, task=task)["ready"]
-    source, = [command for command in calls if "rosbridge.provisioning.source" in command]
+    source, = [command for command in calls if "kinex_sim.provisioning.source" in command]
     assert (source[source.index("--task") + 1] if "--task" in source else None) == expected
-    assert len([command for command in calls if "rosbridge.provisioning.workspace" in command]) == 1
+    assert len([command for command in calls if "kinex_sim.provisioning.workspace" in command]) == 1
     assert checks[0]["all_tasks"] == (expected is None)
 
 
@@ -169,7 +169,7 @@ def test_nested_sources_are_pinned_exported_and_patched_together(tmp_path):
         f'name="fake"\nsource="third_party/main"\npatches="patches/fake"\nsource_revision="{revision}"\n'
         f'[[nested_sources]]\npath="vendor/fork"\nsource="third_party/fork"\nsource_url="unused"\n'
         f'source_revision="{fork}"\n')
-    (tmp_path / "src/rosbridge").mkdir(parents=True)
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
     (tmp_path / "pixi.toml").write_text("")
     patches = tmp_path / "patches/fake"
     patches.mkdir(parents=True)
@@ -207,7 +207,7 @@ packages: []
 
 
 def test_a_lock_whose_platforms_are_only_renamed_keeps_the_build_identity(tmp_path):
-    from rosbridge.provisioning.setup import lock_identity
+    from kinex_sim.provisioning.setup import lock_identity
     path = tmp_path / "pixi.lock"
     path.write_text(LOCK)
     identity = lock_identity(path)

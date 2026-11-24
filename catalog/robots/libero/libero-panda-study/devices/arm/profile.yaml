@@ -50,7 +50,7 @@ meta:
 type: joint
 description: Panda seven-joint manipulator mounted in the tabletop workspace. Geometry
   is the sibling arm.urdf with flange as the tip link; its links are the frames arm/<link>.
-  rosbridge rejects targets outside the URDF joint limits.
+  kinex-sim rejects targets outside the URDF joint limits.
 source: introspected
 calibrated_at: null
 method: introspection

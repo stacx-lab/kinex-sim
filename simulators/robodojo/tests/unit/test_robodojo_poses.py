@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_robodojo.backend import PATH_SAMPLE_RAD, choose, nearest_turn, path
+from kinex_sim_robodojo.backend import PATH_SAMPLE_RAD, choose, nearest_turn, path
 
 NAMES = [f"joint{i}" for i in range(1, 7)]
 LOWER, UPPER = np.r_[[-10.] * 5, -3.14], np.r_[[10.] * 5, 3.14]

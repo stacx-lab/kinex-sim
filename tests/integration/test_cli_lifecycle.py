@@ -1,4 +1,4 @@
-"""End-to-end CLI checks. Requires bootstrap and `rosbridge prepare abc`."""
+"""End-to-end CLI checks. Requires bootstrap and `kinex-sim prepare abc`."""
 import json
 import os
 from pathlib import Path
@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from rosbridge.runs.records import alive, directory, read
+from kinex_sim.runs.records import alive, directory, read
 
 from tests.integration.support import CLI, ROOT, invoke, start
 
@@ -26,7 +26,7 @@ def test_two_domains_exec_and_explicit_conflict(runs):
     assert json.loads(result.stdout) == [str(first["domain_id"]), "space and $(literal)"]
     controller = '''import json, rclpy
 from rclpy.node import Node
-from rosbridge.clients import WorldClockClient
+from kinex_sim.clients import WorldClockClient
 rclpy.init()
 node = Node("cli_control_test")
 result = WorldClockClient(node).wait(.102, timeout_s=10.)

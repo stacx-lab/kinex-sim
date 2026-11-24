@@ -7,10 +7,10 @@ follows RoboEnv's RoboTwin device runtime. Upstream is pinned to
 [design and CLI guide](README.md) for shared lifecycle and timing contracts.
 
 ```bash
-rosbridge prepare robotwin
-rosbridge tasks list --simulator robotwin
-rosbridge launch robotwin/handover-block-aloha-agilex --execution-mode stepped
-rosbridge setup robotwin/handover-block-aloha-agilex --directory ../my-robotwin-workspace
+kinex-sim prepare robotwin
+kinex-sim tasks list --simulator robotwin
+kinex-sim launch robotwin/handover-block-aloha-agilex --execution-mode stepped
+kinex-sim setup robotwin/handover-block-aloha-agilex --directory ../my-robotwin-workspace
 ```
 
 `robotwin` selects `handover_block`. Task IDs keep RoboEnv's embodiment suffix,
@@ -68,7 +68,7 @@ and seed from `ROBOENV_PLANNER_*`.
 Preparation mounts the pinned `TianxingChen/RoboTwin2.0` packs
 (`785feb15aa4a4f532395ad2b1d2be5f28cb561ad`): `embodiments.zip` and
 `objects.zip`, each SHA-256 pinned. Randomized background textures are excluded.
-With `ROSBRIDGE_ASSET_SEED=DIR` naming a depot of the extracted packs, they
+With `KINEX_SIM_ASSET_SEED=DIR` naming a depot of the extracted packs, they
 are verified against their archives (every member's size and CRC) and moved into
 the store instead of being downloaded.
 
@@ -126,9 +126,9 @@ the head and wrist cameras at 960×720.
 
 ```bash
 pixi run --frozen -e robotwin smoke                      # native: timing, gripper, reset, rendering
-ROSBRIDGE_ALL_TASKS=1 pixi run --frozen -e robotwin smoke # every task loads and steps (~35 min)
+KINEX_SIM_ALL_TASKS=1 pixi run --frozen -e robotwin smoke # every task loads and steps (~35 min)
 pixi run --frozen -e robotwin test-ros
-rosbridge demo robotwin
+kinex-sim demo robotwin
 ```
 
 `tests/kinex/native/test_robotwin.py` (with `KINEX_PYTHON`) checks the exported rig's arm FK,

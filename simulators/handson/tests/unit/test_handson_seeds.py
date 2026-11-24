@@ -2,7 +2,7 @@
 each task's first accepted seeds in order."""
 import pytest
 
-from rosbridge_handson.seeds import Screen, screened_seed
+from kinex_sim_handson.seeds import Screen, screened_seed
 
 GATED = {"1": "settle_gate", "3": "settle_gate", "4": "settle_gate"}
 TABLE = {"count": 3, "tasks": {"t24_place_ball_in_bowl": {"seeds": [0, 2, 5], "rejected": GATED},
@@ -64,8 +64,8 @@ def test_a_rerun_resumes_and_a_larger_count_extends_the_table():
 
 
 def test_the_table_names_ten_screened_seeds_for_every_task():
-    from rosbridge.catalog import tasks
-    from rosbridge_handson.seeds import load
+    from kinex_sim.catalog import tasks
+    from kinex_sim_handson.seeds import load
     table = load()
     assert table["count"] == 10 and table["drift_m"] == .02
     assert set(table["tasks"]) == {task["native_task"] for task in tasks(name="handson").values()}

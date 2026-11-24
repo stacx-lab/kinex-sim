@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import yaml
 
-from rosbridge.catalog.robots import setup
-from rosbridge_libero.backend import LiberoSim
+from kinex_sim.catalog.robots import setup
+from kinex_sim_libero.backend import LiberoSim
 from tests.kinex.geometry import requires_kinex
 
 pytestmark = requires_kinex

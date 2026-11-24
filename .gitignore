@@ -12,7 +12,7 @@ __pycache__/
 
 .workspaces/
 
-.cache/rosbridge/
+.cache/kinex-sim/
 
 third_party/
 .ruff_cache/

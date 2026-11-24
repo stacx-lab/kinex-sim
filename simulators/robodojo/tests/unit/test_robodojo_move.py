@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_robodojo import move
+from kinex_sim_robodojo import move
 
 UPRIGHT = (0., 0., 0., 1.)
 

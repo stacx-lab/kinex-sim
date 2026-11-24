@@ -6,18 +6,18 @@ patches = "patches/handson"
 python_path = "simulators/handson"
 # The installable package and its bundled assets live in the repository's handson/ directory.
 install = ["handson"]
-asset_preparer = "rosbridge_handson.assets:prepare"
-asset_checker = "rosbridge_handson.assets:check_task"
-# rosbridge setup: each camera's intrinsics and mount for a task and seed.
-workspace = "rosbridge_handson.workspace:profiles"
+asset_preparer = "kinex_sim_handson.assets:prepare"
+asset_checker = "kinex_sim_handson.assets:check_task"
+# kinex-sim setup: each camera's intrinsics and mount for a task and seed.
+workspace = "kinex_sim_handson.workspace:profiles"
 default_task = "t24_place_ball_in_bowl"
-ros_package = "rosbridge_handson"
+ros_package = "kinex_sim_handson"
 task_catalog = "tasks.toml"
 # The world node runs in the ROS environment; Isaac Sim 5.1 and Isaac Lab (Python 3.11) run the
-# native backend in a separate worker process (rosbridge.core.worker).
+# native backend in a separate worker process (kinex_sim.core.worker).
 environment = "handson"
 native_environment = "handson-native"
-native_backend = "rosbridge_handson.backend:HandsOnSim"
+native_backend = "kinex_sim_handson.backend:HandsOnSim"
 
 # Isaac Lab v2.3.2, the release HandsOn's PhysX evaluator requires; installed without dependencies.
 [[nested_sources]]

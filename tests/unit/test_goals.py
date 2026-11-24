@@ -5,7 +5,7 @@ the tips at x = 1.2.
 """
 import pytest
 
-from rosbridge.runtime.world import WorldRuntime
+from kinex_sim.runtime.world import WorldRuntime
 from tests.toy_backend import PairPoseToy
 
 REACHED = ("succeeded", {"error_code": 0, "error_string": "reached"})

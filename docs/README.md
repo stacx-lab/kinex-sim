@@ -1,6 +1,6 @@
 # Design and usage
 
-rosbridge exposes public robotics simulators, currently ABC, LIBERO, RoboTwin,
+kinex-sim exposes public robotics simulators, currently ABC, LIBERO, RoboTwin,
 RoboDojo, RoboCasa, BEHAVIOR, HandsOn and BiDex-100, as managed ROS 2 graphs. It uses native ROS topics and
 services, with no HTTP or WebSocket bridge. The command-line environment stays
 separate from simulator environments.
@@ -10,23 +10,23 @@ separate from simulator environments.
 Linux x86-64, Git, uv, Pixi, and an EGL-capable graphics driver are required.
 ROS Jazzy and Python 3.12 come from the locked RoboStack/Pixi environment; a system
 ROS installation is not required. Every graph serves the world service
-`custom_interfaces/srv/Wait`, which rosbridge builds from `ros2/custom_interfaces`.
+`custom_interfaces/srv/Wait`, which kinex-sim builds from `ros2/custom_interfaces`.
 
 ```bash
 bash tools/bootstrap.sh
 source .venv/bin/activate
-rosbridge prepare abc
-rosbridge tasks list --simulator abc
-rosbridge launch abc/put-plastic-bottles-in-bin --execution-mode stepped --detach
-rosbridge status RUN_ID
-rosbridge exec RUN_ID -- ros2 node list
-rosbridge exec RUN_ID -- python controller.py
-rosbridge stop RUN_ID
+kinex-sim prepare abc
+kinex-sim tasks list --simulator abc
+kinex-sim launch abc/put-plastic-bottles-in-bin --execution-mode stepped --detach
+kinex-sim status RUN_ID
+kinex-sim exec RUN_ID -- ros2 node list
+kinex-sim exec RUN_ID -- python controller.py
+kinex-sim stop RUN_ID
 ```
 
 `prepare SIMULATOR` synchronizes the pinned source (and any pinned nested sources,
 such as RoboDojo's Isaac Lab and cuRobo forks), prepares assets for every cataloged
-task, builds the ROS overlay with rosbridge's interfaces, and checks readiness. `--task TASK` restricts asset preparation to a single task. Repeat
+task, builds the ROS overlay with kinex-sim's interfaces, and checks readiness. `--task TASK` restricts asset preparation to a single task. Repeat
 preparation reuses source and assets. `doctor SIMULATOR [--task TASK]` checks
 readiness without installation or downloads. Preparation refuses to modify
 environments used by active managed runs.
@@ -51,10 +51,10 @@ service are discoverable and, when recording, the recorder holds every initial
 frame. Startup failures stop the graph and retain logs.
 
 Each run leases a separate ROS domain; `--domain-id` selects one explicitly, and
-leases coordinate this user's local rosbridge runs. `exec` supplies the selected
+leases coordinate this user's local kinex-sim runs. `exec` supplies the selected
 environment, ROS overlay and domain while preserving arguments and exit status.
 External controllers must enable `use_sim_time` themselves. Runs retain logs and
-metadata under `.cache/rosbridge/runs/<id>/`, including each run's ROS logs and
+metadata under `.cache/kinex-sim/runs/<id>/`, including each run's ROS logs and
 temporary files. The graph, recorder, probes and `exec` commands share that run's
 `ROS_HOME`, `ROS_LOG_DIR` and `TMPDIR`. `status` and `stop` can omit the run ID when
 exactly one live run exists. Process identity checks prevent signalling reused PIDs.
@@ -65,9 +65,9 @@ Management commands accept `--project` and `--json`.
 
 | Layer | Responsibility |
 |---|---|
-| `src/rosbridge/cli`, `catalog`, `provisioning`, `runs`, `recording` | Discovery, source/assets, environments, run supervision, recording |
-| `src/rosbridge/core`, `runtime` | Backend/device contracts, commands, stepping, wait scheduling |
-| `ros2/rosbridge_runtime` | The world node, device endpoints, observation publication, shared launch files |
+| `src/kinex_sim/cli`, `catalog`, `provisioning`, `runs`, `recording` | Discovery, source/assets, environments, run supervision, recording |
+| `src/kinex_sim/core`, `runtime` | Backend/device contracts, commands, stepping, wait scheduling |
+| `ros2/kinex_sim_runtime` | The world node, device endpoints, observation publication, shared launch files |
 | `simulators/<sim>` | Native backend, asset preparation, catalog, demo and tests |
 | `tools/robots` | Rig builders that measure device profiles and URDFs from each simulator |
 | `catalog/robots` | Robot rigs: device profiles and URDFs; see [Devices and robot catalog](devices.md) |
@@ -78,7 +78,7 @@ endpoints: `<device>/...` for each arm, gripper and observation camera, plus the
 world clock, waits, stop and, when recording, spectator streams. A simulator
 whose native stack cannot share the ROS interpreter declares `native_environment`
 and `native_backend` in its manifest: the world node then holds a proxy
-(`rosbridge.core.worker`) and the backend runs on the main thread of a worker
+(`kinex_sim.core.worker`) and the backend runs on the main thread of a worker
 process in that environment. Calls are sequential over a private socket; arrays
 cross it independently of the NumPy versions on either side, and a dead worker
 terminates the graph like an executor failure. World owns
@@ -132,7 +132,7 @@ or `world/stop` cancels it; abrupt process loss may prevent a response, so use w
 timeouts.
 
 ```python
-from rosbridge.clients import WorldClockClient
+from kinex_sim.clients import WorldClockClient
 world = WorldClockClient(node)
 result = world.wait(1.0, timeout_s=30.0)  # node not already attached to an executor
 assert result.success, result.message
@@ -141,9 +141,9 @@ result = await world.wait_async(1.0)
 ```
 
 The ROS graph inventory remains fixed during a run. Native evaluator results are
-available to the operator through `rosbridge judge RUN_ID`; task instructions and
+available to the operator through `kinex-sim judge RUN_ID`; task instructions and
 evaluator state are not published. The run log states the episode's task description, the
-instructions upstream's evaluator gives its policy, and `rosbridge describe --domain-id N`
+instructions upstream's evaluator gives its policy, and `kinex-sim describe --domain-id N`
 prints it for the live run on that domain (see [Task description](devices.md#task-description)).
 
 Arms accept `trajectory_msgs/msg/JointTrajectory` on `<arm>/joint_target`:
@@ -198,10 +198,10 @@ initial state and follows native control boundaries, skipping missed sample
 deadlines. Paused stepped worlds produce no repeated frames.
 
 ```bash
-rosbridge launch abc/pouring --execution-mode stepped --detach --record ./recordings/pouring
-rosbridge launch abc --record ./recordings/bag --record-type bag
-rosbridge launch abc --record ./recordings/both --record-type both
-rosbridge launch abc --record ./recordings/wrist --record-views wrist --record-size 640x480 --record-rate 5
+kinex-sim launch abc/pouring --execution-mode stepped --detach --record ./recordings/pouring
+kinex-sim launch abc --record ./recordings/bag --record-type bag
+kinex-sim launch abc --record ./recordings/both --record-type both
+kinex-sim launch abc --record ./recordings/wrist --record-views wrist --record-size 640x480 --record-rate 5
 ```
 
 `--record-type` accepts `mp4` (default), `bag`, or `both`. By default every view the
@@ -229,7 +229,7 @@ thinking time adds no footage, and missing sampling intervals hold the last fram
 Odd image dimensions are padded to even dimensions for H.264. Each view is one
 file, `<view>.mp4`. Bags preserve the original simulation stamps.
 
-Ctrl-C in foreground mode or `rosbridge stop RUN_ID` stops the producer, drains the
+Ctrl-C in foreground mode or `kinex-sim stop RUN_ID` stops the producer, drains the
 recorder and finalizes files. Encoder workers drain concurrently under one shutdown
 deadline. Recording metadata is written only when it changes. A recorder failure
 fails the run and stops the simulation. Forced termination may leave partial output.
@@ -248,27 +248,27 @@ generated source before repreparing; assets stay cached. Export/patch failures
 never publish a partial tree.
 
 Downloads use file locks, atomic extraction and upstream checksums where supplied.
-`ROSBRIDGE_ASSET_SEED=DIR` adopts an existing, already extracted asset depot laid
+`KINEX_SIM_ASSET_SEED=DIR` adopts an existing, already extracted asset depot laid
 out by simulator (`DIR/<simulator>/...`): each file is verified against its pin
 and then renamed into the store, so it must share the store's filesystem. A seeded
 preparation never downloads; a missing or mismatched file is an error.
 Packages without upstream checksums record an observed digest without claiming
-verification. Assets default to `.runtime/assets`; `ROSBRIDGE_ASSET_ROOT`
+verification. Assets default to `.runtime/assets`; `KINEX_SIM_ASSET_ROOT`
 overrides that location. The CLI's managed Python lives in `.runtime/python`.
 Both are shared by all jobs in this checkout. CLI-managed tool caches, temporary
 files and ROS logs are checkout-local; HOME is unchanged.
 
 There is no automatic pruning, log truncation or history retention limit.
-`.cache/rosbridge` contains disposable run history, logs, temporary files and
+`.cache/kinex-sim` contains disposable run history, logs, temporary files and
 rebuildable tool caches. Stop all managed runs and other commands using this
 checkout before removing it; to remove one finished run's history, delete
-`.cache/rosbridge/runs/RUN_ID` after that run and its `exec` commands stop. Keep
+`.cache/kinex-sim/runs/RUN_ID` after that run and its `exec` commands stop. Keep
 `.runtime`, `.venv`, `.pixi`, `.workspaces` and `third_party`; they contain the
 prepared installation. Recordings stay in the directory passed to `--record`.
 
 To add a simulator, follow [Adding a simulator](adding-a-simulator.md), the full procedure. In short:
-implement `SimulatorBackend` (`src/rosbridge/core/backend.py`)
-and register a lazy `rosbridge.backends` entry point (a `WorkerBackend` subclass
+implement `SimulatorBackend` (`src/kinex_sim/core/backend.py`)
+and register a lazy `kinex_sim.backends` entry point (a `WorkerBackend` subclass
 for a native worker). Supply an `ActionLayout` whose commands are positions in
 feedback units (or, for a base's velocity group, body velocities whose feedback is
 odometry; for a pose group, its tip pose, passed to `step(action, poses)` with
@@ -286,7 +286,7 @@ Pixi environment, asset preparer and checker, demo, a catalog rig built by
 ## Verification
 
 `--frozen` keeps `pixi.lock` as committed. Without it, some pixi versions rewrite the lock's
-platform names; rosbridge identifies the lock by what it locks, so that alone does not make a
+platform names; kinex-sim identifies the lock by what it locks, so that alone does not make a
 prepared simulator stale, but the working tree no longer matches the commit.
 
 ```bash
@@ -301,14 +301,14 @@ pixi run --frozen -e behavior-native smoke && pixi run --frozen -e behavior test
 pixi run --frozen -e handson-native smoke && pixi run --frozen -e handson test-ros
 pixi run --frozen -e bidex smoke && pixi run --frozen -e bidex test-ros
 pixi run --frozen -e abc python -m pytest -q tests/integration
-rosbridge demo abc
-rosbridge demo libero --execution-mode realtime
-rosbridge demo robotwin
-rosbridge demo robodojo
-rosbridge demo robocasa
-rosbridge demo behavior --timeout 1800
-rosbridge demo handson --timeout 1800
-rosbridge demo bidex
+kinex-sim demo abc
+kinex-sim demo libero --execution-mode realtime
+kinex-sim demo robotwin
+kinex-sim demo robodojo
+kinex-sim demo robocasa
+kinex-sim demo behavior --timeout 1800
+kinex-sim demo handson --timeout 1800
+kinex-sim demo bidex
 ```
 
 None of the commands above needs Kinex. The checks that do are together in `tests/kinex`

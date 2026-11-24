@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_robotwin"
+package = "kinex_sim_robotwin"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["robotwin = rosbridge_robotwin.backend:RoboTwinSim"],
-        "console_scripts": ["control_demo = rosbridge_robotwin.demos.control:main"],
+        "kinex_sim.backends": ["robotwin = kinex_sim_robotwin.backend:RoboTwinSim"],
+        "console_scripts": ["control_demo = kinex_sim_robotwin.demos.control:main"],
     },
 )

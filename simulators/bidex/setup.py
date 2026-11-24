@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_bidex"
+package = "kinex_sim_bidex"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["bidex = rosbridge_bidex.backend:BiDexSim"],
-        "console_scripts": ["control_demo = rosbridge_bidex.demos.control:main"],
+        "kinex_sim.backends": ["bidex = kinex_sim_bidex.backend:BiDexSim"],
+        "console_scripts": ["control_demo = kinex_sim_bidex.demos.control:main"],
     },
 )

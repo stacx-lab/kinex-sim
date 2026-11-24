@@ -3,9 +3,9 @@ import threading
 from types import SimpleNamespace
 
 import numpy as np
-from rosbridge_runtime.devices import Camera
-from rosbridge_runtime.publishing import Spectator
-from rosbridge_runtime import conversions as conv
+from kinex_sim_runtime.devices import Camera
+from kinex_sim_runtime.publishing import Spectator
+from kinex_sim_runtime import conversions as conv
 
 
 def frame(*_):

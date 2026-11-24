@@ -7,7 +7,7 @@ import subprocess
 import time
 
 import pytest
-from rosbridge.runs.records import alive, read
+from kinex_sim.runs.records import alive, read
 from tests.integration.support import invoke, start
 
 
@@ -40,7 +40,7 @@ def test_record_formats_and_initial_frames(runs, tmp_path, kind, simulator):
     assert (output / 'recording.json').stat().st_mtime_ns == modified
     controller = '''import rclpy
 from rclpy.node import Node
-from rosbridge.clients import WorldClockClient
+from kinex_sim.clients import WorldClockClient
 rclpy.init()
 n=Node('recording_test')
 r=WorldClockClient(n).wait(.34,timeout_s=15)
@@ -116,8 +116,8 @@ def test_recorder_failure_stops_simulation(runs, tmp_path, manifest):
     if manifest != 'unwritable':
         assert metadata(output)['state'] == 'failed'
     # The preparation lock and domain lease must also be released on cleanup errors.
-    from rosbridge.provisioning.setup import workspace_lock
-    from rosbridge.runs.domains import DomainLease
+    from kinex_sim.provisioning.setup import workspace_lock
+    from kinex_sim.runs.domains import DomainLease
     with workspace_lock(Path(record['project']), 'abc'):
         lease = DomainLease(record['domain_id'])
         lease.close()

@@ -6,17 +6,17 @@ import sys
 import pytest
 
 spec = importlib.util.spec_from_file_location(
-    "workspace", Path(__file__).resolve().parents[2] / "src/rosbridge/provisioning/workspace.py")
+    "workspace", Path(__file__).resolve().parents[2] / "src/kinex_sim/provisioning/workspace.py")
 workspace = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(workspace)
 
 
-def test_build_selects_one_simulator_and_rosbridges_own_interfaces(tmp_path, monkeypatch):
+def test_build_selects_one_simulator_and_kinex_sims_own_interfaces(tmp_path, monkeypatch):
     simulator = tmp_path / "simulators/fake"
     simulator.mkdir(parents=True)
     (simulator / "simulator.toml").write_text('ros_package="fake_ros"\n')
     (tmp_path / "simulators/other").mkdir()
-    (tmp_path / "src/rosbridge").mkdir(parents=True)
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
     (tmp_path / "pixi.toml").write_text("")
     monkeypatch.setattr(sys, "argv", ["workspace.py", "--simulator", "fake", "--project", str(tmp_path)])
     calls = []
@@ -44,8 +44,8 @@ def test_the_launch_files_forward_every_world_node_parameter():
                     item.value for item in value.elts}
         raise AssertionError(f"{name} not in {path}")
     root = Path(__file__).resolve().parents[2]
-    package = "ros2/rosbridge_runtime"
+    package = "ros2/kinex_sim_runtime"
     # Launch never sets randomize; every other parameter of the world node must reach it, max_steps included.
-    parameters = literal(f"{package}/rosbridge_runtime/sim_node.py", "defaults") - {"randomize"}
+    parameters = literal(f"{package}/kinex_sim_runtime/sim_node.py", "defaults") - {"randomize"}
     assert literal(f"{package}/launch/sim.launch.py", "TYPES") == parameters
     assert literal(f"{package}/launch/demo.launch.py", "WORLD") == parameters

@@ -7,13 +7,13 @@ Isaac Sim 5.1 with BEHAVIOR's R1Pro, as the official evaluator configures it: de
 `a8247a8cc1633fe1ca0cc66aa07243d46c64f155`, as RoboEnv pins it. See the
 [design and CLI guide](README.md) for shared lifecycle and timing contracts, and [BEHAVIOR:
 known environment issues](behavior-known-issues.md) for what is known to be wrong or
-surprising in the activities, and which of it rosbridge changes.
+surprising in the activities, and which of it kinex-sim changes.
 
 ```bash
-ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES rosbridge prepare behavior
-rosbridge tasks list --simulator behavior
-rosbridge launch behavior/turning-on-radio --execution-mode stepped --timeout 1800
-rosbridge setup behavior/turning-on-radio --directory ../my-behavior-workspace
+KINEX_SIM_BEHAVIOR_ACCEPT_LICENSE=YES kinex-sim prepare behavior
+kinex-sim tasks list --simulator behavior
+kinex-sim launch behavior/turning-on-radio --execution-mode stepped --timeout 1800
+kinex-sim setup behavior/turning-on-radio --directory ../my-behavior-workspace
 ```
 
 Task IDs are kebab-cased activity names, such as `behavior/turning-on-radio`.
@@ -90,7 +90,7 @@ RoboEnv's resolved versions, with the generated tree's OmniGibson and BDDL insta
 editable. The worker simulates and renders on one GPU, the first
 in `CUDA_VISIBLE_DEVICES` (default 0), and hides the others: on IOMMU hosts Kit
 otherwise validates peer-to-peer access between every GPU, holding each for minutes.
-`CUDA_VISIBLE_DEVICES=3 rosbridge launch ...` selects GPU 3. Booting Kit and loading a house takes several minutes (the first boot on a host
+`CUDA_VISIBLE_DEVICES=3 kinex-sim launch ...` selects GPU 3. Booting Kit and loading a house takes several minutes (the first boot on a host
 also compiles kernels); allow `--timeout 1800`. `OMNI_KIT_ACCEPT_EULA` defaults to
 `YES`.
 
@@ -112,7 +112,7 @@ takes 1 s.
 ## Assets and license
 
 The BEHAVIOR Data Bundle is encrypted and licensed separately from OmniGibson;
-preparation requires `ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES`, which accepts the
+preparation requires `KINEX_SIM_BEHAVIOR_ACCEPT_LICENSE=YES`, which accepts the
 BEHAVIOR Data Bundle End User License Agreement, and then installs the dataset key
 with OmniGibson's own `download_key`. The three archives of
 `behavior-1k/zipped-datasets` at `9f0d57d4…` are pinned by SHA-256 and size:
@@ -123,13 +123,13 @@ space for the largest archive). They are cached once under
 which OmniGibson reads. Every activity shares them, so one preparation serves all
 activities; a changed pin or generated source requires preparing again.
 
-With `ROSBRIDGE_ASSET_SEED=DIR`, an extracted depot
+With `KINEX_SIM_ASSET_SEED=DIR`, an extracted depot
 (`DIR/behavior/datasets/<dataset>`) is verified file by file against its
 receipts (`DIR/behavior/<dataset>.json`, which must name the pinned archive) and
 moved into the cache; the key is copied:
 
 ```bash
-ROSBRIDGE_BEHAVIOR_ACCEPT_LICENSE=YES ROSBRIDGE_ASSET_SEED=DIR rosbridge prepare behavior
+KINEX_SIM_BEHAVIOR_ACCEPT_LICENSE=YES KINEX_SIM_ASSET_SEED=DIR kinex-sim prepare behavior
 ```
 
 ## R1Pro
@@ -190,11 +190,11 @@ The spectators render with every step, and loading settles them at their start p
 ```bash
 pixi run --frozen -e behavior-native smoke   # controls, cameras, reset, slicer and vacuum rules
 pixi run --frozen -e behavior test-ros
-rosbridge demo behavior --timeout 1800
+kinex-sim demo behavior --timeout 1800
 ```
 
 The rig is rebuilt with `tools/robots/build_behavior.py` in the native environment.
 Native checks boot
-one activity (`ROSBRIDGE_ALL_TASKS=1` loads every R1Pro activity).
+one activity (`KINEX_SIM_ALL_TASKS=1` loads every R1Pro activity).
 `tests/kinex/native/test_behavior.py` (with `KINEX_PYTHON`) compares the exported rig's FK
 with OmniGibson.

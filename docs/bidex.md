@@ -12,10 +12,10 @@ Generalization, Instruction_Following and Limited_Demonstrations.
 See the [design and CLI guide](README.md) for shared lifecycle and timing contracts.
 
 ```bash
-rosbridge prepare bidex
-rosbridge tasks list --simulator bidex
-rosbridge launch bidex/pour-ice-between-two-cups-ood --execution-mode stepped --early-stop --seed 7
-rosbridge setup bidex/pour-ice-between-two-cups-ood --seed 7 --directory ../my-bidex-workspace
+kinex-sim prepare bidex
+kinex-sim tasks list --simulator bidex
+kinex-sim launch bidex/pour-ice-between-two-cups-ood --execution-mode stepped --early-stop --seed 7
+kinex-sim setup bidex/pour-ice-between-two-cups-ood --seed 7 --directory ../my-bidex-workspace
 ```
 
 `bidex` selects `Generalization/put_apple_in_white_bowl`. A task ID is the native name with
@@ -38,7 +38,7 @@ recorded ID start poses and the demonstration lengths behind the horizons.
 - Otherwise preparation fetches it by its pinned digest.
 
 **RoboCasa assets.** RoboCasa's objects and textures come from the robocasa simulator's
-cache, which `rosbridge prepare robocasa` downloads or adopts from a seed. That cache is
+cache, which `kinex-sim prepare robocasa` downloads or adopts from a seed. That cache is
 identical to BiDex's 5.4 GB `robocasa_assets` pack in every file BiDex uses, including the
 hashed textures of its OOD manifest, so that pack is not downloaded.
 
@@ -73,9 +73,9 @@ part of the episode's time.
 **Cameras.** OOD episodes move their cameras as the evaluator does: 30 of every 50 move the
 head camera, the wrist cameras or both, by up to 1.8 cm and 6°, with a delta drawn per
 episode from upstream's committed pose bank (`bidex/eval/ood.py`). ID episodes keep the
-nominal mounts. `rosbridge setup bidex/TASK --seed N` exports the episode's mounts: the
-catalog rig holds the nominal ones, and `rosbridge_bidex.workspace` moves them by the
-episode's delta with upstream's own plan, without MuJoCo; it needs `rosbridge prepare bidex`.
+nominal mounts. `kinex-sim setup bidex/TASK --seed N` exports the episode's mounts: the
+catalog rig holds the nominal ones, and `kinex_sim_bidex.workspace` moves them by the
+episode's delta with upstream's own plan, without MuJoCo; it needs `kinex-sim prepare bidex`.
 
 **Instruction.** The [task description](devices.md#task-description)'s `instruction` is the
 task's language. Five Instruction_Following tasks and their OOD twins switch their instruction
@@ -113,7 +113,7 @@ The devices split BiDex's 58-D joint action in its own order:
 
 Targets are absolute joint positions in radians. They reach the actuators unchanged, as the
 evaluator's joint adapter passes a policy's, and MuJoCo bounds them to the actuators' ranges,
-so rosbridge refuses no target for being out of range.
+so kinex-sim refuses no target for being out of range.
 
 **Arms.**
 - Joint names: `<side>_fr3v2_joint1..7` on the FR3v2 and `astribot_arm_<side>_joint_1..7` on
@@ -157,7 +157,7 @@ head and wrist cameras at 960×720.
 ```bash
 pixi run --frozen -e bidex smoke
 pixi run --frozen -e bidex test-ros
-rosbridge demo bidex
+kinex-sim demo bidex
 pixi run --frozen -e bidex python tools/robots/build_bidex.py   # rewrites the three catalog rigs
 ```
 

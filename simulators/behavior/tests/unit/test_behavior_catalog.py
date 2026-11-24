@@ -5,11 +5,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from rosbridge.assets import AssetStore
-from rosbridge.catalog import resolve, simulator, tasks
-from rosbridge_behavior import assets
-from rosbridge_behavior.backend import R1ProSim
-from rosbridge_behavior.r1pro import R1Pro
+from kinex_sim.assets import AssetStore
+from kinex_sim.catalog import resolve, simulator, tasks
+from kinex_sim_behavior import assets
+from kinex_sim_behavior.backend import R1ProSim
+from kinex_sim_behavior.r1pro import R1Pro
 
 
 def test_catalog_holds_the_100_challenge_activities():
@@ -27,7 +27,7 @@ def test_catalog_holds_the_100_challenge_activities():
 def test_manifest_runs_omnigibson_in_a_native_worker():
     _, _, config = simulator("behavior")
     assert (config["environment"], config["native_environment"]) == ("behavior", "behavior-native")
-    assert config["native_backend"] == "rosbridge_behavior.backend:R1ProSim"
+    assert config["native_backend"] == "kinex_sim_behavior.backend:R1ProSim"
     assert config["install"] == ["bddl3", "OmniGibson"]
 
 
@@ -56,7 +56,7 @@ def test_seeded_prepare_adopts_receipt_verified_datasets_and_needs_the_license(t
     for name, files in datasets.items():
         seed_dataset(seed, name, files)
     (seed / "behavior/datasets/omnigibson.key").write_bytes(b"key")
-    monkeypatch.setenv("ROSBRIDGE_ASSET_SEED", str(seed))
+    monkeypatch.setenv("KINEX_SIM_ASSET_SEED", str(seed))
     monkeypatch.delenv(assets.LICENSE, raising=False)
     store = AssetStore(tmp_path / "store")
     with pytest.raises(RuntimeError, match="not prepared"):
@@ -86,7 +86,7 @@ def test_seeded_prepare_adopts_receipt_verified_datasets_and_needs_the_license(t
 def test_seed_receipts_must_name_the_pinned_archive_and_every_file(tmp_path, monkeypatch):
     seed = tmp_path / "seed"
     seed_dataset(seed, "omnigibson-robot-assets", {"VERSION": b"3.8.2\n"}, checksum="0" * 64)
-    monkeypatch.setenv("ROSBRIDGE_ASSET_SEED", str(seed))
+    monkeypatch.setenv("KINEX_SIM_ASSET_SEED", str(seed))
     store = AssetStore(tmp_path / "store")
     with pytest.raises(ValueError, match="another archive"):
         assets.dataset(store, "omnigibson-robot-assets")

@@ -1,4 +1,4 @@
-"""Kinex's ROS communication on a rosbridge overlay: fan-out, bounded queues, service failures and teardown."""
+"""Kinex's ROS communication on a kinex-sim overlay: fan-out, bounded queues, service failures and teardown."""
 import asyncio
 import uuid
 

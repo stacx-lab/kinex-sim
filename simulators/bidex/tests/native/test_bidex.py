@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from rosbridge.catalog import tasks
-from rosbridge_bidex.backend import BiDexSim, episode
+from kinex_sim.catalog import tasks
+from kinex_sim_bidex.backend import BiDexSim, episode
 
 RIGS = {("dual_fr3v2_sharpa", (0.5, -0.45, 0.6)): "bidex/bidex-fr3v2-sharpa-tabletop",
         ("dual_fr3v2_sharpa", (0.8, -0.45, 0.7)): "bidex/bidex-fr3v2-sharpa-dexjoco",
@@ -36,7 +36,7 @@ def test_representative_tasks_reset_hold_step_and_render(task, seed, joint):
         assert (sim.steps, sim.time_s, sim.period, sim.max_steps) == (0, 0, .04, max_steps_for_task(suite, name))
         assert sim.layout.joint_names[0] == joint and len(sim.layout.joint_names) == 58
         assert [g.name for g in sim.layout.groups] == ["right_arm", "left_arm", "right_hand", "left_hand"]
-        # As the evaluator's joint adapter, rosbridge bounds no target; MuJoCo's actuators do.
+        # As the evaluator's joint adapter, kinex-sim bounds no target; MuJoCo's actuators do.
         assert all(np.isinf(g.lower).all() and np.isinf(g.upper).all() for g in sim.layout.groups)
         hold = sim.state()[0]
         for _ in range(25):
@@ -129,7 +129,7 @@ def test_failed_reset_keeps_the_episode(monkeypatch):
 
 def test_a_switching_instruction_is_given_whole():
     from bidex import load_task
-    from rosbridge_bidex.backend import instruction
+    from kinex_sim_bidex.backend import instruction
     task = load_task("Instruction_Following", "take_milk_and_lemon_from_shelf_into_tray")
     assert instruction(task) == ("Pick up the milk carton from the shelf and put it into the tray. Leave the milk. "
                                  "Pick up the lemon from the shelf and put it into the tray instead.")

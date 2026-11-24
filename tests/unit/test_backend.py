@@ -4,10 +4,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from rosbridge.core.backend import ActionLayout, CommandGroup
-from rosbridge.core.commands import CommandBuffer, CommandError
-from rosbridge_runtime.conversions import trajectory
-from rosbridge.core import registry
+from kinex_sim.core.backend import ActionLayout, CommandGroup
+from kinex_sim.core.commands import CommandBuffer, CommandError
+from kinex_sim_runtime.conversions import trajectory
+from kinex_sim.core import registry
 
 
 def test_non_abc_layout_and_atomic_rejection():

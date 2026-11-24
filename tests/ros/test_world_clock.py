@@ -6,8 +6,8 @@ from custom_interfaces.srv import Wait
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64, Float64MultiArray
 from std_srvs.srv import Trigger
-from rosbridge.clients import WorldClockClient
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim.clients import WorldClockClient
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
 
 TIME_LIMIT = "the episode ended because the time limit was reached"
@@ -33,8 +33,8 @@ def budgets(graph):
 
 
 def test_the_run_log_states_the_task_description(tmp_path):
-    """The world logs the task description as one line, which `rosbridge describe` reads back."""
-    from rosbridge.runtime.description import stated
+    """The world logs the task description as one line, which `kinex-sim describe` reads back."""
+    from kinex_sim.runtime.description import stated
     graph = Graph(tmp_path, task="succeeds")
     try:
         graph.logs[0].flush()
@@ -161,7 +161,7 @@ def test_an_early_stop_run_ends_saying_why(tmp_path, task, message):
 
 def test_scene_options_reach_reset_and_the_episode_record(tmp_path, monkeypatch):
     import json
-    monkeypatch.setenv("ROSBRIDGE_RUN_DIR", str(tmp_path))
+    monkeypatch.setenv("KINEX_SIM_RUN_DIR", str(tmp_path))
     graph = Graph(tmp_path, backend="scene_toy", max_steps=1, scene={"layout": 4})
     try:
         assert graph.wait(.1).message == f"ok; {TIME_LIMIT}"

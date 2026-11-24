@@ -7,7 +7,7 @@ from std_msgs.msg import Float64
 from std_srvs.srv import Trigger
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
 
 # Scene construction runs upstream's expert dry run; allow minutes to start.

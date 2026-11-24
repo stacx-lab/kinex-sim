@@ -7,13 +7,13 @@ Upstream is pinned to `c9598b53fc2a01355e74837de397bd7b2b1ab602`, with Isaac Lab
 (`isaac-sim/IsaacLab@37ddf626`) as a nested source. See the [design and CLI
 guide](README.md) for shared lifecycle and timing contracts, and [HandsOn: known
 environment issues](handson-known-issues.md) for what is known to be wrong or surprising in
-the tasks, and which of it rosbridge corrects.
+the tasks, and which of it kinex-sim corrects.
 
 ```bash
-rosbridge prepare handson
-rosbridge tasks list --simulator handson
-rosbridge launch handson/t12-load-and-start-microwave --execution-mode stepped --early-stop --seed 3 --timeout 1800
-rosbridge setup handson/t12-load-and-start-microwave --seed 3 --directory ../my-handson-workspace
+kinex-sim prepare handson
+kinex-sim tasks list --simulator handson
+kinex-sim launch handson/t12-load-and-start-microwave --execution-mode stepped --early-stop --seed 3 --timeout 1800
+kinex-sim setup handson/t12-load-and-start-microwave --seed 3 --directory ../my-handson-workspace
 ```
 
 `handson` selects `t24_place_ball_in_bowl`. Task IDs are the native names with
@@ -22,7 +22,7 @@ hyphens, such as `handson/eval-flex02-fold-towel-twice`.
 ## Native worker, source and assets
 
 The world node runs in the `handson` environment (the shared ROS environment) and proxies
-`rosbridge_handson.backend.HandsOnSim`, which runs on the main thread of a worker in
+`kinex_sim_handson.backend.HandsOnSim`, which runs on the main thread of a worker in
 `handson-native`: Python 3.11, Isaac Sim 5.1, CUDA 12.8 torch 2.7 and Isaac Lab's direct
 requirements, the pins `robodojo-native` shares, plus HandsOn's own. As for RoboDojo, the
 worker sees one GPU, the first in `CUDA_VISIBLE_DEVICES`, and renders on its Vulkan device.
@@ -65,7 +65,7 @@ A launch builds the episode as upstream's `handson/evaluation/native.py:run_epis
   kept only native seeds it accepts.
 - **Instruction:** the seeded instruction (canonical or paraphrased). Its `prompt` is the
   [task description](devices.md#task-description)'s `instruction`; the whole binding is
-  upstream's `handson/PROMPT.json` receipt in the run's directory (`.cache/rosbridge/runs/<id>/`).
+  upstream's `handson/PROMPT.json` receipt in the run's directory (`.cache/kinex-sim/runs/<id>/`).
 
 Booting Isaac, converting the scene and settling take minutes (about 2.5 on an L40S); allow
 `--timeout 1800`. A worker serves the one episode it was launched with.
@@ -115,7 +115,7 @@ is replaced. The episode record's `seed` is the launch's seed and `native_seed` 
 
 A native seed samples the layout, the table height and, where a task has one, its goal. `t24`
 always asks for the tennis ball and `t26` for the apple: only the constructor overrides of
-upstream's archived paper trials choose their targets, and rosbridge does not use those
+upstream's archived paper trials choose their targets, and kinex-sim does not use those
 trials. For the 16 tasks in upstream's `settings.json`, the native seed selects a setting and
 derives the reset seed. The instruction is fixed by task, native seed and goal: canonical for
 about one seed in five, else one of 32 paraphrases. The task description holds only
@@ -161,7 +161,7 @@ incomplete. Each GPU starts one reset at a time, and only while it has `--min-fr
 free. Every run's detail goes to `seeds.json.log.jsonl`, which is not committed.
 
 Upstream's leaderboard (`docs/leaderboard.md` at the pin) also ranks two prompted agents on a
-palm-and-finger interface like rosbridge's, GPT-6 and Fable 5.2, over ten fixed trials per
+palm-and-finger interface like kinex-sim's, GPT-6 and Fable 5.2, over ten fixed trials per
 task with a budget of model calls rather than steps. Its trials are not these seeds, so the
 two sets of results are not directly comparable.
 
@@ -178,7 +178,7 @@ two sets of results are not directly comparable.
 Arms are commanded as upstream's EEF52 actions command them: by the pose of the palm,
 `<side>_palm_link`, the arm's tip link `palm`. A `pose_target` is a
 `MultiDOFJointTrajectory` of palm poses in `<side>_arm/base` (the arm's `link0_<side>`,
-mounted in `world:base`, which is Isaac's world), timed from receipt. rosbridge interpolates
+mounted in `world:base`, which is Isaac's world), timed from receipt. kinex-sim interpolates
 it at 30 Hz, positions linearly and rotations by slerp, and each step hands upstream the
 palm's world pose with the hand's targets, unchanged. Everything after that is upstream's:
 - **IK:** the task's own arm IK, Isaac Lab's damped least squares (λ 0.04) by default, one
@@ -206,7 +206,7 @@ to idle.
 
 Single-arm tasks `eval_comb01`, `eval_gen01`, `eval_gen03`, `eval_gen06` and `eval_gen07`
 hold the left arm and hand at home and never ask for their targets
-(`bimanual_assembly_env.py:_apply_joint_targets`). Their workspaces from `rosbridge setup`
+(`bimanual_assembly_env.py:_apply_joint_targets`). Their workspaces from `kinex-sim setup`
 declare no commands on those two devices, only their state, so a client that goes by the
 profiles, as Kinex does, has no command to send. The other single-arm tasks drive both arms upstream: those built on the frozen bases,
 which predate the hold, and the five Core tasks upstream exempts from it (`t11`, `t29`,
@@ -242,10 +242,10 @@ evaluator's for the task and seed:
   with a setting, else the native seed. The head camera is fixed in the world and each wrist
   camera on its palm, both at their nominal mount composed with that offset.
 
-`rosbridge setup handson/TASK --seed K` exports the workspace of that task and seed: the rig
+`kinex-sim setup handson/TASK --seed K` exports the workspace of that task and seed: the rig
 with each camera's intrinsics and drawn mount, and in the five held tasks the left arm and
-hand without commands (`rosbridge_handson.workspace`, from upstream's camera contracts
-without Isaac; it needs `rosbridge prepare handson`). The catalog rig itself holds the
+hand without commands (`kinex_sim_handson.workspace`, from upstream's camera contracts
+without Isaac; it needs `kinex-sim prepare handson`). The catalog rig itself holds the
 default profile at nominal mounts.
 
 ## Recording and checks
@@ -257,9 +257,9 @@ much of a recorded run's cost.
 
 ```bash
 pixi run --frozen -e handson-native smoke                       # native checks via worker processes
-ROSBRIDGE_ALL_TASKS=1 pixi run --frozen -e handson-native smoke  # every task boots Isaac (hours)
+KINEX_SIM_ALL_TASKS=1 pixi run --frozen -e handson-native smoke  # every task boots Isaac (hours)
 pixi run --frozen -e handson test-ros
-rosbridge demo handson --timeout 1800
+kinex-sim demo handson --timeout 1800
 pixi run --frozen -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
     python tools/robots/build_handson.py                # rewrites the catalog rig
 ```

@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from rosbridge_handson.assets import (ARCHIVED_OMNIGLASS, MDL_MODULES, SURFACES, check_mdl_modules,
+from kinex_sim_handson.assets import (ARCHIVED_OMNIGLASS, MDL_MODULES, SURFACES, check_mdl_modules,
                                       link_mdl_modules)
 
 RUNTIME = Path(__file__).resolve().parents[4] / ".runtime/handson"

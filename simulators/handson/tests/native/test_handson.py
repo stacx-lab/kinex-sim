@@ -2,7 +2,7 @@
 
 Isaac hosts one episode per process and its shutdown ends the process, so every check
 drives HandsOnSim through a worker subprocess. Each task needs its own Isaac boot
-(minutes), so the every-task sweep runs only with ROSBRIDGE_ALL_TASKS=1.
+(minutes), so the every-task sweep runs only with KINEX_SIM_ALL_TASKS=1.
 """
 import os
 import sys
@@ -11,15 +11,15 @@ import numpy as np
 import pytest
 import yaml
 
-from rosbridge.catalog import tasks
-from rosbridge.catalog.robots import setup
-from rosbridge.core.worker import WorkerBackend
+from kinex_sim.catalog import tasks
+from kinex_sim.catalog.robots import setup
+from kinex_sim.core.worker import WorkerBackend
 
 # The default task: both arms move freely.
 TASK, STEPS = "t24_place_ball_in_bowl", 150
 ALL = {t["native_task"]: t["id"] for t in tasks(name="handson").values()}
 # A bimanual task and one whose left arm and hand upstream holds.
-SELECTED = list(ALL) if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["t12_load_and_start_microwave",
+SELECTED = list(ALL) if os.environ.get("KINEX_SIM_ALL_TASKS") else ["t12_load_and_start_microwave",
                                                                     "eval_gen01_cover_lunchbox"]
 SIDES = (("right", 0), ("left", 27))
 CURL = [4, 6, 7, 8, 10, 11]  # index and middle finger flexion, in the hand's finger-major order
@@ -131,10 +131,10 @@ def lined_up(image, view, spectator_k, rays, size=96):
 
 def test_cameras_render_the_geometry_their_profiles_state(tmp_path, sim):
     """Each image lines up with its undistorted spectator through the rays of the camera's profile: the pinhole's
-    for the wrists, and for the head camera those the world node serves through its lens (rosbridge.core.lens).
+    for the wrists, and for the head camera those the world node serves through its lens (kinex_sim.core.lens).
     Without the head camera's lens, its edges miss by pixels."""
-    from rosbridge.catalog.cameras import BROWN_CONRADY
-    from rosbridge.core.lens import LensGeometry
+    from kinex_sim.catalog.cameras import BROWN_CONRADY
+    from kinex_sim.core.lens import LensGeometry
     setup(TASK, tmp_path, seed=0)  # the workspace of the episode the fixture loaded
     for camera, view in (("head_camera", "third_person"), ("left_camera", "left_wrist"),
                          ("right_camera", "right_wrist")):

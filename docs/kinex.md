@@ -1,18 +1,18 @@
-# Using rosbridge with Kinex
+# Using kinex-sim with Kinex
 
-rosbridge does not depend on Kinex: its graphs, profiles and tests stand on their own
+kinex-sim does not depend on Kinex: its graphs, profiles and tests stand on their own
 (see [Devices and robot catalog](devices.md)). Its device types, operation names and
-profile format are Kinex's, so a workspace that `rosbridge setup` exports is a Kinex
+profile format are Kinex's, so a workspace that `kinex-sim setup` exports is a Kinex
 workspace: `.kinex/workspace.yaml`, `.kinex/devices/<name>/profile.yaml` and
 `.kinex/kinex.json` with the `ros-jazzy` provider. Setup neither starts Kinex nor prepares
 its Python environment.
 
 ```sh
-rosbridge setup libero/libero-spatial-01 --directory ../my-libero-workspace --domain-id 83
-rosbridge launch libero/libero-spatial-01 --execution-mode stepped --domain-id 83
+kinex-sim setup libero/libero-spatial-01 --directory ../my-libero-workspace --domain-id 83
+kinex-sim launch libero/libero-spatial-01 --execution-mode stepped --domain-id 83
 ```
 
-Every operation of a profile is an endpoint of rosbridge's world node, so Kinex borrows the
+Every operation of a profile is an endpoint of kinex-sim's world node, so Kinex borrows the
 simulator instead of relaying it. What Kinex adds runs in Kinex:
 
 - the links of each joint and gripper device's URDF, which Kinex publishes on TF from
@@ -25,23 +25,23 @@ simulator instead of relaying it. What Kinex adds runs in Kinex:
 
 The world's `wait` is `custom_interfaces/srv/Wait` and a lensed camera's `geometry`,
 `unproject` and `project` are `custom_interfaces/srv/Json`. An arm's `move` is the standard
-`control_msgs/action/FollowJointTrajectory`. rosbridge and Kinex each build an
+`control_msgs/action/FollowJointTrajectory`. kinex-sim and Kinex each build an
 identical copy of the package, from `ros2/custom_interfaces` here and from Kinex's own assets
 there, so the types are the same on the wire and neither project needs the other to build or
 to call them. The package also holds `LookupTransform`, the type of Kinex's frame service;
-rosbridge carries it to keep the two copies the same and does not serve it. The camera
+kinex-sim carries it to keep the two copies the same and does not serve it. The camera
 operations take and return the JSON of Kinex's camera geometry operations.
 
 ## Compatibility checks
 
-Every check that needs Kinex is in `tests/kinex`, apart from rosbridge's own tests, which
+Every check that needs Kinex is in `tests/kinex`, apart from kinex-sim's own tests, which
 run without it. They take Kinex Python from
 `KINEX_PYTHON=../kinex2.0/packages/core/assets/python` and are skipped without it.
 
 | Directory | Checks | Runs in |
 |---|---|---|
 | `tests/kinex/unit` | `custom_interfaces` is the same package here and in Kinex; Kinex's profile schema and readiness plan accept every rig | the default environment, next to a Kinex checkout |
-| `tests/kinex/ros` | Kinex's ROS communication and device host on a rosbridge overlay; `workspace.mjs`, an end-to-end program against a launched LIBERO run | a sourced simulator overlay |
+| `tests/kinex/ros` | Kinex's ROS communication and device host on a kinex-sim overlay; `workspace.mjs`, an end-to-end program against a launched LIBERO run | a sourced simulator overlay |
 | `tests/kinex/native` | `test_<simulator>.py`: the exported rig's FK, mounts and camera frames, through Kinex's kinematics, against the simulator | that simulator's native environment |
 
 ```bash

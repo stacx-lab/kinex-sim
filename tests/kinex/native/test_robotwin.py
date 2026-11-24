@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from rosbridge_robotwin.backend import RoboTwinSim, pose_matrix
+from kinex_sim_robotwin.backend import RoboTwinSim, pose_matrix
 from tests.kinex.geometry import Rig, compose, requires_kinex, rt
 
 pytestmark = requires_kinex

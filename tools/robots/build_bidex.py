@@ -4,8 +4,8 @@ Each rig is measured on one of its tasks: the dual FR3v2 on the LIBERO tabletop 
 dexjoco table, which differ only in the robot base pose, and the Astribot S1, whose torso and head
 the 58-D action never moves; their servos hold the initial pose, which the mounts bake in. It also
 writes each camera's orientation on its attachment body by robot type (simulators/bidex/
-camera_orientations.json), which rosbridge setup needs to move an out-of-domain episode's cameras.
-Run in the BiDex-100 environment after `rosbridge prepare bidex`:
+camera_orientations.json), which kinex-sim setup needs to move an out-of-domain episode's cameras.
+Run in the BiDex-100 environment after `kinex-sim prepare bidex`:
     pixi run --frozen -e bidex python tools/robots/build_bidex.py
 """
 import json
@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "simulators/bidex"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from rosbridge_bidex.backend import CAMERAS, OPTICAL, BiDexSim  # noqa: E402
-from rosbridge_bidex.workspace import ORIENTATIONS  # noqa: E402
+from kinex_sim_bidex.backend import CAMERAS, OPTICAL, BiDexSim  # noqa: E402
+from kinex_sim_bidex.workspace import ORIENTATIONS  # noqa: E402
 
 SIDES = ("right", "left")
 RIGS = {

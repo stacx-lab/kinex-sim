@@ -6,7 +6,7 @@ import pytest
 from custom_interfaces.srv import Json
 from sensor_msgs.msg import CameraInfo
 
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph
 
 

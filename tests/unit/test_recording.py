@@ -4,10 +4,10 @@ import time
 
 import pytest
 
-from rosbridge.cli.main import main, parser
-from rosbridge.recording import destination, reserve
-from rosbridge.recording.video import VideoStream, encoder_path
-from rosbridge.runs.api import recording_settings
+from kinex_sim.cli.main import main, parser
+from kinex_sim.recording import destination, reserve
+from kinex_sim.recording.video import VideoStream, encoder_path
+from kinex_sim.runs.api import recording_settings
 
 
 def test_record_cli_and_empty_destination(tmp_path, monkeypatch):
@@ -118,7 +118,7 @@ def test_encoder_queue_is_bounded(tmp_path, monkeypatch):
 
 def test_stalled_encoders_share_shutdown_deadline(tmp_path, monkeypatch):
     import sys
-    from rosbridge.recording import video
+    from kinex_sim.recording import video
     executable = tmp_path / 'stalled-encoder'
     executable.write_text(f'#!{sys.executable}\nimport time\ntime.sleep(60)\n')
     executable.chmod(0o700)
@@ -162,7 +162,7 @@ def test_stalled_encoders_share_shutdown_deadline(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('contents', [None, '{broken', '[]', '{"state":"failed","error":["bad"]}'])
 def test_invalid_recording_metadata_retains_original_failure(tmp_path, contents):
-    from rosbridge.recording import finalize
+    from kinex_sim.recording import finalize
     path = tmp_path / 'recording.json'
     if contents is not None:
         path.write_text(contents)
@@ -174,7 +174,7 @@ def test_invalid_recording_metadata_retains_original_failure(tmp_path, contents)
 
 
 def test_recorder_failure_detail_is_retained(tmp_path):
-    from rosbridge.recording import finalize
+    from kinex_sim.recording import finalize
     path = tmp_path / 'recording.json'
     path.write_text(json.dumps({'state': 'failed', 'error': 'encoder failed'}))
     record = {'recording_dir': str(tmp_path), 'error': 'Recorder exited unexpectedly'}

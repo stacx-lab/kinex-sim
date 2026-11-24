@@ -18253,7 +18253,7 @@ packages:
   size: 24624
   timestamp: 1791428379408
 - pypi: ./
-  name: rosbridge
+  name: kinex-sim
   requires_dist:
   - pyyaml>=6,<7
   - numpy ; extra == 'runtime'

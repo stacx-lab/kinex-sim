@@ -1,5 +1,5 @@
 """Run by test_slicing.py in a process of its own: slicers and food on the ground of an empty scene, each step
-rendered as rosbridge steps an episode. A tool floats (no gravity) and is moved by its velocity alone, or falls.
+rendered as kinex-sim steps an episode. A tool floats (no gravity) and is moved by its velocity alone, or falls.
 Writes to argv[1], as JSON, what each trial did to the food and to the slicers' SlicerActive state:
   handle / blade   an axe, a carving knife and a table knife lowered onto a log, an egg and a cupcake: handle first,
                    then blade first at several speeds down to a slow press
@@ -14,7 +14,7 @@ import traceback
 
 import numpy as np
 
-from rosbridge_behavior.environment import boot, rotation, values
+from kinex_sim_behavior.environment import boot, rotation, values
 
 boot()
 import omnigibson as og  # noqa: E402

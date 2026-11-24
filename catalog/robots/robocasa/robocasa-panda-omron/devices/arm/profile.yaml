@@ -51,7 +51,7 @@ meta:
 type: joint
 description: Franka Panda seven-joint arm on the torso. Geometry is the sibling arm.urdf with
   flange as the tip link; its links are the frames arm/<link>. Commands are absolute native
-  joint positions; rosbridge rejects targets outside the native joint ranges.
+  joint positions; kinex-sim rejects targets outside the native joint ranges.
 source: introspected
 calibrated_at: null
 method: introspection

@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_behavior"
+package = "kinex_sim_behavior"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["behavior = rosbridge_behavior.worker:BehaviorWorker"],
-        "console_scripts": ["control_demo = rosbridge_behavior.demos.control:main"],
+        "kinex_sim.backends": ["behavior = kinex_sim_behavior.worker:BehaviorWorker"],
+        "console_scripts": ["control_demo = kinex_sim_behavior.demos.control:main"],
     },
 )

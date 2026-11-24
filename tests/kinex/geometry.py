@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from rosbridge.catalog.robots import setup
+from kinex_sim.catalog.robots import setup
 
 PROJECT = Path(__file__).resolve().parents[2]
 
@@ -42,7 +42,7 @@ def rt(position, quaternion_wxyz):
 
 
 class Rig:
-    """The Kinex workspace a task and seed's launch serves (rosbridge setup)."""
+    """The Kinex workspace a task and seed's launch serves (kinex-sim setup)."""
     def __init__(self, selection, directory, seed=None):
         setup(selection, directory, seed=seed, project=PROJECT)
         self.directory = Path(directory) / ".kinex/devices"

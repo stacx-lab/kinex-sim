@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from rosbridge.assets import AssetStore
-from rosbridge.catalog import resolve, simulator, tasks
-from rosbridge_robodojo import assets
+from kinex_sim.assets import AssetStore
+from kinex_sim.catalog import resolve, simulator, tasks
+from kinex_sim_robodojo import assets
 
 
 def test_catalog_pairs_the_base_tasks_with_the_dual_x5_rig():
@@ -21,7 +21,7 @@ def test_catalog_pairs_the_base_tasks_with_the_dual_x5_rig():
 def test_manifest_runs_isaac_in_a_native_worker_with_pinned_forks():
     _, _, config = simulator("robodojo")
     assert (config["environment"], config["native_environment"]) == ("robodojo", "robodojo-native")
-    assert config["native_backend"] == "rosbridge_robodojo.backend:RoboDojoSim"
+    assert config["native_backend"] == "kinex_sim_robodojo.backend:RoboDojoSim"
     assert [(n["path"], len(n["source_revision"])) for n in config["nested_sources"]] == [
         ("third_party/IsaacLab", 40), ("third_party/curobo", 40)]
 

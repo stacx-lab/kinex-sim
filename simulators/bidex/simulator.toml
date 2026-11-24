@@ -4,12 +4,12 @@ source_url = "https://github.com/robbyant-research/BiDex-100.git"
 source_revision = "5d077559b0c648bd1c4f32261a8032785740cb01"
 patches = "patches/bidex"
 python_path = "simulators/bidex"
-asset_preparer = "rosbridge_bidex.assets:prepare"
-asset_checker = "rosbridge_bidex.assets:check_task"
-# rosbridge setup: each out-of-domain episode's camera mounts.
-workspace = "rosbridge_bidex.workspace:profiles"
+asset_preparer = "kinex_sim_bidex.assets:prepare"
+asset_checker = "kinex_sim_bidex.assets:check_task"
+# kinex-sim setup: each out-of-domain episode's camera mounts.
+workspace = "kinex_sim_bidex.workspace:profiles"
 default_task = "Generalization/put_apple_in_white_bowl"
-ros_package = "rosbridge_bidex"
+ros_package = "kinex_sim_bidex"
 environment = "bidex"
 task_catalog = "tasks.toml"
 

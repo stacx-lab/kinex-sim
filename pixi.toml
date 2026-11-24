@@ -1,5 +1,5 @@
 [workspace]
-name = "rosbridge"
+name = "kinex-sim"
 channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
 platforms = ["linux-64"]
 
@@ -26,7 +26,7 @@ setuptools = "<80"
 ffmpeg = ">=9.0.1,<10"
 
 [pypi-dependencies]
-rosbridge = { path = ".", editable = true }
+kinex-sim = { path = ".", editable = true }
 
 [activation.env]
 MUJOCO_GL = "egl"
@@ -42,7 +42,7 @@ pyyaml = "*"
 tyro = "*"
 
 [feature.abc.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator abc"
+build = "python -m kinex_sim.provisioning.workspace --simulator abc"
 test-ros = "bash -c 'source .workspaces/abc/install/local_setup.bash && python -m pytest -q tests/ros simulators/abc/tests/ros'"
 smoke = "python -m pytest -q simulators/abc/tests/native"
 
@@ -66,7 +66,7 @@ cloudpickle = "==2.1.0"
 gym = "==0.25.2"
 
 [feature.libero.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator libero"
+build = "python -m kinex_sim.provisioning.workspace --simulator libero"
 test-ros = "bash -c 'source .workspaces/libero/install/local_setup.bash && python -m pytest -q simulators/libero/tests/ros'"
 smoke = "python -m pytest -q simulators/libero/tests/native"
 
@@ -97,7 +97,7 @@ pyyaml = "*"
 jsonschema = "*"
 
 [feature.robotwin.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator robotwin"
+build = "python -m kinex_sim.provisioning.workspace --simulator robotwin"
 test-ros = "bash -c 'source .workspaces/robotwin/install/local_setup.bash && python -m pytest -q simulators/robotwin/tests/ros'"
 smoke = "python -m pytest -q simulators/robotwin/tests/native"
 
@@ -172,7 +172,7 @@ tqdm = "==4.70.0"
 pyyaml = "*"
 
 [feature.robocasa.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator robocasa"
+build = "python -m kinex_sim.provisioning.workspace --simulator robocasa"
 test-ros = "bash -c 'source .workspaces/robocasa/install/local_setup.bash && python -m pytest -q simulators/robocasa/tests/ros'"
 smoke = "python -m pytest -q simulators/robocasa/tests/native"
 
@@ -188,18 +188,18 @@ quaternionic = "*"
 msgpack = "*"
 
 [feature.bidex.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator bidex"
+build = "python -m kinex_sim.provisioning.workspace --simulator bidex"
 test-ros = "bash -c 'source .workspaces/bidex/install/local_setup.bash && python -m pytest -q simulators/bidex/tests/ros'"
 smoke = "python -m pytest -q simulators/bidex/tests/native"
 
 # RoboDojo's and HandsOn's world nodes: the shared ROS environment plus their tasks. Each
-# simulator runs in its own Python 3.11 interpreter (rosbridge.core.worker).
+# simulator runs in its own Python 3.11 interpreter (kinex_sim.core.worker).
 [feature.robodojo.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator robodojo"
+build = "python -m kinex_sim.provisioning.workspace --simulator robodojo"
 test-ros = "bash -c 'source .workspaces/robodojo/install/local_setup.bash && python -m pytest -q simulators/robodojo/tests/ros'"
 
 [feature.handson.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator handson"
+build = "python -m kinex_sim.provisioning.workspace --simulator handson"
 test-ros = "bash -c 'source .workspaces/handson/install/local_setup.bash && python -m pytest -q simulators/handson/tests/ros'"
 
 # Isaac Sim 5.1 ships Python 3.11 wheels only, while RoboStack Jazzy is Python 3.12. Isaac Sim and
@@ -295,9 +295,9 @@ zarr = "==2.18.7"
 smoke = "env PYTHONPATH=src:simulators/handson:.runtime/handson python -m pytest -q -p no:cacheprovider simulators/handson/tests/native"
 
 # BEHAVIOR's world node: the shared ROS environment plus its tasks. OmniGibson runs in a separate
-# Python 3.11 interpreter, behavior-native (rosbridge.core.worker).
+# Python 3.11 interpreter, behavior-native (kinex_sim.core.worker).
 [feature.behavior.tasks]
-build = "python -m rosbridge.provisioning.workspace --simulator behavior"
+build = "python -m kinex_sim.provisioning.workspace --simulator behavior"
 test-ros = "bash -c 'source .workspaces/behavior/install/local_setup.bash && python -m pytest -q simulators/behavior/tests/ros'"
 
 # Isaac Sim 5.1 ships Python 3.11 wheels only. Direct requirements of OmniGibson (with the

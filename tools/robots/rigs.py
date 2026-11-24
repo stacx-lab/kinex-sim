@@ -10,7 +10,7 @@ import math
 import numpy as np
 import yaml
 
-from rosbridge.catalog import cameras
+from kinex_sim.catalog import cameras
 
 CREATED = "2026-10-24T00:00:00Z"
 
@@ -191,7 +191,7 @@ def locomotion(name, description, axes, base, *, timeout_s, units="normalized"):
 def camera(name, description, intrinsics, base, depth_range=None, distortion=None):
     """An RGB or RGB-D camera; distortion is its lens's OpenCV Brown-Conrady (k1, k2, p1, p2, k3), or None for
     an undistorted pinhole. An undistorted pinhole's FOV and rays follow from the profile; the world node serves
-    a distorted camera's geometry, unproject and project (rosbridge.core.lens)."""
+    a distorted camera's geometry, unproject and project (kinex_sim.core.lens)."""
     width, height = intrinsics[:2]
     color = cameras.color(*intrinsics, distortion)
     rgbd = depth_range is not None
@@ -469,7 +469,7 @@ def source_tree(source, root, name, comment):
 
 
 def patch(base, target):
-    """The merge patch that takes base to target, as rosbridge.catalog.robots.merge applies it: removed keys
+    """The merge patch that takes base to target, as kinex_sim.catalog.robots.merge applies it: removed keys
     become None, shared mappings recurse, and anything else, a new mapping whole, takes target's value."""
     changes = {key: None for key in base if key not in target}
     for key, value in target.items():

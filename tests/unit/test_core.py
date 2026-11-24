@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 
-from rosbridge.core.commands import CommandBuffer, CommandError
-from rosbridge.runtime.pacing import Pacer
+from kinex_sim.core.commands import CommandBuffer, CommandError
+from kinex_sim.runtime.pacing import Pacer
 
-from rosbridge.core.backend import ActionLayout, CommandGroup
+from kinex_sim.core.backend import ActionLayout, CommandGroup
 
 LAYOUT = ActionLayout(tuple(f"joint{i}" for i in range(14)), (
     CommandGroup("left", tuple(range(6)), (-1.,)*6, (1.,)*6),
@@ -50,7 +50,7 @@ def test_trajectory_interpolates_then_holds():
 
 
 def test_velocity_groups_start_at_rest_and_expire():
-    from rosbridge.core.devices import device_inventory
+    from kinex_sim.core.devices import device_inventory
     layout = ActionLayout(("arm", "x", "y", "yaw"), (
         CommandGroup("arm", (0,), (-1.,), (1.,)),
         CommandGroup("base", (1, 2, 3), (-1.,)*3, (1.,)*3, velocity=True)))
@@ -75,7 +75,7 @@ def test_velocity_groups_start_at_rest_and_expire():
 
 
 def test_pose_groups_hold_no_target_until_commanded_then_track_tip_poses():
-    from rosbridge.core.devices import device_inventory
+    from kinex_sim.core.devices import device_inventory
     layout = ActionLayout(("j1", "j2", "finger"), (
         CommandGroup("arm", (0, 1), (-1.,)*2, (1.,)*2, tip="palm"),
         CommandGroup("hand", (2,), (0.,), (1.,))))

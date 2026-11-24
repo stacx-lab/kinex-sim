@@ -1,6 +1,6 @@
 from collections import Counter
 
-from rosbridge.catalog import resolve, simulator, tasks
+from kinex_sim.catalog import resolve, simulator, tasks
 
 TABLETOP, DEXJOCO, ASTRIBOT = (f"bidex/bidex-{rig}" for rig in (
     "fr3v2-sharpa-tabletop", "fr3v2-sharpa-dexjoco", "astribot-s1-sharpa"))
@@ -35,7 +35,7 @@ def test_an_out_of_domain_workspace_moves_the_cameras_its_episode_moves(tmp_path
     import numpy as np
     import pytest
     import yaml
-    from rosbridge.catalog.robots import setup
+    from kinex_sim.catalog.robots import setup
     root = Path(__file__).resolve().parents[4]
     if not (root / ".runtime/bidex/bidex/eval/ood.py").is_file():
         pytest.skip("BiDex-100 is not prepared")

@@ -2,10 +2,10 @@
 
 Chains come from upstream's robot MJCF (sim/envs/xmls/rokae_wuji1_<side>.xml), which Isaac imports
 at the same base poses for every task. Cameras are the default profile of the camera contract at
-their nominal mounts: the head camera fixed in the world, each wrist camera on its palm. rosbridge
-setup changes them to the task's profile and the episode's drawn mounts (rosbridge_handson.workspace);
+their nominal mounts: the head camera fixed in the world, each wrist camera on its palm. kinex-sim
+setup changes them to the task's profile and the episode's drawn mounts (kinex_sim_handson.workspace);
 the native test checks that workspace against the live Isaac scene. Runs in the native environment after
-`rosbridge prepare handson`:
+`kinex-sim prepare handson`:
     pixi run --frozen -e handson-native env PYTHONPATH=src:simulators/handson:.runtime/handson \
         python tools/robots/build_handson.py
 """
@@ -21,8 +21,8 @@ sys.path[:0] = [str(ROOT / "simulators/handson"), str(Path(__file__).parent)]
 import mujoco  # noqa: E402
 import rigs  # noqa: E402
 from handson.evaluation.camera_contracts import current  # noqa: E402
-from rosbridge_handson.backend import SIDES  # noqa: E402
-from rosbridge_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, distortion, lens  # noqa: E402
+from kinex_sim_handson.backend import SIDES  # noqa: E402
+from kinex_sim_handson.cameras import CAMERAS, OPENGL_TO_OPTICAL, distortion, lens  # noqa: E402
 
 PACKAGE = ROOT / ".runtime/handson/handson/handson"
 

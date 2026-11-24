@@ -19,7 +19,7 @@ operations:
     timeout_s: 10
   target:
     description: Integrated native gripper command (data) from -1 (open) to +1 (closed). Every
-      control step rosbridge moves it by the native 0.2 toward the target while that gets
+      control step kinex-sim moves it by the native 0.2 toward the target while that gets
       strictly closer, so -1 and +1 are reached exactly within 10 steps. A target persists
       until replaced or stopped; out-of-range targets are ignored, so verify joint_state.
     transport: topic

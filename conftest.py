@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-for package in ("src", "ros2/rosbridge_runtime"):
+for package in ("src", "ros2/kinex_sim_runtime"):
     sys.path.insert(0, str(ROOT / package))
 for manifest in (ROOT / "simulators").glob("*/simulator.toml"):
     sys.path.insert(0, str(manifest.parent))

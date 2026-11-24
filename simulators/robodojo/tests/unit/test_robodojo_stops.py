@@ -1,7 +1,7 @@
 """The constraint an early-stop RoboDojo run fails on, without Isaac: its reward manager's queries in."""
 from types import SimpleNamespace
 
-from rosbridge_robodojo.backend import violations
+from kinex_sim_robodojo.backend import violations
 
 LIFT = ("is_lift", {"label": "t", "z_threshold": 0.01})
 GRASP = ("is_grasp", {"label": "cup"})
@@ -17,7 +17,7 @@ def test_a_failure_names_the_queries_that_held_more_often_than_allowed():
 
 def test_episodes_score_as_upstream_eval_env_scores_them():
     """EvalEnv.run_eval: a success scores 1; a failed graded task keeps its 0..100 score; other failures 0."""
-    from rosbridge_robodojo.backend import RoboDojoSim
+    from kinex_sim_robodojo.backend import RoboDojoSim
     sim = RoboDojoSim()
     for completed, success, graded, reward in ((True, True, [40.], 1.), (True, True, None, 1.),
                                                (False, False, [40.], .4), (True, False, None, 0.)):

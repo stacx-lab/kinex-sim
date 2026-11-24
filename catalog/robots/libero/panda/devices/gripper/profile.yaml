@@ -18,7 +18,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: finger_joint1 position (data) from 0 (closed) to 0.04 m (open). rosbridge
+    description: finger_joint1 position (data) from 0 (closed) to 0.04 m (open). kinex-sim
       steers LIBERO's integrated direction command toward it every control step with
       1 mm tolerance, so open and closed are reached reliably while intermediate targets
       oscillate by a few millimetres. A target persists until replaced or stopped;

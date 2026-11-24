@@ -6,9 +6,9 @@ span `libero_spatial`, `libero_object`, `libero_goal`, `libero_10` and `libero_9
 Task numbers are one-based, in official task order zero:
 
 ```bash
-rosbridge prepare libero
-rosbridge tasks list --simulator libero
-rosbridge launch libero/libero-spatial-01 --execution-mode stepped --record ../ros_libero/run
+kinex-sim prepare libero
+kinex-sim tasks list --simulator libero
+kinex-sim launch libero/libero-spatial-01 --execution-mode stepped --record ../ros_libero/run
 ```
 
 `libero` selects `libero/libero-spatial-01`. Preparation is noninteractive and
@@ -31,7 +31,7 @@ the [robot catalog](devices.md).
 | `camera_agentview` | `camera_agentview/{image,camera_info}` |
 | `camera_wrist` | `camera_wrist/{image,camera_info}` (native `robot0_eye_in_hand`) |
 
-Managed runs lease separate ROS domains; use `rosbridge exec RUN_ID -- ...` to join
+Managed runs lease separate ROS domains; use `kinex-sim exec RUN_ID -- ...` to join
 a run's environment and domain.
 
 ```mermaid
@@ -69,8 +69,8 @@ emit per-step end-effector deltas. `--config osc` runs that controller with upst
 configuration unchanged, and the arm takes flange pose targets instead of joint targets:
 
 ```bash
-rosbridge setup libero/libero-spatial-01 --config osc --directory ../my-libero-osc
-rosbridge launch libero/libero-spatial-01 --config osc --execution-mode stepped
+kinex-sim setup libero/libero-spatial-01 --config osc --directory ../my-libero-osc
+kinex-sim launch libero/libero-spatial-01 --config osc --execution-mode stepped
 ```
 
 `arm/pose_target` takes a `trajectory_msgs/msg/MultiDOFJointTrajectory` of absolute
@@ -117,7 +117,7 @@ Episodes are scored as upstream's evaluation scores them:
   (`libero/configs/eval/default.yaml`); the world node's `max_steps` parameter overrides it.
 - **Success:** each step's success is `env.step`'s own `done`, the BDDL goal on the
   kinematics the step leaves, as upstream reads it; reward is the same sparse value.
-- **Judging:** `rosbridge judge RUN_ID` reports them. `--early-stop` ends the episode at
+- **Judging:** `kinex-sim judge RUN_ID` reports them. `--early-stop` ends the episode at
   the first success, as the evaluator's `done` does. LIBERO has no failure termination.
 
 The [task description](devices.md#task-description)'s `instruction` is the suite task's
@@ -136,12 +136,12 @@ calibrated camera frames are in the profiles; the graph publishes no TF.
 With `--record`, spectator views render the native `agentview` and
 `robot0_eye_in_hand` cameras at 960×720 and 10 Hz into `third_person.mp4` and
 `wrist.mp4`; `--record-type bag` or `both` adds a ROS bag. Without `--record`
-no spectator is rendered. Stop a detached run with `rosbridge stop RUN_ID` to
+no spectator is rendered. Stop a detached run with `kinex-sim stop RUN_ID` to
 finalize files. Recording never advances a paused world.
 
 ```bash
-rosbridge demo libero --record ../ros_libero/demo
-rosbridge demo libero --execution-mode realtime
+kinex-sim demo libero --record ../ros_libero/demo
+kinex-sim demo libero --execution-mode realtime
 ```
 
 The finite ROS-only demo moves the arm out and back (with `--config osc`, it lifts the

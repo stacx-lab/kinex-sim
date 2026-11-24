@@ -13,7 +13,7 @@ from std_srvs.srv import Trigger
 from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
                                  MultiDOFJointTrajectoryPoint)
 
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, ended, execute, seconds
 
 # Isaac Sim boots, compiles shaders and loads the layout before serving.
@@ -25,7 +25,7 @@ def workers(graph):
     found = []
     for process in psutil.process_iter(["cmdline"]):
         try:
-            if ("rosbridge.core.worker_main" in " ".join(process.info["cmdline"] or ())
+            if ("kinex_sim.core.worker_main" in " ".join(process.info["cmdline"] or ())
                     and process.environ().get("ROS_DOMAIN_ID") == str(graph.lease.domain)):
                 found.append(process)
         except (psutil.NoSuchProcess, psutil.AccessDenied):

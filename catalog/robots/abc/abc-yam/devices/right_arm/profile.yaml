@@ -51,7 +51,7 @@ meta:
 type: joint
 description: YAM six-joint right arm of the ABC station. Geometry is the sibling arm.urdf
   with flange (link_6) as the tip link; its links are the frames right_arm/<link>. Commands
-  are the native absolute joint positions of upstream's 14-D policy action; rosbridge rejects
+  are the native absolute joint positions of upstream's 14-D policy action; kinex-sim rejects
   targets outside the native joint ranges.
 source: introspected
 calibrated_at: null

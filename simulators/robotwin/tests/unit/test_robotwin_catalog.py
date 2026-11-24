@@ -3,9 +3,9 @@ import zipfile
 
 import pytest
 
-from rosbridge.assets import AssetStore
-from rosbridge.catalog import resolve, tasks
-from rosbridge_robotwin import assets
+from kinex_sim.assets import AssetStore
+from kinex_sim.catalog import resolve, tasks
+from kinex_sim_robotwin import assets
 
 
 def test_catalog_pairs_every_evaluation_task_with_the_aloha_rig():
@@ -51,8 +51,8 @@ def test_every_task_has_the_seeds_upstream_evaluates():
     """simulators/robotwin/seeds.json, from tools/robotwin_seeds.py: per task, the seeds upstream's evaluation runs
     for eval seed 0, in order, from its first candidate 100000; a launch's seed k is the k-th."""
     import json
-    from rosbridge.catalog import simulator
-    from rosbridge_robotwin.backend import SEEDS, native_seed
+    from kinex_sim.catalog import simulator
+    from kinex_sim_robotwin.backend import SEEDS, native_seed
     table = json.loads(SEEDS.read_text())
     assert (table["eval_seed"], table["planner"]) == (0, "curobo v0.7.8")
     assert table["source_revision"] == simulator("robotwin")[2]["source_revision"]

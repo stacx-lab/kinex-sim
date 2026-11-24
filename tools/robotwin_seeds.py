@@ -66,7 +66,7 @@ def export(revision):
     archive = subprocess.run(["git", "-C", str(ROOT / manifest()["source"]), "archive", revision],
                              capture_output=True, check=True).stdout
     subprocess.run(["tar", "-x", "-C", str(TREE)], input=archive, check=True)
-    assets = ROOT / ".runtime/robotwin/assets"  # rosbridge_robotwin.assets.ARCHIVES
+    assets = ROOT / ".runtime/robotwin/assets"  # kinex_sim_robotwin.assets.ARCHIVES
     (TREE / "assets/objects").symlink_to((assets / "objects").resolve())
     shutil.copytree((assets / "embodiments").resolve(), TREE / "assets/embodiments", copy_function=os.symlink)
     subprocess.run([sys.executable, "scripts/update_embodiment_config_path.py"], cwd=TREE, check=True,

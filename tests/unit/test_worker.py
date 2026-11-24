@@ -6,8 +6,8 @@ import sys
 import numpy as np
 import pytest
 
-from rosbridge.core import ActionLayout, CommandGroup
-from rosbridge.core.worker import WorkerBackend, WorkerError, decode, encode
+from kinex_sim.core import ActionLayout, CommandGroup
+from kinex_sim.core.worker import WorkerBackend, WorkerError, decode, encode
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -79,7 +79,7 @@ def test_scene_options_reach_the_native_reset():
 
 
 def test_a_backends_camera_rate_reaches_the_proxy():
-    from rosbridge.core.devices import camera_rate
+    from kinex_sim.core.devices import camera_rate
 
     class SlowCameraWorker(WorkerBackend):
         target = "tests.toy_backend:SlowCameraToy"

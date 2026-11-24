@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_abc"
+package = "kinex_sim_abc"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["abc = rosbridge_abc.backend:AbcSim"],
-        "console_scripts": ["control_demo = rosbridge_abc.demos.control:main"],
+        "kinex_sim.backends": ["abc = kinex_sim_abc.backend:AbcSim"],
+        "console_scripts": ["control_demo = kinex_sim_abc.demos.control:main"],
     },
 )

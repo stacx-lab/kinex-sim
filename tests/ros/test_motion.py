@@ -12,7 +12,7 @@ from std_srvs.srv import Trigger
 from geometry_msgs.msg import Quaternion, Transform, Twist, Vector3
 from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
                                  MultiDOFJointTrajectoryPoint)
-from rosbridge_runtime.devices import STREAM_QOS
+from kinex_sim_runtime.devices import STREAM_QOS
 from unique_identifier_msgs.msg import UUID
 from tests.ros.support import Graph, ended, execute
 

@@ -6,16 +6,16 @@ patches = "patches/behavior"
 python_path = "simulators/behavior"
 # BEHAVIOR-1K is a monorepo; OmniGibson and BDDL are its packages.
 install = ["bddl3", "OmniGibson"]
-asset_preparer = "rosbridge_behavior.assets:prepare"
-asset_checker = "rosbridge_behavior.assets:check_task"
+asset_preparer = "kinex_sim_behavior.assets:prepare"
+asset_checker = "kinex_sim_behavior.assets:check_task"
 default_task = "turning_on_radio"
-ros_package = "rosbridge_behavior"
+ros_package = "kinex_sim_behavior"
 task_catalog = "tasks.toml"
 # The world node runs in the ROS environment; OmniGibson (Isaac Sim 5.1, Python 3.11) runs
-# the native backend in a separate worker process (rosbridge.core.worker).
+# the native backend in a separate worker process (kinex_sim.core.worker).
 environment = "behavior"
 native_environment = "behavior-native"
-native_backend = "rosbridge_behavior.backend:R1ProSim"
+native_backend = "kinex_sim_behavior.backend:R1ProSim"
 
 # The backend's device inventory; catalog rigs must declare exactly these devices.
 [devices]

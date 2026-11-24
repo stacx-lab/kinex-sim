@@ -2,13 +2,13 @@
 set -euo pipefail
 project=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$project"
-export XDG_CACHE_HOME="$project/.cache/rosbridge/xdg"
-export UV_CACHE_DIR="$project/.cache/rosbridge/uv"
+export XDG_CACHE_HOME="$project/.cache/kinex-sim/xdg"
+export UV_CACHE_DIR="$project/.cache/kinex-sim/uv"
 export UV_PYTHON_INSTALL_DIR="$project/.runtime/python"
-export TMPDIR="$project/.cache/rosbridge/tmp"
+export TMPDIR="$project/.cache/kinex-sim/tmp"
 mkdir -p "$TMPDIR"
 if ! command -v uv >/dev/null 2>&1; then
-  echo 'uv is required to bootstrap the rosbridge CLI.' >&2
+  echo 'uv is required to bootstrap the kinex-sim CLI.' >&2
   exit 1
 fi
 if [[ $# -gt 1 ]]; then
@@ -26,4 +26,4 @@ fi
 "$environment_dir/bin/python" -I -c 'import sys; assert sys.version_info[:2] == (3, 12), "Python 3.12 required"'
 uv pip install --python "$environment_dir/bin/python" -e ".[cli]"
 echo "Activate: source $environment_dir/bin/activate"
-echo 'Prepare a simulator: rosbridge prepare abc'
+echo 'Prepare a simulator: kinex-sim prepare abc'

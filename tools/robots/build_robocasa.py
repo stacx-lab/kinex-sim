@@ -1,6 +1,6 @@
 """Measure the RoboCasa PandaOmron rig from MuJoCo and write catalog/robots/robocasa/robocasa-panda-omron.
 
-Run in the RoboCasa environment after `rosbridge prepare robocasa`:
+Run in the RoboCasa environment after `kinex-sim prepare robocasa`:
     pixi run --frozen -e robocasa python tools/robots/build_robocasa.py
 """
 from pathlib import Path
@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "simulators/robocasa"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from rosbridge.core.commands import VELOCITY_TIMEOUT_S  # noqa: E402
-from rosbridge_robocasa.backend import OPTICAL, RoboCasaSim  # noqa: E402
+from kinex_sim.core.commands import VELOCITY_TIMEOUT_S  # noqa: E402
+from kinex_sim_robocasa.backend import OPTICAL, RoboCasaSim  # noqa: E402
 
 
 def gripper_urdf(model, controller, fingers):
@@ -76,7 +76,7 @@ def main():
             "arm",
             "Franka Panda seven-joint arm on the torso. Geometry is the sibling arm.urdf with "
             "flange as the tip link; its links are the frames arm/<link>. Commands are absolute native "
-            "joint positions; rosbridge rejects targets outside the native joint ranges.",
+            "joint positions; kinex-sim rejects targets outside the native joint ranges.",
             list(robot.robot_joints), robot.init_qpos,
             rigs.pose_frame("torso:top", rigs.relative(top, pose["robot0_link0"]))),
         "gripper": rigs.gripper(
@@ -87,7 +87,7 @@ def main():
             "stalled on an object; check cameras before assuming a grasp.",
             "gripper",
             "Integrated native gripper command (data) from -1 (open) to +1 (closed). Every "
-            "control step rosbridge moves it by the native 0.2 toward the target while that "
+            "control step kinex-sim moves it by the native 0.2 toward the target while that "
             "gets strictly closer, so -1 and +1 are reached exactly within 10 steps. A target "
             "persists until replaced or stopped; out-of-range targets are ignored, so verify "
             "joint_state.",

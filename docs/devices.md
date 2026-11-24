@@ -4,10 +4,10 @@ Every device of a run is a set of endpoints on the single `world` node. They use
 standard ROS types, `std_srvs/srv/Trigger` stops and two types of `custom_interfaces`
 (`ros2/custom_interfaces`): `Wait`, the world service, and `Json`, the free-form
 service of a lensed camera's geometry. A ROS 2 program on the run's domain operates the
-devices with nothing else: in the run's environment (`rosbridge exec`), or anywhere
+devices with nothing else: in the run's environment (`kinex-sim exec`), or anywhere
 `custom_interfaces` is built. Each device is described by a profile of the
 robot catalog (its endpoints, types, QoS, units, limits, frames and URDF), which
-`rosbridge setup` exports. The device types, operation names and profile format are
+`kinex-sim setup` exports. The device types, operation names and profile format are
 Kinex's, so a Kinex workspace uses an export as it is; see [Kinex](kinex.md).
 
 ## Device contract
@@ -37,7 +37,7 @@ joints mimic from their actuator ranges. BEHAVIOR's R1Pro grip joint `<side>_gri
 is the evaluator's smooth command, limits [-1, 1] with `open: 1` and `closed: -1`.
 HandsOn's Wuji hands are `joint` devices of 20 joints on their arm's `palm`, the tip link
 of each ROKAE arm and the frame HandsOn's palm-pose actions command. BiDex-100's Sharpa hands are `joint` devices of 22 joints on their arm's
-`flange`; as BiDex's evaluator does, rosbridge passes their targets and the arms' to MuJoCo's
+`flange`; as BiDex's evaluator does, kinex-sim passes their targets and the arms' to MuJoCo's
 actuators unchanged, which bound them.
 
 A base is a `locomotion` device in the single mode `drive`: `velocity`
@@ -93,7 +93,7 @@ these frames as `<device>/<frame>`: `<camera>/base` on images, `<base>/odom` and
 
 ## Robot catalog and workspace setup
 
-`rosbridge robots list` lists every rig. Builders in `tools/robots` measure each
+`kinex-sim robots list` lists every rig. Builders in `tools/robots` measure each
 rig from its simulator (`build_abc.py`, `build_robotwin.py`, `build_robodojo.py`,
 `build_robocasa.py`, `build_behavior.py`, `build_handson.py`, `build_bidex.py`);
 the native [Kinex checks](kinex.md#compatibility-checks) compare the exported profiles
@@ -127,13 +127,13 @@ copies their content.
 | `libero/libero-panda-study` | 18 | `libero/libero-10-06` |
 
 ```sh
-rosbridge robots list
-rosbridge tasks list --simulator libero --robot libero/libero-panda-tabletop
-rosbridge setup libero/libero-spatial-01 --directory ../my-libero-workspace --domain-id 83
-rosbridge launch libero/libero-spatial-01 --execution-mode stepped --domain-id 83
+kinex-sim robots list
+kinex-sim tasks list --simulator libero --robot libero/libero-panda-tabletop
+kinex-sim setup libero/libero-spatial-01 --directory ../my-libero-workspace --domain-id 83
+kinex-sim launch libero/libero-spatial-01 --execution-mode stepped --domain-id 83
 ```
 
-`rosbridge setup` takes a task as `launch` does, with `--seed` and `--config`. It exports the
+`kinex-sim setup` takes a task as `launch` does, with `--seed` and `--config`. It exports the
 workspace that a launch of that task, seed and configuration serves: the task's rig in that
 configuration, with the profile changes its simulator makes for that task and seed. HandsOn
 changes its cameras' intrinsics and mounts by task and seed, and BiDex-100 moves cameras in its
@@ -163,21 +163,21 @@ configuration its simulator declares and check the device kinds against the mani
 
 Task instructions and judging are not device operations or ROS topics. The agent's objective
 is the episode's task description; the operator reads native outcomes with
-`rosbridge judge RUN_ID --json`.
+`kinex-sim judge RUN_ID --json`.
 
 ### Task description
 
 Every simulator describes an episode the same way: its native task and seed, and the
 instructions upstream's evaluator gives its policy for that episode, which may depend on the
 seed or the scene. When the episode starts, the world node states it in the run log
-(`graph.log`) as one `task description: {...}` line of JSON, and `rosbridge describe` prints it
+(`graph.log`) as one `task description: {...}` line of JSON, and `kinex-sim describe` prints it
 for the live run on a ROS domain, the one launch printed. It reads the line back, so it opens
 nothing and answers at once; `--json` prints the JSON. Give it to the agent; nothing is
 published on ROS or written to a file.
 
 ```sh
-rosbridge launch robodojo/stack-bowls --execution-mode stepped --domain-id 83 --detach
-rosbridge describe --domain-id 83
+kinex-sim launch robodojo/stack-bowls --execution-mode stepped --domain-id 83 --detach
+kinex-sim describe --domain-id 83
 ```
 
 ```text
@@ -200,7 +200,7 @@ step or, with `--early-stop`, where the simulator's evaluator ends it (a success
 task failure with its cause) pauses physics, and wait replies from then on say which.
 The graph remains available for images and clock; new commands are rejected. The
 episode's native outcome is appended once, when it ends or the run stops, to
-`episode-results.jsonl` in rosbridge's run directory; a simulator may add its own measures, such as BEHAVIOR's partial credit `q_score`
+`episode-results.jsonl` in kinex-sim's run directory; a simulator may add its own measures, such as BEHAVIOR's partial credit `q_score`
 or RoboCasa's `split` and kitchen `layout_id` and `style_id`, except after a failed step. An interrupted run is marked stopped, not a successful terminal
 episode. Judge records are separate from the agent workspace; this separation is not
 an OS security sandbox.

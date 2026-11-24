@@ -1,7 +1,7 @@
 """Measure BEHAVIOR's R1Pro and write catalog/robots/behavior/behavior-r1pro.
 
 Chains come from the R1Pro URDF; the grasp frames and camera mounts are measured in the live
-OmniGibson scene. Runs in the native environment after `rosbridge prepare behavior`:
+OmniGibson scene. Runs in the native environment after `kinex-sim prepare behavior`:
     pixi run --frozen -e behavior-native env PYTHONPATH=src:simulators/behavior:.runtime/behavior \
         python tools/robots/build_behavior.py
 """
@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "simulators/behavior"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from rosbridge.core.commands import VELOCITY_TIMEOUT_S  # noqa: E402
-from rosbridge_behavior.backend import R1ProSim  # noqa: E402
+from kinex_sim.core.commands import VELOCITY_TIMEOUT_S  # noqa: E402
+from kinex_sim_behavior.backend import R1ProSim  # noqa: E402
 
 SIDES = ("left", "right")
 

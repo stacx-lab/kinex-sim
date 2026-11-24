@@ -1,7 +1,7 @@
 """Measure the RoboDojo dual ARX X5 rig and write catalog/robots/robodojo/robodojo-arx-x5.
 
 Chains come from the X5 URDF; mounts and cameras are measured in the live Isaac
-scene. Runs in the native environment after `rosbridge prepare robodojo`:
+scene. Runs in the native environment after `kinex-sim prepare robodojo`:
     pixi run --frozen -e robodojo-native env PYTHONPATH=src:simulators/robodojo:.runtime/robodojo \
         python tools/robots/build_robodojo.py
 """
@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "simulators/robodojo"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from rosbridge_robodojo import move  # noqa: E402
-from rosbridge_robodojo.backend import RoboDojoSim, runtime  # noqa: E402
+from kinex_sim_robodojo import move  # noqa: E402
+from kinex_sim_robodojo.backend import RoboDojoSim, runtime  # noqa: E402
 
 # RoboEnv's parallel-gripper geometry: the pad center ahead of link6, in the flange frame.
 TCP = (0.15007, -0.000002, -0.00144)
@@ -24,7 +24,7 @@ ARM = ("ARX X5 six-joint {side} arm of the RoboDojo rig. Geometry is the sibling
        "names joint1..joint6.")
 JOINTS = ("It takes joint targets, upstream's absolute joint positions ({side}_arm_joint_state of "
           "EvalEnv.take_action), which the native controller interpolates over each 0.04 s frame.")
-# The move configuration: what an arm's move goal does (rosbridge_robodojo.move).
+# The move configuration: what an arm's move goal does (kinex_sim_robodojo.move).
 GOALS = ("It takes move goals for its flange, which upstream's cuRobo IK turns into upstream's absolute joint "
          "positions ({side}_arm_joint_state of EvalEnv.take_action), a step every 0.04 s frame.")
 MOVE = (f"Move the flange through poses in a straight line at the arm's own pace: multi_dof_trajectory with "

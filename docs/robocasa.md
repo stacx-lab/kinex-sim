@@ -8,9 +8,9 @@ tasks; a run's flags select the kitchen and objects (see
 [Scenes](#scenes-split-layout-and-style)):
 
 ```bash
-rosbridge prepare robocasa
-rosbridge tasks list --simulator robocasa
-rosbridge launch robocasa/pick-place-counter-to-cabinet --execution-mode stepped --record ../ros_robocasa/run
+kinex-sim prepare robocasa
+kinex-sim tasks list --simulator robocasa
+kinex-sim launch robocasa/pick-place-counter-to-cabinet --execution-mode stepped --record ../ros_robocasa/run
 ```
 
 `robocasa` selects `robocasa/pick-place-counter-to-cabinet`; task IDs are the
@@ -31,13 +31,13 @@ preparation mounts all six upstream archives (about 23 GB) for every task. They 
 cached once under `.runtime/assets/robocasa` and linked into
 `.runtime/robocasa/robocasa/models/assets`, beside the files upstream tracks there;
 ABC mounts the objaverse and lightwheel packs from the same cache. Upstream
-publishes no checksums. With `ROSBRIDGE_ASSET_SEED=DIR`, extracted archives at
+publishes no checksums. With `KINEX_SIM_ASSET_SEED=DIR`, extracted archives at
 `DIR/robocasa/<root>/` (`textures`, `generative_textures`, `fixtures`, `objaverse`,
 `aigen_objs`, `lightwheel`) are verified file by file against their sha256
 receipts `DIR/robocasa/<archive>.json` and moved into the cache:
 
 ```bash
-ROSBRIDGE_ASSET_SEED=DIR rosbridge prepare robocasa
+KINEX_SIM_ASSET_SEED=DIR kinex-sim prepare robocasa
 ```
 
 ## Graph
@@ -130,7 +130,7 @@ The seed then works exactly as upstream's: it seeds the kitchen's own generator,
 the kitchen from the split's, the fixtures' initial state, object categories and instances
 within the split, their placements, the robot's base pose and the instruction.
 `--split target --seed 3` builds the same episode as upstream's
-`create_env(task, split="target", seed=3)`; rosbridge also seeds Python's and NumPy's process
+`create_env(task, split="target", seed=3)`; kinex-sim also seeds Python's and NumPy's process
 generators, which upstream leaves as they are. A layout or style id given overrides the
 split's kitchens, as upstream's `collect_demos.py --layout/--style` does: an id not given
 ranges over the split's group (1–10 for `target`, 11–60 for `pretrain`, 1–60 otherwise), and
@@ -139,14 +139,14 @@ task excludes fails to launch with an error naming the ids it excludes. Each epi
 states `split`, `layout_id` and `style_id`, the kitchen the seed picked or the ids pinned.
 
 ```bash
-rosbridge launch robocasa/close-fridge --split target --seed 2                         # a seed-picked target kitchen
-rosbridge launch robocasa/close-fridge --split target --layout-id 4 --style-id 4 --seed 2
+kinex-sim launch robocasa/close-fridge --split target --seed 2                         # a seed-picked target kitchen
+kinex-sim launch robocasa/close-fridge --split target --layout-id 4 --style-id 4 --seed 2
 ```
 
 ### Training and evaluation splits
 
 Upstream's benchmark trains on 300 tasks in its training kitchens and evaluates on 50 tasks
-in 10 held-out kitchens, with held-out objects. rosbridge ships no datasets; the split is the
+in 10 held-out kitchens, with held-out objects. kinex-sim ships no datasets; the split is the
 scene a run launches:
 
 | | Train: pretraining (`pretrain300`) | Test: target (`TARGET_TASKS`) |
@@ -203,9 +203,9 @@ the optical axis. The near clip plane scales with each kitchen's extent (about
 `robot0_eye_in_hand` into `third_person.mp4` and `wrist.mp4`.
 
 ```bash
-rosbridge demo robocasa --record ../ros_robocasa/demo
-rosbridge demo robocasa/prepare-veggie-dip --execution-mode realtime --seed 2
-rosbridge launch robocasa/close-fridge --split target --layout-id 4 --style-id 4 --seed 0
+kinex-sim demo robocasa --record ../ros_robocasa/demo
+kinex-sim demo robocasa/prepare-veggie-dip --execution-mode realtime --seed 2
+kinex-sim launch robocasa/close-fridge --split target --layout-id 4 --style-id 4 --seed 0
 ```
 
 The finite ROS-only demo moves the arm and torso, closes and opens the gripper,

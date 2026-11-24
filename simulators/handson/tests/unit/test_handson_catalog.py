@@ -1,6 +1,6 @@
 import re
 
-from rosbridge.catalog import resolve, simulator, tasks
+from kinex_sim.catalog import resolve, simulator, tasks
 
 
 def test_catalog_holds_core_50_and_transfer_16_on_one_rig():

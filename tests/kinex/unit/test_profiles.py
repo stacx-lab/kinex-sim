@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from rosbridge.catalog import simulator, tasks
-from rosbridge.catalog.robots import list_robots, setup
+from kinex_sim.catalog import simulator, tasks
+from kinex_sim.catalog.robots import list_robots, setup
 
 PROJECT = Path(__file__).resolve().parents[3]
 
@@ -30,7 +30,7 @@ def test_kinex_schema_and_readiness_accept_every_rig(tmp_path):
                for configuration in (None, *simulator(robot.split("/")[0], PROJECT)[2].get("configurations", {}))]
     workspaces = [tmp_path / f"{robot.replace('/', '-')}-{configuration}" for robot, configuration in exports]
     for (robot, configuration), workspace in zip(exports, workspaces):
-        with patch("rosbridge.catalog.robots.changes", lambda *args: {}):  # the rig, without a task's changes
+        with patch("kinex_sim.catalog.robots.changes", lambda *args: {}):  # the rig, without a task's changes
             setup(next(task["id"] for task in tasks(PROJECT).values() if task["robot"] == robot), workspace,
                   project=PROJECT, configuration=configuration)
         (workspace / ".kinex/python").symlink_to(Path(python).resolve(), target_is_directory=True)

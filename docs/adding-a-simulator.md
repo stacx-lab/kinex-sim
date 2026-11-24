@@ -1,6 +1,6 @@
 # Adding a simulator
 
-This is the procedure for bringing an upstream simulator into rosbridge, from its pinned source to its
+This is the procedure for bringing an upstream simulator into kinex-sim, from its pinned source to its
 tests and docs. Every integration under `simulators/` follows it:
 
 - `simulators/bidex` is a compact in-process example;
@@ -21,7 +21,7 @@ The contracts these steps rely on are in [Design and usage](README.md) and [Devi
   episode selection follow upstream's evaluation script, not its environment's defaults (see
   [Scoring parity](#scoring-parity)).
 - **No surprise downloads.** Preparation downloads and verifies assets once.
-  `ROSBRIDGE_ASSET_SEED` adopts an existing verified depot instead, and launch never downloads.
+  `KINEX_SIM_ASSET_SEED` adopts an existing verified depot instead, and launch never downloads.
   Check free disk space before large installs.
 
 ## 1. Source
@@ -48,19 +48,19 @@ Keep each patch minimal and explain it at its top. A change to the source or a p
    lock file), and an environment of the same name. Put the environment in the `jazzy` solve group
    when it runs the world node itself.
 2. **Tasks:** give the feature the three tasks every simulator has:
-   - `build = "python -m rosbridge.provisioning.workspace --simulator <sim>"`;
+   - `build = "python -m kinex_sim.provisioning.workspace --simulator <sim>"`;
    - `test-ros`, which sources `.workspaces/<sim>/install` and runs `simulators/<sim>/tests/ros`;
    - `smoke`, which runs `simulators/<sim>/tests/native`.
 3. **Unit tests:** add `simulators/<sim>/tests/unit` to the default `test` task.
 4. **Different Python:** when upstream needs a Python that ROS Jazzy lacks, as Isaac Sim's 3.11 does:
    - add a native environment `<sim>-native` with `no-default-feature = true`;
    - name it in the manifest as `native_environment`, with `native_backend = "module:Class"`;
-   - register a `WorkerBackend` subclass as the backend (`simulators/robodojo/rosbridge_robodojo/worker.py`).
+   - register a `WorkerBackend` subclass as the backend (`simulators/robodojo/kinex_sim_robodojo/worker.py`).
 
    The world node stays in the ROS environment, and the worker runs the native class on its own main
    thread.
-5. **Rebuilds:** editing `pixi.toml` or `ros2/rosbridge_runtime` marks every simulator's ROS build
-   stale. Run `rosbridge doctor <sim>` for each, then `rosbridge prepare <sim>`; nothing downloads.
+5. **Rebuilds:** editing `pixi.toml` or `ros2/kinex_sim_runtime` marks every simulator's ROS build
+   stale. Run `kinex-sim doctor <sim>` for each, then `kinex-sim prepare <sim>`; nothing downloads.
    Prepare refuses environments in use by live runs.
 
 ## 3. Package
@@ -69,8 +69,8 @@ Keep each patch minimal and explain it at its top. A change to the source or a p
 simulators/<sim>/
   simulator.toml               the manifest (step 4)
   tasks.toml                   the task catalog (step 5)
-  package.xml, setup.py, setup.cfg, resource/rosbridge_<sim>
-  rosbridge_<sim>/
+  package.xml, setup.py, setup.cfg, resource/kinex_sim_<sim>
+  kinex_sim_<sim>/
     backend.py                 the SimulatorBackend (step 9)
     assets.py                  prepare(runtime, task) and check_task(runtime, task) (step 7)
     demos/control.py           the control demo
@@ -79,9 +79,9 @@ simulators/<sim>/
 
 `setup.py` is an ament_python package with two entry points:
 
-- `"rosbridge.backends": ["<sim> = rosbridge_<sim>.backend:Class"]`, or the worker class;
-- `"console_scripts": ["control_demo = rosbridge_<sim>.demos.control:main"]`, the finite ROS-only exercise
-  that `rosbridge demo <sim>` runs.
+- `"kinex_sim.backends": ["<sim> = kinex_sim_<sim>.backend:Class"]`, or the worker class;
+- `"console_scripts": ["control_demo = kinex_sim_<sim>.demos.control:main"]`, the finite ROS-only exercise
+  that `kinex-sim demo <sim>` runs.
 
 ## 4. Manifest
 
@@ -94,7 +94,7 @@ simulators/<sim>/
 | `native_environment`, `native_backend` | a native worker (step 2) |
 | `[devices]` | the backend's device inventory by kind (step 8) |
 | `scene_options` | upstream's episode controls besides the seed, which launch takes as flags and passes to `reset` (step 6) |
-| `workspace` | a setup hook for profile changes by task and seed ([HandsOn](handson.md), [BiDex-100](bidex.md)); it runs in the CLI's interpreter, which has PyYAML, NumPy and SciPy (`rosbridge[cli]`) |
+| `workspace` | a setup hook for profile changes by task and seed ([HandsOn](handson.md), [BiDex-100](bidex.md)); it runs in the CLI's interpreter, which has PyYAML, NumPy and SciPy (`kinex-sim[cli]`) |
 | `[configurations.NAME]` | alternative device sets that `--config` selects ([Devices](devices.md#robot-catalog-and-workspace-setup)) |
 
 ## 5. Task catalog
@@ -115,7 +115,7 @@ instead (see [Scoring parity](#scoring-parity)).
 Each simulator chooses and randomizes its episodes in its own terms. Find how upstream's evaluation
 controls them, and expose exactly those controls, under upstream's names, values, defaults and
 semantics. The controls may be a seed, a scene split, a layout, instance or trial index, a
-randomization switch, or anything else. Don't rename them, merge them or invent controls of rosbridge's
+randomization switch, or anything else. Don't rename them, merge them or invent controls of kinex-sim's
 own: whatever upstream leaves to chance stays upstream's chance.
 
 - **Seed.** When upstream takes a seed, `--seed` passes it to `reset(task, seed, randomize)`, and the
@@ -125,7 +125,7 @@ own: whatever upstream leaves to chance stays upstream's chance.
   1. Declare it in the manifest's `scene_options`.
   2. Add it as a keyword-only argument of the backend's `reset`, defaulting to upstream's default.
   3. Add a launch flag for it to `SCENE_FLAGS` and the `launch`/`demo` parser in
-     `src/rosbridge/cli/main.py`, with help that names the simulator and upstream's meaning.
+     `src/kinex_sim/cli/main.py`, with help that names the simulator and upstream's meaning.
 
   Launch refuses options a simulator does not declare, and the backend checks their values.
 - **Tests.**
@@ -136,22 +136,22 @@ own: whatever upstream leaves to chance stays upstream's chance.
 ## 7. Assets
 
 - **Preparer:** `prepare(runtime, task)` fetches each pinned archive into the shared `AssetStore`
-  (`rosbridge.assets`), verifies it against its pin, and links it into `.runtime/<sim>`.
+  (`kinex_sim.assets`), verifies it against its pin, and links it into `.runtime/<sim>`.
 - **Checker:** `check_task(runtime, task)` raises before an environment is built when something
   is missing. It never downloads.
 - **Seeding:** where a verified copy already exists on the store's filesystem, adopt it with
-  `ROSBRIDGE_ASSET_SEED` rather than downloading again.
+  `KINEX_SIM_ASSET_SEED` rather than downloading again.
 
 ## 8. Devices
 
 Devices follow Kinex's device contract: its device types, operation names and types, and profile
-schema. rosbridge serves them unchanged (see [Devices](devices.md) and [Kinex](kinex.md)). Map
+schema. kinex-sim serves them unchanged (see [Devices](devices.md) and [Kinex](kinex.md)). Map
 upstream's robot and cameras onto that contract.
 
 - **One inventory.** The backend's `devices`, the manifest's `[devices]` table and every catalog rig
   of the simulator must list the same devices; the export test compares them.
 - **New types.** A device type the contract lacks needs that contract, and its endpoints in the world
-  node (`ros2/rosbridge_runtime`), before a simulator uses it.
+  node (`ros2/kinex_sim_runtime`), before a simulator uses it.
 - **Several options.** Where upstream offers more than one way to expose a device, ask the user which
   one is the default before building it. Examples are a joint or an end-effector controller, or RGB or
   RGB-D cameras. Offer the others as configurations, which `--config` selects
@@ -159,7 +159,7 @@ upstream's robot and cameras onto that contract.
 
 ## 9. Backend
 
-Implement `SimulatorBackend` (`src/rosbridge/core/backend.py`). Its docstring is the contract.
+Implement `SimulatorBackend` (`src/kinex_sim/core/backend.py`). Its docstring is the contract.
 
 - **Action layout.** `layout` is an `ActionLayout` of `CommandGroup`s.
   - Joint and gripper groups command positions in feedback units, so a measured state is a valid
@@ -183,7 +183,7 @@ Implement `SimulatorBackend` (`src/rosbridge/core/backend.py`). Its docstring is
 - **Task description.** After the reset, `description` holds the instructions upstream's evaluator
   gives its policy for this episode: `{"instruction": ...}`, read from upstream as its evaluation
   reads it, plus any further text it gives under its own name (RoboDojo's `detailed_instruction`).
-  The world node logs it and `rosbridge describe` reads it back
+  The world node logs it and `kinex-sim describe` reads it back
   ([Task description](devices.md#task-description)); the backend neither prints nor writes it.
 - **Ending.** `done` at the step limit; `success` and `reward` every step.
   - Created with `early_stop`, the backend ends where upstream's evaluator ends an episode, and names
@@ -230,7 +230,7 @@ A launch's record should equal what upstream's evaluation would score for the sa
 upstream's evaluation script, not only its environment, and match each item:
 
 1. **Success.** Use the predicate the evaluator counts, read at the same point.
-   - LIBERO's success is `env.step`'s `done`, before rosbridge's extra `sim.forward()`.
+   - LIBERO's success is `env.step`'s `done`, before kinex-sim's extra `sim.forward()`.
    - RoboCasa's gym wrapper evaluates `_check_success()` a second time after the step's state update.
    - A predicate with side effects, such as a timer counted per call, must be called as often as
      upstream calls it.
@@ -274,14 +274,14 @@ rerun it.
 - **Native.**
   - Parity with upstream: actions, timing and the scoring items above.
   - Every task loads, describes itself (`description["instruction"]`) and steps. Guard a slow sweep
-    with `ROSBRIDGE_ALL_TASKS=1`.
+    with `KINEX_SIM_ALL_TASKS=1`.
   - Rendering and spectator isolation.
   - A failed reset keeps the episode.
 - **ROS.** A graph test through `tests.ros.support.Graph(backend="<sim>")`: device endpoints, waits,
   stops and cameras.
 - **Geometry.** `tests/kinex/native/test_<sim>.py`: the exported rig's FK, mounts and camera frames
   against the simulator.
-- **Demo.** `rosbridge demo <sim>`.
+- **Demo.** `kinex-sim demo <sim>`.
 
 ## 12. Docs
 

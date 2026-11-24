@@ -1,5 +1,5 @@
 """Run by test_vacuum.py in a process of its own: BEHAVIOR's vacuum, the only particle remover by projection of its
-taxonomy, standing under gravity on a floor box with dust, each step rendered as rosbridge steps an episode.
+taxonomy, standing under gravity on a floor box with dust, each step rendered as kinex-sim steps an episode.
 Writes to argv[1], as JSON, where the vacuum's removal box lies against the floor and what each trial removed:
   off      standing over a particle, switched off
   beside   switched on, with particles 5 mm and 15 mm beside the box's long side and 15 mm beyond its end
@@ -14,7 +14,7 @@ import traceback
 
 import numpy as np
 
-from rosbridge_behavior.environment import boot, rotation, values
+from kinex_sim_behavior.environment import boot, rotation, values
 
 boot()
 import omnigibson as og  # noqa: E402

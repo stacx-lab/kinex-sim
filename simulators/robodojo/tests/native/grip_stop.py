@@ -12,8 +12,8 @@ import sys
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from rosbridge.core.commands import CommandBuffer
-from rosbridge_robodojo.backend import RoboDojoSim
+from kinex_sim.core.commands import CommandBuffer
+from kinex_sim_robodojo.backend import RoboDojoSim
 
 TCP = np.array([0.15007, -0.000002, -0.00144])  # the pad centre in the link6 frame, as the rig's profile has it
 

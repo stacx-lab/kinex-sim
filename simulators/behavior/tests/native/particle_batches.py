@@ -4,7 +4,7 @@ made, what it left, and how far the cabinet's joints, set afterwards, read from 
 import json
 import sys
 
-from rosbridge_behavior.environment import boot
+from kinex_sim_behavior.environment import boot
 
 boot()
 import omnigibson as og  # noqa: E402

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 pytest.importorskip("abc_sim")
-from rosbridge_abc.backend import AbcSim  # noqa: E402
+from kinex_sim_abc.backend import AbcSim  # noqa: E402
 
 
 def test_step_moves_toward_command(monkeypatch):
@@ -57,7 +57,7 @@ def test_spectator_isolation_and_reset_failure(monkeypatch):
         images = {c: sim.render(c) for c in sim.cameras}
         state = sim.env.data.qpos.copy(), sim.env.data.qvel.copy(), float(sim.env.data.time)
         vis = (sim.env.model.vis.global_.offwidth, sim.env.model.vis.global_.offheight)
-        from rosbridge.core.mujoco_rendering import SpectatorRenderer
+        from kinex_sim.core.mujoco_rendering import SpectatorRenderer
         sim.configure_spectators(960, 720)
         renderer = SpectatorRenderer(sim.env.model, sim.env.data, sim.spectators)
         try:
@@ -114,8 +114,8 @@ def test_wrapped_actions_match_native_rollout():
 
 import yaml  # noqa: E402
 
-from rosbridge.catalog import tasks  # noqa: E402
-from rosbridge.catalog.robots import setup  # noqa: E402
+from kinex_sim.catalog import tasks  # noqa: E402
+from kinex_sim.catalog.robots import setup  # noqa: E402
 
 
 @pytest.mark.parametrize('task', [entry['native_task'] for entry in tasks(name='abc').values()])

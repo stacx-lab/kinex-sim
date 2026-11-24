@@ -1,6 +1,6 @@
 from collections import Counter
 
-from rosbridge.catalog import resolve, tasks
+from kinex_sim.catalog import resolve, tasks
 
 
 def test_official_catalog_has_unique_ids_and_contiguous_suite_indices():

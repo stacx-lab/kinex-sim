@@ -4,9 +4,9 @@ import re
 
 import pytest
 
-from rosbridge.assets import AssetStore
-from rosbridge.catalog import resolve, tasks
-from rosbridge_robocasa import assets
+from kinex_sim.assets import AssetStore
+from kinex_sim.catalog import resolve, tasks
+from kinex_sim_robocasa import assets
 
 SLUG = re.compile(r'(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])')
 
@@ -27,7 +27,7 @@ def test_catalog_holds_robocasa365_and_leaves_the_scene_to_the_launch():
 def test_manifest_scene_options_are_the_backend_reset_keywords():
     import ast
     from pathlib import Path
-    from rosbridge.catalog import simulator
+    from kinex_sim.catalog import simulator
     # The backend imports MuJoCo, which the CLI environment lacks; read reset's signature from its source.
     source = Path(assets.__file__).with_name('backend.py').read_text()
     reset, = (node for node in ast.walk(ast.parse(source))
@@ -53,7 +53,7 @@ def test_seeded_prepare_adopts_verified_archives_and_overlays_the_upstream_tree(
     (tree / 'fixtures/cabinets').mkdir(parents=True)
     (tree / 'fixtures/cabinets/panel.xml').write_bytes(b'tracked')
     (runtime / 'robosuite/robosuite').mkdir(parents=True)
-    monkeypatch.setenv('ROSBRIDGE_ASSET_SEED', str(tmp_path / 'seed'))
+    monkeypatch.setenv('KINEX_SIM_ASSET_SEED', str(tmp_path / 'seed'))
     store = AssetStore(tmp_path / 'store')
     with pytest.raises(RuntimeError, match='not prepared'):
         assets.check_task(runtime, 'Task')

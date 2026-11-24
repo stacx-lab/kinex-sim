@@ -1,7 +1,7 @@
 """Measure the RoboTwin ALOHA AgileX rig and write catalog/robots/robotwin/robotwin-aloha-agilex.
 
 Chains come from the embodiment URDF; mounts, wrist cameras and the TCP are
-measured in the live SAPIEN scene. Run after `rosbridge prepare robotwin`:
+measured in the live SAPIEN scene. Run after `kinex-sim prepare robotwin`:
     pixi run --frozen -e robotwin python tools/robots/build_robotwin.py
 """
 from pathlib import Path
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "simulators/robotwin"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from rosbridge_robotwin.backend import OPTICAL, RoboTwinSim, pose_matrix, runtime  # noqa: E402
+from kinex_sim_robotwin.backend import OPTICAL, RoboTwinSim, pose_matrix, runtime  # noqa: E402
 
 PREFIX = {"left": "fl", "right": "fr"}
 

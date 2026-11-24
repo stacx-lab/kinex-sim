@@ -3,10 +3,10 @@ from concurrent.futures import Future, ThreadPoolExecutor
 
 import pytest
 
-from rosbridge.core import CommandError
-from rosbridge.core.worker import WorkerError
+from kinex_sim.core import CommandError
+from kinex_sim.core.worker import WorkerError
 from tests.toy_backend import ToyBackend
-from rosbridge.runtime.world import WorldRuntime
+from kinex_sim.runtime.world import WorldRuntime
 
 
 
@@ -119,7 +119,7 @@ def test_a_wait_reply_says_why_the_episode_ended(task, early_stop, max_steps, en
     ("stumbles", False, "timeout", None, None),
 ])
 def test_records_say_why_the_episode_ended(tmp_path, monkeypatch, task, early_stop, reason, cause, first_success_step):
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world(max_steps=4, task=task, early_stop=early_stop)
     wait(runtime, 1.)
     finish(runtime)
@@ -246,7 +246,7 @@ def test_shutdown_resolves_pending_and_fails_queued_requests():
 
 def test_the_episode_is_recorded_once_when_it_ends(tmp_path, monkeypatch):
     import json
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world(max_steps=1)
     pending = wait(runtime, 1.)
     runtime.drain()
@@ -261,7 +261,7 @@ def test_the_episode_is_recorded_once_when_it_ends(tmp_path, monkeypatch):
 
 def test_stopping_records_the_open_episode(tmp_path, monkeypatch):
     import json
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world()
     wait(runtime, .2)
     finish(runtime)
@@ -274,9 +274,9 @@ def test_stopping_records_the_open_episode(tmp_path, monkeypatch):
 def test_operator_judge_reads_results_without_ros(tmp_path, monkeypatch):
     import json
     import os
-    from rosbridge.cli.main import main
-    from rosbridge.runs.api import judge
-    from rosbridge.runs.records import SCHEMA
+    from kinex_sim.cli.main import main
+    from kinex_sim.runs.api import judge
+    from kinex_sim.runs.records import SCHEMA
     run = tmp_path / 'run.json'
     run.write_text(json.dumps({'schema': SCHEMA, 'uid': os.getuid(), 'id': 'test', 'state': 'stopped'}))
     assert judge(str(run))['state'] == 'pending'
@@ -288,7 +288,7 @@ def test_operator_judge_reads_results_without_ros(tmp_path, monkeypatch):
 
 def test_a_world_stopped_by_an_error_records_it(tmp_path, monkeypatch):
     import json
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world()
     pending = wait(runtime, 1.)
     runtime.drain()
@@ -315,7 +315,7 @@ def records(folder):
 
 
 def test_records_add_a_backends_measures(tmp_path, monkeypatch):
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world(max_steps=1, backend=MeasuredToy)
     wait(runtime, .1)
     finish(runtime)
@@ -325,7 +325,7 @@ def test_records_add_a_backends_measures(tmp_path, monkeypatch):
 
 
 def test_a_world_stopped_by_an_error_records_no_measures(tmp_path, monkeypatch):
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world(backend=MeasuredToy)
     runtime.close(error="WorkerError: native worker exited (exit -9)")
     outcome, = records(tmp_path)
@@ -337,7 +337,7 @@ FAILED = "the episode ended because the simulation failed"
 
 
 def test_a_step_that_fails_ends_the_episode_and_the_world_goes_on_answering(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, published = world(backend=MeasuredToy, task="fails")
     pending = wait(runtime, 1.)
     finish(runtime)
@@ -371,7 +371,7 @@ def test_a_failed_step_in_a_worker_names_the_native_exception():
 
 
 def test_a_measure_that_fails_is_the_records_error(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv('ROSBRIDGE_RUN_DIR', str(tmp_path))
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
     runtime, _ = world(backend=MeasuredToy)
     runtime.sim.position[:] = -1.
     runtime.close()

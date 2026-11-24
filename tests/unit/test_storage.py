@@ -6,7 +6,7 @@ import stat
 
 import pytest
 
-from rosbridge.storage import local_environment, run_environment, write_json
+from kinex_sim.storage import local_environment, run_environment, write_json
 
 
 def test_atomic_json_failure_preserves_previous_file(tmp_path):
@@ -32,8 +32,8 @@ def test_concurrent_json_writes_publish_complete_files(tmp_path):
 
 def test_run_environment_isolated_without_copying_dependencies(tmp_path):
     base = local_environment(tmp_path, {})
-    first = dict(base, **run_environment(tmp_path / '.cache/rosbridge/runs/one'))
-    second = dict(base, **run_environment(tmp_path / '.cache/rosbridge/runs/two'))
+    first = dict(base, **run_environment(tmp_path / '.cache/kinex-sim/runs/one'))
+    second = dict(base, **run_environment(tmp_path / '.cache/kinex-sim/runs/two'))
     for key in ('ROS_HOME', 'ROS_LOG_DIR', 'TMPDIR'):
         assert first[key] != second[key]
         assert Path(first[key]).is_dir() and Path(second[key]).is_dir()

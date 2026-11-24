@@ -2,7 +2,7 @@
 
 Isaac hosts one app per process and its shutdown ends the process, so every check
 drives RoboDojoSim through a worker subprocess. Each task needs its own Isaac boot
-(minutes), so the every-task sweep runs only with ROSBRIDGE_ALL_TASKS=1.
+(minutes), so the every-task sweep runs only with KINEX_SIM_ALL_TASKS=1.
 """
 import os
 import sys
@@ -10,13 +10,13 @@ import sys
 import numpy as np
 import pytest
 
-from rosbridge.catalog import simulator, tasks
-from rosbridge.catalog.robots import catalog_profiles
-from rosbridge.core.worker import WorkerBackend
+from kinex_sim.catalog import simulator, tasks
+from kinex_sim.catalog.robots import catalog_profiles
+from kinex_sim.core.worker import WorkerBackend
 
 ROOT, _, MANIFEST = simulator("robodojo")
 ALL = [t["native_task"] for t in tasks(name="robodojo").values()]
-SELECTED = ALL if os.environ.get("ROSBRIDGE_ALL_TASKS") else ["stack_bowls"]
+SELECTED = ALL if os.environ.get("KINEX_SIM_ALL_TASKS") else ["stack_bowls"]
 
 
 class Native(WorkerBackend):

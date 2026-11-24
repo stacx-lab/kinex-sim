@@ -1,7 +1,7 @@
 """Where an early-stop HandsOn run ends, without Isaac: a native step's info and the evaluator's reason in."""
 import pytest
 
-from rosbridge_handson.backend import failure_cause, native_stop
+from kinex_sim_handson.backend import failure_cause, native_stop
 
 
 def returned(**info):

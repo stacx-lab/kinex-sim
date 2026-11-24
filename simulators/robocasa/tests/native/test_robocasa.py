@@ -4,7 +4,7 @@ import random
 import numpy as np
 import pytest
 
-from rosbridge_robocasa.backend import RoboCasaSim
+from kinex_sim_robocasa.backend import RoboCasaSim
 
 
 TARGET_KITCHENS = [(i, i) for i in range(1, 11)]
@@ -68,7 +68,7 @@ def test_split_and_seed_select_the_episode_upstream_create_env_does(task, split,
         meta = env.get_ep_meta()
         return (meta['layout_id'], meta['style_id'], meta['lang'],
                 [cfg['info']['mjcf_path'].split('/')[-2] for cfg in meta['object_cfgs']], env.obj_instance_split)
-    random.seed(seed)  # rosbridge also seeds the process generators, which upstream leaves as they are
+    random.seed(seed)  # kinex-sim also seeds the process generators, which upstream leaves as they are
     np.random.seed(seed)
     native = create_env(task, split=split, seed=seed)
     try:

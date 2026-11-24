@@ -1,4 +1,4 @@
-"""rosbridge's copy of custom_interfaces against Kinex's."""
+"""kinex-sim's copy of custom_interfaces against Kinex's."""
 from pathlib import Path
 
 import pytest

@@ -1,7 +1,7 @@
 """The exported mobile rig's chain base -> torso:top -> arm:flange agrees with MuJoCo."""
 import numpy as np
 
-from rosbridge_robocasa.backend import RoboCasaSim
+from kinex_sim_robocasa.backend import RoboCasaSim
 from tests.kinex.geometry import Rig, compose, requires_kinex, rt
 
 pytestmark = requires_kinex

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from rosbridge.catalog.cameras import color, distort, undistort
-from rosbridge.core.lens import LIMIT, LensGeometry
+from kinex_sim.catalog.cameras import color, distort, undistort
+from kinex_sim.core.lens import LIMIT, LensGeometry
 
 # HandsOn's head camera: the Gemini 336's calibrated lens (k1, k2, p1, p2, k3).
 LENS = (0.00646656053141, -0.0479530096054, -0.000352804054273, -0.000104829683551, 0.0332237109542)

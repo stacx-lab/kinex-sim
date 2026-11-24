@@ -1,8 +1,8 @@
 """Synthetic position/scalar backend for shared conformance tests."""
 import threading
 import numpy as np
-from rosbridge.core import Action, ActionLayout, CommandGroup
-from rosbridge.core.devices import device_inventory
+from kinex_sim.core import Action, ActionLayout, CommandGroup
+from kinex_sim.core.devices import device_inventory
 
 
 class ToyBackend:

@@ -1,12 +1,12 @@
 # HandsOn: known environment issues
 
-This page lists the problems known in HandsOn's 66 dexterous-manipulation tasks as rosbridge runs them: upstream `TsinghuaC3I/HandsOn` pinned at `c9598b53fc2a01355e74837de397bd7b2b1ab602`, in Isaac Sim 5.1 and Isaac Lab v2.3.2, with Core-50 (`t01`–`t50`) and Transfer-16 (`eval_comb01..06`, `eval_gen01..07`, `eval_flex01..03`). Upstream's only commit after `fee28452`, where these were found, publishes its leaderboard and changes no simulation code, so every upstream entry still holds. [HandsOn](handson.md) describes how rosbridge runs the simulator, including the corrections preparation applies. Problems of a harness that runs agents, outside this repository, are not listed.
+This page lists the problems known in HandsOn's 66 dexterous-manipulation tasks as kinex-sim runs them: upstream `TsinghuaC3I/HandsOn` pinned at `c9598b53fc2a01355e74837de397bd7b2b1ab602`, in Isaac Sim 5.1 and Isaac Lab v2.3.2, with Core-50 (`t01`–`t50`) and Transfer-16 (`eval_comb01..06`, `eval_gen01..07`, `eval_flex01..03`). Upstream's only commit after `fee28452`, where these were found, publishes its leaderboard and changes no simulation code, so every upstream entry still holds. [HandsOn](handson.md) describes how kinex-sim runs the simulator, including the corrections preparation applies. Problems of a harness that runs agents, outside this repository, are not listed.
 
-## What rosbridge fixes
+## What kinex-sim fixes
 
-rosbridge reproduces the pinned evaluator: its physics, success and failure, budgets and instructions, so that results compare with upstream's. By that rule:
+kinex-sim reproduces the pinned evaluator: its physics, success and failure, budgets and instructions, so that results compare with upstream's. By that rule:
 
-1. **rosbridge's own protocol** (how it drives, ends and reports an episode) is fixed wherever it departs from the evaluator's.
+1. **kinex-sim's own protocol** (how it drives, ends and reports an episode) is fixed wherever it departs from the evaluator's.
 2. **An upstream defect** is corrected at preparation only when the correction leaves the scored task bit-identical (physics, success, failure and simulation time), restores what upstream evidently intends (its code, comments or published figures) or protects the host, and admits no other reading. Three do: Kit's present thread, the archived materials and `eval_gen06`'s spray cone (11.1–11.3).
 3. **Any other upstream defect** is left as the evaluator has it, documented here and worth reporting upstream, even when it makes a task impossible: correcting one such task would make its scores incomparable while the others stay as they are. `eval_comb03`'s lid (8.1) is one.
 
@@ -14,7 +14,7 @@ rosbridge reproduces the pinned evaluator: its physics, success and failure, bud
 
 **Evidence.** Each entry says how it is known:
 
-- *measured*: a native run in Isaac Sim through rosbridge's own backend, driving the robot only through the commands a client sends (arm joint targets before the arms took palm poses; see 15);
+- *measured*: a native run in Isaac Sim through kinex-sim's own backend, driving the robot only through the commands a client sends (arm joint targets before the arms took palm poses; see 15);
 - *read*: source code or data files;
 - *inferred*: reasoning from measured or read facts, not itself run;
 - *recorded*: seen in recorded agent episodes, with counts.
@@ -27,9 +27,9 @@ Unless stated otherwise, native runs used seed 0. A *positive control* is a scri
 
 | Status | Meaning |
 |---|---|
-| rosbridge | Fixed or documented in rosbridge's protocol (rule 1) |
+| kinex-sim | Fixed or documented in kinex-sim's protocol (rule 1) |
 | prepared | Corrected at preparation (rule 2) |
-| upstream | Needs a change in HandsOn (or Isaac Lab); rosbridge leaves it as the evaluator has it (rule 3) |
+| upstream | Needs a change in HandsOn (or Isaac Lab); kinex-sim leaves it as the evaluator has it (rule 3) |
 | open | No fix exists or is proposed |
 | reported | Evidence only; a decision on changing it is pending |
 | left as is | Known and deliberately unchanged, with the reason |
@@ -41,19 +41,19 @@ Nothing has been reported to HandsOn yet. Section 14 lists the reports worth fil
 
 | # | Task(s) | Issue | Status |
 |---|---|---|---|
-| 2.1 | all that can fail | A latched native failure was silent; the episode ran to its horizon | rosbridge |
-| 2.2 | all without a success latch | A run judged on its final state loses a success reached earlier | rosbridge |
-| 2.3 | 27 tasks; `t02`, `t20`, `t31`, `t45`, `eval_comb06` | No native failure; states where success is impossible without failing | rosbridge (documents) |
-| 2.4 | `eval_comb01`, `eval_gen01/03/06/07` | Commands to the left side upstream holds were dropped silently | rosbridge |
-| 2.5 | `t16`, `eval_comb02` | The hinge brake needs the commanded palm to rise; no commanded palm reached it | rosbridge |
-| 2.6 | 11 tasks | Upstream's palm limits and guards were skipped on arm joint targets | rosbridge |
-| 2.7 | `t22` | Upstream's IK joint limits did not bound joint targets | rosbridge (no longer applies) |
+| 2.1 | all that can fail | A latched native failure was silent; the episode ran to its horizon | kinex-sim |
+| 2.2 | all without a success latch | A run judged on its final state loses a success reached earlier | kinex-sim |
+| 2.3 | 27 tasks; `t02`, `t20`, `t31`, `t45`, `eval_comb06` | No native failure; states where success is impossible without failing | kinex-sim (documents) |
+| 2.4 | `eval_comb01`, `eval_gen01/03/06/07` | Commands to the left side upstream holds were dropped silently | kinex-sim |
+| 2.5 | `t16`, `eval_comb02` | The hinge brake needs the commanded palm to rise; no commanded palm reached it | kinex-sim |
+| 2.6 | 11 tasks | Upstream's palm limits and guards were skipped on arm joint targets | kinex-sim |
+| 2.7 | `t22` | Upstream's IK joint limits did not bound joint targets | kinex-sim (no longer applies) |
 | 2.8 | 15 Core tasks | Tasks declared single-arm move the left arm natively | left as is |
-| 3.1 | 14 Core tasks reject seeds | A seed the settle gate rejects failed the launch like any error | rosbridge |
-| 3.2 | `t09` | The gate accepts a scene whose socket tray slid while settling | rosbridge (pre-screen) |
+| 3.1 | 14 Core tasks reject seeds | A seed the settle gate rejects failed the launch like any error | kinex-sim |
+| 3.2 | `t09` | The gate accepts a scene whose socket tray slid while settling | kinex-sim (pre-screen) |
 | 3.3 | 13 tasks; Transfer-16 | No settle gate; default gate parameters | property |
 | 3.4 | `t24`, `t26` | Seed-only mode always asks for the tennis ball and the apple | left as is |
-| 3.5 | all | Receipts beside the instruction are for the judge | rosbridge (documents) |
+| 3.5 | all | Receipts beside the instruction are for the judge | kinex-sim (documents) |
 | 4.1 | all with free task bodies | Task bodies spin at most 30°/s: a deg/s value meant as rad/s | reported |
 | 5.1 | `t07` | The skillet collides as a flat floor inside vertical walls, unlike its visual bowl | upstream |
 | 5.2 | `t36` | The spoon's marble-only proxies collide with a 43 mm golf ball | upstream |
@@ -92,7 +92,7 @@ Nothing has been reported to HandsOn yet. Section 14 lists the reports worth fil
 | 8.9 | `t22` | Two failure guards are never called | upstream |
 | 8.10 | `t35` | Only two of nine failure codes can be set | upstream |
 | 8.11 | `t01` | Provisional calibration: the success latch is never armed | upstream |
-| 9.1 | all | The record held no checklist and no failure cause | rosbridge (the cause) |
+| 9.1 | all | The record held no checklist and no failure cause | kinex-sim (the cause) |
 | 9.2 | `eval_comb06` | The stream is drawn hit or miss; seasoning progress is shown nowhere | upstream |
 | 9.3 | all | Wrist camera mounts collide but do not count as hand contact | property |
 | 10.1 | `eval_gen06` | A budget borrowed from `t50`, and a trigger out of reach in place | upstream |
@@ -101,9 +101,9 @@ Nothing has been reported to HandsOn yet. Section 14 lists the reports worth fil
 | 11.1 | all | Kit's present thread stayed on in headless worlds | prepared |
 | 11.2 | `t15`, `t27`, `t29`, `t30`, `t37` | Glass and some plastics rendered opaque red | prepared |
 | 11.3 | `eval_gen06` | The spray cone never rendered | prepared |
-| 11.4 | all | A three-view capture costs seconds; cameras sampled at 30 Hz | rosbridge |
+| 11.4 | all | A three-view capture costs seconds; cameras sampled at 30 Hz | kinex-sim |
 | 11.5 | `t49` | Collision-only grip boxes are invisible | open |
-| 11.6 | all | The head camera rendered without its lens; every principal point was half a pixel off | rosbridge |
+| 11.6 | all | The head camera rendered without its lens; every principal point was half a pixel off | kinex-sim |
 | 12.1 | all | No torsional friction at fingertips; default friction 1.0/0.8 | property |
 | 12.2 | all | Heavily damped PD arm drives | property |
 | 12.3 | all but `eval_flex01` | Stiff finger drives | property |
@@ -117,26 +117,26 @@ Section 15 lists what has not been investigated. The largest item there is wheth
 
 ### 2.1 A latched native failure was silent, and the episode ran to its horizon
 
-A native failure latches at its first step, and success is impossible from then on, but nothing ended the episode or told the client; upstream's evaluator ends a trial at its first success or failure (`evaluation/rollout.py:119,140`). *Measured*: `t14` failed (a click before the mouse was on its pad) at step 100 of 375, and every wait reply until step 375 was `ok`. *Recorded*: rules that fail silently decided many episodes (`t36` 27 of 31, `eval_comb06` 12 of 32; 6.5, 6.8). Status: rosbridge. With `--early-stop` the episode ends where the evaluator ends a trial, at a success or a reported failure; the wait reply and the record name the end and the native cause. A step that succeeds and fails at once is a success, as upstream scores it.
+A native failure latches at its first step, and success is impossible from then on, but nothing ended the episode or told the client; upstream's evaluator ends a trial at its first success or failure (`evaluation/rollout.py:119,140`). *Measured*: `t14` failed (a click before the mouse was on its pad) at step 100 of 375, and every wait reply until step 375 was `ok`. *Recorded*: rules that fail silently decided many episodes (`t36` 27 of 31, `eval_comb06` 12 of 32; 6.5, 6.8). Status: kinex-sim. With `--early-stop` the episode ends where the evaluator ends a trial, at a success or a reported failure; the wait reply and the record name the end and the native cause. A step that succeeds and fails at once is a success, as upstream scores it.
 
 ### 2.2 A run judged on its final state loses a success reached earlier
 
-Without `--early-stop`, `success` is what holds on the last step. Holds restart when a condition breaks, so a success can be lost before the horizon. Only `t07`, `t20`, `t22`, `t33`, `t34`, `t47`, `eval_comb04`, `t18`, `t49`, `eval_gen02`, `eval_flex01` and `eval_flex03` latch success. *Recorded*: one of 52 `t45` episodes met the checker at step 1224 and ended at step 1505 without success, after a regrasp rocked the pot and a single left-hand contact sample read 0 N (8.7). *Measured*: in a scripted `t32` run all five conditions held for 48 frames; lifting one finger 1 mm off the bottle's neck afterwards lost the success to the end. Status: rosbridge. The record carries `first_success_step`, and `--early-stop` scores the first success, as upstream does.
+Without `--early-stop`, `success` is what holds on the last step. Holds restart when a condition breaks, so a success can be lost before the horizon. Only `t07`, `t20`, `t22`, `t33`, `t34`, `t47`, `eval_comb04`, `t18`, `t49`, `eval_gen02`, `eval_flex01` and `eval_flex03` latch success. *Recorded*: one of 52 `t45` episodes met the checker at step 1224 and ended at step 1505 without success, after a regrasp rocked the pot and a single left-hand contact sample read 0 N (8.7). *Measured*: in a scripted `t32` run all five conditions held for 48 frames; lifting one finger 1 mm off the bottle's neck afterwards lost the success to the end. Status: kinex-sim. The record carries `first_success_step`, and `--early-stop` scores the first success, as upstream does.
 
 ### 2.3 27 tasks cannot fail, and five states make success impossible without failing
 
 - **What happens** (*read*). 27 tasks have no native failure and can only succeed or time out: `t02`–`t06`, `t08`, `t09`, `t12`, `t19`, `t21`, `t23`–`t26`, `t31`, `t32`, `t42`–`t45`, `eval_comb01`, `eval_comb03`, `eval_comb04`, `eval_gen01`, `eval_gen03`, `eval_gen07`, `eval_flex03`. Some states rule out success without raising a failure: in `t02` a cable seated before the plug (`sim/isaaclab/abc_collection_env.py:33449-33450`), in `t20` the left hand touching the pen first, in `t31` an interrupted brew, and in `t45` and `eval_comb06` a lost left-hand contact (`sim/isaaclab/b320_bimanual_env.py:4934-4941`, `sim/isaaclab/eval_comb06_season_and_stir_env.py:147-152`; the latch clears a success condition, `b320_bimanual_env.py:5845`, and sets no failure).
 - **Effect.** An episode in such a state runs on to its horizon even with `--early-stop`.
-- **Status.** rosbridge documents the 27 tasks and these five states in [HandsOn](handson.md); the states are upstream's.
+- **Status.** kinex-sim documents the 27 tasks and these five states in [HandsOn](handson.md); the states are upstream's.
 
 ### 2.4 Commands to a side that upstream holds were dropped silently
 
-Upstream's control path holds the left arm and hand at home in `eval_comb01`, `eval_gen01`, `eval_gen03`, `eval_gen06` and `eval_gen07` and never asks for their targets (`sim/isaaclab/bimanual_assembly_env.py:3641-3662`), so left commands were accepted and had no effect. Status: rosbridge. `rosbridge setup` exports these tasks' `left_arm` and `left_hand` with their state only, so Kinex refuses a command at once; a client that publishes the topics directly is still ignored. The native suite checks the five tasks against upstream's control path. *Measured*: in `eval_gen01` a 4 cm lift commanded to both palms moved the right palm 4 cm and the left 0 mm.
+Upstream's control path holds the left arm and hand at home in `eval_comb01`, `eval_gen01`, `eval_gen03`, `eval_gen06` and `eval_gen07` and never asks for their targets (`sim/isaaclab/bimanual_assembly_env.py:3641-3662`), so left commands were accepted and had no effect. Status: kinex-sim. `kinex-sim setup` exports these tasks' `left_arm` and `left_hand` with their state only, so Kinex refuses a command at once; a client that publishes the topics directly is still ignored. The native suite checks the five tasks against upstream's control path. *Measured*: in `eval_gen01` a 4 cm lift commanded to both palms moved the right palm 4 cm and the left 0 mm.
 
 ### 2.5 `t16_open_laptop` and `eval_comb02`: the hinge brake needs the commanded palm to rise
 
 - **What happens** (*read*). The display moves only through a contact-gated hinge (`sim/isaaclab/fu015_collection_env.py:389-425, 1799-1834, 1990-2022`). A brake holds it unless the right hand touches it; within 0.25° of closed, the brake also needs the commanded right palm to rise at least 0.2 mm in that step. A drive of at most 4 N·m then opens it 0.4° per step while contact and rise last. With joint targets in place of upstream's palm command, native logic never saw the commanded palm rise.
-- **Status.** rosbridge. The arms take palm pose targets, which upstream's own IK executes, so the commanded palm upstream reads is the client's. *Measured*: in `t16` upstream's commanded right palm equalled the pose target exactly. Under the earlier joint-target control, with the commanded palm supplied by forward kinematics, targets that raised the palm a little each step along the hinge's arc with a fingertip on the display opened it to 57° in 6 s; that sequence has not been re-run with pose targets. `eval_comb02`'s left-hand route is still not wired (7.2).
+- **Status.** kinex-sim. The arms take palm pose targets, which upstream's own IK executes, so the commanded palm upstream reads is the client's. *Measured*: in `t16` upstream's commanded right palm equalled the pose target exactly. Under the earlier joint-target control, with the commanded palm supplied by forward kinematics, targets that raised the palm a little each step along the hinge's arc with a fingertip on the display opened it to 57° in 6 s; that sequence has not been re-run with pose targets. `eval_comb02`'s left-hand route is still not wired (7.2).
 
 ### 2.6 Upstream's palm limits and guards were skipped on arm joint targets
 
@@ -149,7 +149,7 @@ Upstream's control path holds the left arm and hand at home in `eval_comb01`, `e
   - `t10_lift_carton`: no palm rises until both hands grip with 10 N, then the palms move only together (`sim/isaaclab/b320_bimanual_env.py:3815-3851, 4134-4616`);
   - `t01`: the left hand is locked once the left block is level at height (`sim/isaaclab/b320_bc021_env.py:737-874`).
 - **Evidence.** *Measured* under joint targets: in `eval_flex02`, fingers commanded 25 mm below the floor reached the table top, 10.9 mm through the cloth; in `t10`, palms commanded 5 cm up before any grasp rose 5.0 cm. *Recorded*: in `eval_flex02`, cloth caught on a hand in 11 of 11 and 5 or 6 of 10 episodes of two sets; in `t22`, every lift combined with a wrist turn while holding dropped the tool (4 of 4).
-- **Status.** rosbridge. With palm pose targets, upstream's limits and guards run on the commanded palm as they do for its own policies. *Measured*: in `t10` a 4 cm lift commanded to both palms before any grasp moved neither; in ten other tasks the same lift converged within 1 s. Results under the earlier joint-target control are not comparable in these tasks. Under `eval_flex02`'s floor, flat cloth cannot be pinched (5.10).
+- **Status.** kinex-sim. With palm pose targets, upstream's limits and guards run on the commanded palm as they do for its own policies. *Measured*: in `t10` a 4 cm lift commanded to both palms before any grasp moved neither; in ten other tasks the same lift converged within 1 s. Results under the earlier joint-target control are not comparable in these tasks. Under `eval_flex02`'s floor, flat cloth cannot be pinched (5.10).
 
 ### 2.7 `t22`: upstream's IK joint limits did not bound joint targets
 
@@ -159,17 +159,17 @@ Upstream's `t22` IK keeps joints within operational limits (`sim/envs/rokae_wuji
 
 - **What happens** (*read, measured*). Upstream's configs declare `robot_type: single_arm` for 19 tasks, and its policy wrappers hold the inactive side at its measured state (`eef52.py:74-86`). In 15 Core ones (`t03`, `t04`, `t09`, `t11`, `t14`, `t19`, `t24`, `t25`, `t26`, `t29`, `t33`, `t34`, `t44`, `t47`, `t50`) upstream's native control path drives the left arm: the frozen Core bases (`core_box_base`, `core_pitcher_base`, `core_peg_base`) have no left hold, and `sim/isaaclab/bimanual_assembly_env.py:3641-3649` exempts five tasks from it. A probe of upstream's control path in all 66 tasks agrees.
 - **Evidence** (*recorded*). 11 of 25 successful episodes in these tasks manipulated with the left hand. In `t47` and `t50` left-hand presses never count (6.1).
-- **Status.** Left as is: rosbridge follows the native control path. Refusing the left side would follow the policy protocol instead and would change these tasks' difficulty.
+- **Status.** Left as is: kinex-sim follows the native control path. Refusing the left side would follow the policy protocol instead and would change these tasks' difficulty.
 
 ## 3. Seeds, the settle gate and receipts
 
 ### 3.1 A seed the settle gate rejects failed the launch like any other error
 
-After the reset a stable-origin gate settles the scene and fails closed with `RecordingOriginStabilityError` if the reset drifts more than 5 mm or 3° from its authored pose or contacts penetrate (`sim/isaaclab/recording_origin.py`). Upstream's evaluator does not retry; the paper replaced a rejected candidate with the next accepted one. *Read*: upstream's archive of 45,000 accepted paper trials records 4.8 % of reset candidates rejected, all in tasks with the native recording gate (`t27` 43.0 %, `t23` 25.2 %, `t07` 19.9 %, then `t14`, `t19`, `t24`, `t04`, `t25`, `t26`, `t09`, `t48`, `t36`, `t40`, `t11`). Status: rosbridge. A launch's seed `k` names the task's `k`-th native seed that a pre-screen accepted (`simulators/handson/seeds.json`); see [HandsOn](handson.md).
+After the reset a stable-origin gate settles the scene and fails closed with `RecordingOriginStabilityError` if the reset drifts more than 5 mm or 3° from its authored pose or contacts penetrate (`sim/isaaclab/recording_origin.py`). Upstream's evaluator does not retry; the paper replaced a rejected candidate with the next accepted one. *Read*: upstream's archive of 45,000 accepted paper trials records 4.8 % of reset candidates rejected, all in tasks with the native recording gate (`t27` 43.0 %, `t23` 25.2 %, `t07` 19.9 %, then `t14`, `t19`, `t24`, `t04`, `t25`, `t26`, `t09`, `t48`, `t36`, `t40`, `t11`). Status: kinex-sim. A launch's seed `k` names the task's `k`-th native seed that a pre-screen accepted (`simulators/handson/seeds.json`); see [HandsOn](handson.md).
 
 ### 3.2 The settle gate accepts a scene whose socket tray slid while settling: `t09_insert_peg`
 
-At native seed 0 the gate accepts a reset in which the socket tray slides 6.1 cm while settling (*measured* by the pre-screen, identical on four GPUs). An earlier report of the tray thrown 6 m to the floor was not reproduced. Status: rosbridge. The pre-screen also rejects a native seed whose gate moved a task body more than 2 cm, which only this one did, so no launch seed names it; launches do not repeat the check. Upstream: the gate tests stillness, not that the scene is intact.
+At native seed 0 the gate accepts a reset in which the socket tray slides 6.1 cm while settling (*measured* by the pre-screen, identical on four GPUs). An earlier report of the tray thrown 6 m to the floor was not reproduced. Status: kinex-sim. The pre-screen also rejects a native seed whose gate moved a task body more than 2 cm, which only this one did, so no launch seed names it; launches do not repeat the check. Upstream: the gate tests stillness, not that the scene is intact.
 
 ### 3.3 13 tasks have no settle gate, and Transfer-16 uses default gate parameters
 
@@ -177,11 +177,11 @@ At native seed 0 the gate accepts a reset in which the socket tray slides 6.1 cm
 
 ### 3.4 `t24` always asks for the tennis ball and `t26` for the apple
 
-The target resolves to the first of the task's target objects unless a `target_object` override is given (`sim/isaaclab/collection_runtime.py:22-27`, `sim/isaaclab/core_box_env.py:2823, 9147-9151`). Only upstream's archived paper trials set the override: `t24` asks for the golf, mini soccer and tennis balls 186, 304 and 410 times of 900, and `t26` for four fruits. *Read, measured*. Status: left as is; rosbridge does not use the paper trials, and [HandsOn](handson.md) says so.
+The target resolves to the first of the task's target objects unless a `target_object` override is given (`sim/isaaclab/collection_runtime.py:22-27`, `sim/isaaclab/core_box_env.py:2823, 9147-9151`). Only upstream's archived paper trials set the override: `t24` asks for the golf, mini soccer and tennis balls 186, 304 and 410 times of 900, and `t26` for four fruits. *Read, measured*. Status: left as is; kinex-sim does not use the paper trials, and [HandsOn](handson.md) says so.
 
 ### 3.5 Receipts beside the instruction are for the judge
 
-`PROMPT.json` holds `prompt` and other fields: `canonical_prompt` undoes the paraphrase draw, `goal` and `native_goal_readback` restate the target, `eval_gen05`'s readback gives the knobs' initial angles (`tasks/goal_readers.py:79-91`) and `eval_comb04`'s the fruit's id. `TASK_BOUNDARY_SETTLE.json` and `TASK_BOUNDARY.json` (`t01`, `t15`, `t38`) hold every object pose and joint position (`evaluation/boundary.py:39,61`, `evaluation/readback.py:55-65`), and `SETTING_SELECTION.json` holds `t38`'s knob angles. *Read and measured*. Status: rosbridge documents that only `prompt` goes to an agent.
+`PROMPT.json` holds `prompt` and other fields: `canonical_prompt` undoes the paraphrase draw, `goal` and `native_goal_readback` restate the target, `eval_gen05`'s readback gives the knobs' initial angles (`tasks/goal_readers.py:79-91`) and `eval_comb04`'s the fruit's id. `TASK_BOUNDARY_SETTLE.json` and `TASK_BOUNDARY.json` (`t01`, `t15`, `t38`) hold every object pose and joint position (`evaluation/boundary.py:39,61`, `evaluation/readback.py:55-65`), and `SETTING_SELECTION.json` holds `t38`'s knob angles. *Read and measured*. Status: kinex-sim documents that only `prompt` goes to an agent.
 
 ## 4. Unit slip
 
@@ -347,7 +347,7 @@ The instruction allows either hand to open the laptop. The left-hand hooks in `s
 
 ### 7.3 `t10_lift_carton`: the 12 N limit is waived
 
-The instruction says neither side may exceed 12 N. Upstream's evaluator protocol waives force for scoring and keeps support, lift, a 3 s hold and a drop check (`evaluation/carton.py:13-81`, disclosed in `docs/custom_policy_integration.md:165-167`); the native 12 N check could not fire anyway, because forces are capped at 10 N before the peak is taken (`sim/isaaclab/b320_bimanual_env.py:3716-3725`). *Read*. Status: left as is: rosbridge runs the evaluator's protocol.
+The instruction says neither side may exceed 12 N. Upstream's evaluator protocol waives force for scoring and keeps support, lift, a 3 s hold and a drop check (`evaluation/carton.py:13-81`, disclosed in `docs/custom_policy_integration.md:165-167`); the native 12 N check could not fire anyway, because forces are capped at 10 N before the peak is taken (`sim/isaaclab/b320_bimanual_env.py:3716-3725`). *Read*. Status: left as is: kinex-sim runs the evaluator's protocol.
 
 ### 7.4 `t37_scrub_bottle`: checklist label 6 cm, code 8 cm
 
@@ -357,7 +357,7 @@ The checklist row says the scrub path must exceed 6 cm (`sim/isaaclab/abc_collec
 
 ### 8.1 `eval_comb03`: the box lid has no hand-contact view, so the task can never succeed
 
-The D runtime builds hand-contact views only for the bodies `_D_CONTACT_TARGETS` lists, and `eval_comb03`'s entry lists the block alone (`sim/isaaclab/d_collection_env.py:196`). The lid's reading failed closed (`:1780-1781`), so the right-hand lid credit (`sim/isaaclab/xy1_composition.py:111-145`) could never latch. *Measured*: a right-hand hook pull moved the lid 9 cm with 0.00 N read; with the lid added to that entry, a fingertip press read 19 N and, with the block stage set complete, a 5 cm hook pull latched the lid credit. Status: upstream. Adding the lid makes a task that the evaluator scores 0 succeedable, which changes its scoring, so rosbridge does not (rule 3).
+The D runtime builds hand-contact views only for the bodies `_D_CONTACT_TARGETS` lists, and `eval_comb03`'s entry lists the block alone (`sim/isaaclab/d_collection_env.py:196`). The lid's reading failed closed (`:1780-1781`), so the right-hand lid credit (`sim/isaaclab/xy1_composition.py:111-145`) could never latch. *Measured*: a right-hand hook pull moved the lid 9 cm with 0.00 N read; with the lid added to that entry, a fingertip press read 19 N and, with the block stage set complete, a 5 cm hook pull latched the lid credit. Status: upstream. Adding the lid makes a task that the evaluator scores 0 succeedable, which changes its scoring, so kinex-sim does not (rule 3).
 
 ### 8.2 `t24_place_ball_in_bowl`: no release or speed check
 
@@ -413,7 +413,7 @@ The task runs on a provisional acceptance calibration (`sim/isaaclab/b320_bc021_
 ### 9.1 The record held no checklist and no failure cause
 
 - **What happened** (*read*). Upstream's evaluator records binary success only (`evaluation/rollout.py:154-171`). Every environment does have a task-specific success checklist, `_success_condition_rows()`, which headless runs never compute (`sim/isaaclab/abc_collection_env.py:37512-37519`). A failure was recorded as `native_failed`; its cause existed only in per-task info entries such as `ycb01_failure_reason` and `b320_failure_reason`.
-- **Status.** rosbridge, for the cause: with `--early-stop` a failure ends the episode, and the wait reply and the record give the native info that explains it, such as `native_failed: ycb01_failure_reason=ball_or_hand_touched_gate`. The checklist and a partial score are not recorded.
+- **Status.** kinex-sim, for the cause: with `--early-stop` a failure ends the episode, and the wait reply and the record give the native info that explains it, such as `native_failed: ycb01_failure_reason=ball_or_hand_touched_gate`. The checklist and a partial score are not recorded.
 
 ### 9.2 `eval_comb06`: the stream is drawn hit or miss
 
@@ -455,7 +455,7 @@ The cone imports as an Xform with a same-named child mesh. Setup hides every pri
 
 ### 11.4 A three-view capture costs seconds
 
-Each camera view is path-traced; a three-view capture costs about 4 s (3.7–7 s measured) against 0.05–0.14 s per step, and at the shared 30 Hz camera rate a stepped run with a subscriber spent its time rendering. Status: rosbridge: HandsOn's cameras sample at 2 Hz of simulation time, and a new subscriber still gets a frame at once. *Measured*: in `t24` a persistent head-camera subscriber got frames at 0.5 s and 1.0 s over a 1 s wait, which took 15.5 s; one-shot reads took about 6 s.
+Each camera view is path-traced; a three-view capture costs about 4 s (3.7–7 s measured) against 0.05–0.14 s per step, and at the shared 30 Hz camera rate a stepped run with a subscriber spent its time rendering. Status: kinex-sim: HandsOn's cameras sample at 2 Hz of simulation time, and a new subscriber still gets a frame at once. *Measured*: in `t24` a persistent head-camera subscriber got frames at 0.5 s and 1.0 s over a 1 s wait, which took 15.5 s; one-shot reads took about 6 s.
 
 ### 11.5 `t49`: collision-only grip boxes are invisible
 
@@ -463,7 +463,7 @@ Each camera view is path-traced; a three-view capture costs about 4 s (3.7–7 s
 
 ### 11.6 The head camera rendered without its lens; every principal point was half a pixel off
 
-Upstream renders the head camera through the Gemini 336's calibrated lens. Isaac's OpenCV lens schema carries the Brown-Conrady coefficients k1, k2, p1, p2 and k3; k4 to k6 are 0. rosbridge zeroed the lens so that Kinex could compute the camera's rays from its profile, which moved the image's edges by up to 4.3 px against the evaluator's. The lens schema also places every camera's principal point (upstream's K, authored by `sim/isaaclab/calibrated_cameras.py:apply_lens` on all three cameras) with pixel corners at integers, half a pixel from ROS and OpenCV pixel centers.
+Upstream renders the head camera through the Gemini 336's calibrated lens. Isaac's OpenCV lens schema carries the Brown-Conrady coefficients k1, k2, p1, p2 and k3; k4 to k6 are 0. kinex-sim zeroed the lens so that Kinex could compute the camera's rays from its profile, which moved the image's edges by up to 4.3 px against the evaluator's. The lens schema also places every camera's principal point (upstream's K, authored by `sim/isaaclab/calibrated_cameras.py:apply_lens` on all three cameras) with pixel corners at integers, half a pixel from ROS and OpenCV pixel centers.
 
 *Measured* against an undistorted spectator at each camera's pose, by phase correlation of textured patches:
 
@@ -471,7 +471,7 @@ Upstream renders the head camera through the Gemini 336's calibrated lens. Isaac
 - with half a pixel added to (cx, cy), the wrists' mean offset is below 0.04 px;
 - the head image's edges miss a pinhole by about 2 px, but line up with the calibrated lens within 0.3 px; scaling the lens by 0.8 or 1.2 fits worse.
 
-Status: rosbridge.
+Status: kinex-sim.
 - The head camera renders through its lens, as the evaluator does.
 - Its profile states the lens (`opencv_brown_conrady`) and its field of view, and the world node serves `geometry`, `unproject` and `project` through that lens.
 - `camera_info` carries the same plumb_bob D.

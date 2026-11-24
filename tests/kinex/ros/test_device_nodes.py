@@ -95,7 +95,7 @@ def test_two_devices_can_borrow_endpoints_from_one_node():
     asyncio.run(run())
 
 
-def test_catalog_camera_borrows_rosbridge_endpoints_and_checks_readiness():
+def test_catalog_camera_borrows_kinex_sim_endpoints_and_checks_readiness():
     from sensor_msgs.msg import CameraInfo, Image
 
     profile = Path(__file__).resolve().parents[3] / "catalog/robots/libero/libero-panda-tabletop/devices/camera_agentview/profile.yaml"

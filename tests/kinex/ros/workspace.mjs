@@ -1,4 +1,4 @@
-// Native cross-repository smoke: start rosbridge, export a workspace, prepare its
+// Native cross-repository smoke: start kinex-sim, export a workspace, prepare its
 // Kinex Python, then: node tests/kinex/ros/workspace.mjs WORKSPACE.
 import assert from 'node:assert/strict'
 import { access, mkdtemp, rm } from 'node:fs/promises'

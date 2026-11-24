@@ -1,6 +1,6 @@
 """Measure the ABC YAM rig from MuJoCo and write catalog/robots/abc/abc-yam.
 
-Run in the ABC environment after `rosbridge prepare abc`:
+Run in the ABC environment after `kinex-sim prepare abc`:
     pixi run --frozen -e abc python tools/robots/build_abc.py
 """
 from pathlib import Path
@@ -11,7 +11,7 @@ sys.path[:0] = [str(ROOT / "simulators/abc"), str(ROOT / ".runtime/abc"), str(Pa
 
 import mujoco  # noqa: E402
 import rigs  # noqa: E402
-from rosbridge_abc.backend import GRIPPER_SCALE, OPTICAL, AbcSim  # noqa: E402
+from kinex_sim_abc.backend import GRIPPER_SCALE, OPTICAL, AbcSim  # noqa: E402
 
 HOME = {"left": [-0.20656902, 0.47283894, 0.99431604, -0.7043946, -0.30842298, -0.32864118],
         "right": [0.20160982, 0.39005876, 1.1182956, -0.8726253, 0.13332571, 0.42629892]}
@@ -65,7 +65,7 @@ def main():
             f"{side}_arm",
             f"YAM six-joint {side} arm of the ABC station. Geometry is the sibling arm.urdf with "
             f"flange (link_6) as the tip link; its links are the frames {side}_arm/<link>. "
-            "Commands are the native absolute joint positions of upstream's 14-D policy action; rosbridge rejects "
+            "Commands are the native absolute joint positions of upstream's 14-D policy action; kinex-sim rejects "
             "targets outside the native joint ranges.",
             [f"{side}_joint{i}" for i in range(1, 7)], HOME[side], base)
         site = model.site(f"{side}_grasp_site").id

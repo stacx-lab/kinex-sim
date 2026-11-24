@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package = "rosbridge_robocasa"
+package = "kinex_sim_robocasa"
 
 setup(
     name=package,
@@ -13,7 +13,7 @@ setup(
     install_requires=["setuptools"],
     zip_safe=True,
     entry_points={
-        "rosbridge.backends": ["robocasa = rosbridge_robocasa.backend:RoboCasaSim"],
-        "console_scripts": ["control_demo = rosbridge_robocasa.demos.control:main"],
+        "kinex_sim.backends": ["robocasa = kinex_sim_robocasa.backend:RoboCasaSim"],
+        "console_scripts": ["control_demo = kinex_sim_robocasa.demos.control:main"],
     },
 )

@@ -1,4 +1,4 @@
-"""Kinex compatibility checks: everything in rosbridge's tests that needs Kinex.
+"""Kinex compatibility checks: everything in kinex-sim's tests that needs Kinex.
 
 unit/ needs a Kinex checkout next to this one, ros/ a sourced simulator overlay and native/ a simulator's
 native environment. The Python checks import Kinex from KINEX_PYTHON (its packages/core/assets/python) and are

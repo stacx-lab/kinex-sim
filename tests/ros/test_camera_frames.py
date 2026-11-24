@@ -10,7 +10,7 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
-from rosbridge_runtime.devices import FRAME_QOS, KEEPALIVE_S, Camera
+from kinex_sim_runtime.devices import FRAME_QOS, KEEPALIVE_S, Camera
 from tests.ros.support import Graph, seconds
 
 READERS = 10
