@@ -17,6 +17,8 @@ from tests.asset_helpers import package, ensure
 def test_patched_upstream_asset_map_covers_the_whole_catalog(tmp_path):
     root = Path(__file__).resolve().parents[4]
     upstream = root / "third_party/abc"
+    if not (upstream / "prepare.py").is_file():
+        pytest.skip("ABC is not prepared")
     shutil.copyfile(upstream / "prepare.py", tmp_path / "prepare.py")
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "apply", str(root / "patches/abc/0001-complete-task-asset-map.patch")],
