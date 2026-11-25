@@ -4,7 +4,7 @@ import time
 import pytest
 from custom_interfaces.srv import Wait
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import Float64
 from std_srvs.srv import Trigger
 from kinex_sim.clients import WorldClockClient
 from kinex_sim_runtime.devices import STREAM_QOS
@@ -24,12 +24,10 @@ def ticks(graph):
     return round(seconds(graph.last["clock"].clock) / .1)
 
 
-def budgets(graph):
-    """The world/budget topic's [used_s, max_s] arrays, as received."""
-    received = []
-    graph.node.create_subscription(Float64MultiArray, "world/budget", lambda msg: received.append(list(msg.data)),
-                                   STREAM_QOS)
-    return received
+def budget(graph):
+    """world/now's (used_s, max_s): the episode's budget in seconds of world time."""
+    now = graph.now()
+    return now.used_s, now.max_s
 
 
 def test_the_run_log_states_the_task_description(tmp_path):
@@ -44,35 +42,15 @@ def test_the_run_log_states_the_task_description(tmp_path):
         graph.close()
 
 
-def test_the_budget_topic_reports_a_stepped_episodes_budget(tmp_path):
-    """Kinex's world budget: data [used_s, max_s], the control steps taken and the step limit times the 0.1 s
-    control period, latched for a new reader and published after every step."""
+def test_now_reports_time_and_a_stepped_episodes_budget(tmp_path):
+    """Kinex's world budget: the control steps taken and the step limit, times the 0.1 s control period."""
     graph = Graph(tmp_path, max_steps=3)
-    received = budgets(graph)
     try:
-        graph.until(lambda: received)
-        assert received[-1] == [0., pytest.approx(.3)]
+        assert (graph.now().time_s, *budget(graph)) == (0., 0., pytest.approx(.3))
         assert graph.wait(.2).success
-        graph.until(lambda: received[-1][0] == pytest.approx(.2))
+        assert (graph.now().time_s, *budget(graph)) == (pytest.approx(.2), pytest.approx(.2), pytest.approx(.3))
         graph.wait(1.)
-        graph.until(lambda: received[-1] == [pytest.approx(.3), pytest.approx(.3)])
-    finally:
-        graph.close()
-
-
-def test_without_a_step_limit_the_budget_has_no_cap(stepped):
-    received = budgets(stepped)
-    stepped.until(lambda: received)
-    assert received[-1] == [0., float("inf")]
-
-
-def test_a_realtime_world_has_no_budget(tmp_path):
-    import math
-    graph = Graph(tmp_path, mode="realtime", max_steps=50)
-    received = budgets(graph)
-    try:
-        graph.until(lambda: received)
-        assert all(math.isnan(value) for value in received[-1])
+        assert budget(graph) == (pytest.approx(.3), pytest.approx(.3))
     finally:
         graph.close()
 
@@ -99,8 +77,8 @@ def test_stepped_pause_validation_and_rounding(stepped):
 
 def test_waits_are_sequential_and_stop_ends_them(stepped):
     graph = stepped
-    assert set(Wait.Request.get_fields_and_field_types()) == {"duration_s", "goals", "goal_timeout_s"}
-    pending = graph.wait_client.call_async(Wait.Request(duration_s=1e8))
+    assert set(Wait.Request.get_fields_and_field_types()) == {"seconds", "goals", "timeout"}
+    pending = graph.wait_client.call_async(Wait.Request(seconds=[1e8]))
     graph.spin(.2)
     assert "sequential" in graph.wait(0.).message
     assert graph.call(graph.stop_client, Trigger.Request()).success
@@ -123,7 +101,7 @@ def test_realtime_runs_autonomously(tmp_path):
         assert ticks(graph) > before
         start = time.monotonic()
         result = graph.wait(.5)
-        assert result.success and result.waited_s == pytest.approx(.5)
+        assert result.success and .5 <= result.waited_s < .8  # it ran on between the reading of its time and the wait
         assert time.monotonic() - start < 2.
     finally:
         graph.close()
@@ -197,7 +175,7 @@ def test_wall_timeout_leaves_the_admitted_wait_to_stop(stepped):
 def test_runtime_loss_interrupts_an_inflight_wait(tmp_path):
     graph = Graph(tmp_path, mode="realtime")
     try:
-        future = graph.wait_client.call_async(Wait.Request(duration_s=1000.))
+        future = graph.wait_client.call_async(Wait.Request(seconds=[1e6]))
         graph.spin(.2)
         assert not future.done()
         graph.stop(graph.owner)
@@ -231,4 +209,4 @@ def test_no_task_judge_or_reset_interfaces(stepped):
     topics = {name for name, _ in graph.node.get_topic_names_and_types()}
     assert not {"/task/status", "/task/instruction", "/joint_states", "/action"} & topics
     services = {name for name, _ in graph.node.get_service_names_and_types()}
-    assert "/world/wait" in services and "/world/reset" not in services
+    assert {"/world/now", "/world/wait_all", "/world/wait_any", "/world/stop"} <= services and "/world/reset" not in services

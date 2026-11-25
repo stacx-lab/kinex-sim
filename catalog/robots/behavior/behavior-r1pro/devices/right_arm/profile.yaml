@@ -5,10 +5,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Measured positions of right_arm_joint1, right_arm_joint2, right_arm_joint3,
-      right_arm_joint4, right_arm_joint5, right_arm_joint6, right_arm_joint7 in radians with
-      velocities and the world-clock acquisition stamp; do not infer motion completion from
-      a sent command.
+    description: Measured joint positions and velocities in URDF units, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /right_arm/joint_state
@@ -19,12 +16,11 @@ operations:
       durability: transient_local
     timeout_s: 10
   joint_target:
-    description: Joint trajectory over all 7 arm joints in radians, timed from receipt by
-      strictly increasing time_from_start and finishing within 120 seconds; velocities, accelerations
-      and effort must be empty. A zero header stamp selects now; a nonzero stamp must not
-      start in the past. Points are absolute native joint positions, linearly interpolated
-      at the native control period. Replacement clears pending references; invalid trajectories
-      are ignored, so verify measured joint_state.
+    description: Position trajectory naming every joint once, without velocities, accelerations
+      or effort, with strictly increasing time_from_start ending within 120 s. It starts on
+      receipt, or at a nonzero header stamp not in the past, runs linearly from the current
+      target and replaces the active command. One that is malformed or leaves the joint limits
+      is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /right_arm/joint_target
@@ -35,7 +31,7 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Stop arm motion and hold the measured posture.
+    description: Stop motion and hold the measured posture.
     transport: service
     direction: input
     endpoint: /right_arm/stop
@@ -50,8 +46,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: R1Pro seven-joint right arm on the torso; its flange carries the right gripper
-  and wrist camera.
+description: R1Pro seven-joint right arm.
 source: introspected
 calibrated_at: null
 method: introspection

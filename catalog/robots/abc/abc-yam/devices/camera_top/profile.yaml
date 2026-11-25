@@ -5,11 +5,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   image:
-    description: RGB image measurements with encoding, dimensions, row stride and acquisition
-      timestamp in the Image header. The frame_id identifies the calibrated optical frame;
-      use its stamp for tf2 lookup. A new subscriber receives the current frame at once, also
-      while the world is paused, then one per camera sample; reading never advances world
-      time.
+    description: rgb8 images stamped at acquisition in optical frame camera_top/base.
     transport: topic
     direction: output
     endpoint: /camera_top/image
@@ -20,9 +16,8 @@ operations:
       durability: volatile
     timeout_s: 10
   depth:
-    description: '16UC1 depth registered to image in millimetres along the optical axis; 0
-      marks missing or out-of-range samples. Rendered with its image: same stamp and frame_id,
-      so pair the two by stamp.'
+    description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
+      0 marks missing samples.
     transport: topic
     direction: output
     endpoint: /camera_top/depth
@@ -33,9 +28,7 @@ operations:
       durability: volatile
     timeout_s: 10
   camera_info:
-    description: CameraInfo mirroring the profile, with K and P from color.projection, zero
-      plumb_bob distortion, image size and optical frame. The camera's geometry is the profile's,
-      not this topic's; intrinsics are not TF transforms.
+    description: CameraInfo mirroring the profile's color geometry.
     transport: topic
     direction: output
     endpoint: /camera_top/camera_info
@@ -50,8 +43,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: rgbd
-description: Fixed RGB-D camera (D405 model) on the overhead gate, looking down at the table.
-  Image and registered depth calibration and the optical-frame mount are in the profile.
+description: D405 RGB-D camera fixed on the overhead gate, looking down at the table.
 source: introspected
 calibrated_at: null
 method: introspection

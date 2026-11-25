@@ -170,7 +170,7 @@ two sets of results are not directly comparable.
 
 | Device | Interfaces |
 |---|---|
-| `world` | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `right_arm`, `left_arm` | `<arm>/joint_state`, `<arm>/pose_target`, `<arm>/pose_state`, `<arm>/stop` |
 | `right_hand`, `left_hand` | `<hand>/joint_state`, `<hand>/joint_target`, `<hand>/stop` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/camera_info` |

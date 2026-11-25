@@ -1,9 +1,8 @@
-"""Owner-thread observation publication: clock, episode budget, joint states, cameras and spectator streams."""
+"""Owner-thread observation publication: clock, joint states, cameras and spectator streams."""
 import threading
 
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, Image
-from std_msgs.msg import Float64MultiArray
 
 from kinex_sim.core.devices import SampleSchedule, camera_rate
 from . import conversions as conv
@@ -40,8 +39,6 @@ class ObservationPublisher:
     def __init__(self, node, spectator_rate_hz):
         self.node, self.sim = node, node.sim
         self.clock = node.create_publisher(Clock, '/clock', STREAM_QOS)
-        # The episode budget, [used_s, max_s], latched so a new reader gets it at once.
-        self.budget = node.create_publisher(Float64MultiArray, 'world/budget', STREAM_QOS)
         self.cameras = SampleSchedule(camera_rate(self.sim))
         self.spectator_schedule = SampleSchedule(spectator_rate_hz)
         self.spectators = [Spectator(node, view) for view in self.sim.spectators]
@@ -51,7 +48,6 @@ class ObservationPublisher:
         stamp = conv.stamp(time_s)
         positions, velocities = self.sim.state()
         self.clock.publish(conv.clock(stamp))
-        self.budget.publish(Float64MultiArray(data=list(self.node.world.budget())))
         cameras = self.cameras.due(time_s)
         for device in self.node.devices:
             if not isinstance(device, Camera):

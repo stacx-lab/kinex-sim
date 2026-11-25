@@ -44,7 +44,7 @@ The simulator hosts these devices on one `world` node:
 
 | Device | Interfaces |
 |---|---|
-| `world` | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/joint_target`, `<arm>/stop` |
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
 | `camera_top`, `camera_left`, `camera_right` | `<camera>/image`, `<camera>/depth`, `<camera>/camera_info` |
@@ -70,8 +70,8 @@ lies within MuJoCo's clip range), with the same stamp as its image.
 ```bash
 kinex-sim exec RUN_ID -- ros2 topic pub --once /left_gripper/target \
   std_msgs/msg/Float64 '{data: 0.0}'
-kinex-sim exec RUN_ID -- ros2 service call /world/wait \
-  custom_interfaces/srv/Wait '{duration_s: 1.0}'
+kinex-sim exec RUN_ID -- ros2 service call /world/wait_all \
+  custom_interfaces/srv/Wait '{seconds: [1.0]}'
 ```
 
 In stepped mode, follow commands with a positive wait to advance physics. Use a

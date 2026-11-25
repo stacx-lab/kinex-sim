@@ -6,8 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Measured right_gripper, the native normalized gripper opening (0 closed,
-      1 open), stamped at acquisition; the URDF finger links follow it.
+    description: Measured grip joint position, a normalized opening, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /right_gripper/joint_state
@@ -18,10 +17,9 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Native normalized opening (data) from 0 (closed) to 1 (open), the gripper
-      entry of upstream's 14-D qpos action. The native setter runs on every 250 Hz substep
-      and moves the drive target at most 0.1 per call toward it. A target persists until replaced
-      or stopped; out-of-range targets are ignored, so verify joint_state.
+    description: Grip joint position (data), a normalized opening, between closed and open.
+      It persists until replaced or stopped; one out of range is refused, which the world's
+      next wait reply reports.
     transport: topic
     direction: input
     endpoint: /right_gripper/target
@@ -32,8 +30,8 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Stop and keep the active grip target; a held object stays gripped. Before
-      the first command it holds the opening at reset. Command an open target to release.
+    description: Keep the active grip target, so a held object stays gripped; before the first
+      command, hold the measured opening. An open target releases.
     transport: service
     direction: input
     endpoint: /right_gripper/stop
@@ -48,11 +46,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: 'ALOHA AgileX right parallel two-finger gripper on the right_arm flange. The
-  grip joint right_gripper is upstream''s normalized gripper value (0 closed, 1 open): finger
-  targets are -0.01 + 0.055 m per unit, so a closed command squeezes past the finger stop.
-  The TCP is upstream''s tcp pose, gripper_bias ahead of the wrist joint with +x approaching.
-  A closed or stalled grip alone does not prove a successful grasp.'
+description: ALOHA AgileX right parallel two-finger gripper. A closed target squeezes past
+  the finger stop. The TCP approaches along +x.
 source: introspected
 calibrated_at: null
 method: introspection

@@ -54,76 +54,75 @@ def device(name, kind, description, operations, *, observation=None, layout=None
             "source": "introspected", "calibrated_at": None, "method": "introspection", **facts}
 
 
+# Profiles are what an agent reads. They state a device's contract, never that a simulator serves it, and leave to
+# the profile's fields what the fields say: joints, units, limits, mounts and image geometry.
+
+# How a command topic answers a command it does not take: the publisher gets no reply.
+REFUSED = "is refused, which the world's next wait reply reports."
+
+
 def world(description):
+    """The world: the operations every world declares, in the words of Kinex's world device guide, and what this
+    one's waits add to them. Its clock is the domain's /clock."""
+    entries = ("is over: each of seconds, a duration of world time from now, and each of goals, the id of an "
+               "executing action goal, once it finishes. A positive timeout, in seconds of world time, ends the "
+               "wait with entries left (timed_out). The reply gives time_s, the world time reached, and whether "
+               "each entry was over: elapsed for seconds, finished for goals. One wait at a time: a second is "
+               "rejected.")
+    ends = ("A command a device refused since the previous reply ends the wait at once with success false; message "
+            "names it and why. Once the episode has ended, a wait with entries left fails and message says why.")
     ops = {
-        "time": operation("Authoritative world clock", "topic", "output", "/clock",
-                          "rosgraph_msgs/msg/Clock", qos(durability="transient_local")),
-        "wait": operation(
-            "Advance or await duration_s of world time (finite and nonnegative). Zero is an "
-            "observation barrier. Waits are sequential; one requested while another is pending "
-            "is rejected. With goals, executing action goals, it also waits until all have "
-            "finished; goals still executing goal_timeout_s into the wait are cancelled (zero: "
-            "none). It ends once duration_s has passed and the goals have finished. A terminal "
-            "episode rejects further progression. A device command "
-            "refused during a wait, or before it and not yet reported, ends it there (success "
-            "false; waited_s is how far it ran): the rest is never stepped, so it costs no "
-            "budget. The reply's message names the commands refused since the previous reply, "
-            "with their reasons.", "service", "input", "/world/wait",
-            "custom_interfaces/srv/Wait",
-            timeout_s=120),
-        "budget": operation(
-            "The episode budget, published with every world step: data is [used_s, max_s], "
-            "the seconds of world time the episode has used and is allowed, its control steps "
-            "and step limit times the control period (max_s inf without a limit). Only a "
-            "stepped run has a budget; a realtime run publishes [NaN, NaN].", "topic", "output",
-            "/world/budget", "std_msgs/msg/Float64MultiArray", qos(durability="transient_local")),
+        "now": operation(
+            "World time, time_s, and the time budget in seconds of world time: used_s spent of max_s allowed. "
+            "Without a budget both are NaN; without a limit max_s is inf.", "service", "input", "/world/now",
+            "custom_interfaces/srv/Now"),
+        "wait_all": operation(f"Wait until every entry {entries} With no entries it returns at once. {ends}",
+                              "service", "input", "/world/wait_all", "custom_interfaces/srv/Wait", timeout_s=120),
+        "wait_any": operation(f"Wait until one entry {entries} {ends}", "service", "input", "/world/wait_any",
+                              "custom_interfaces/srv/Wait", timeout_s=120),
         "stop": operation("Cancel the pending wait.", "service", "input", "/world/stop",
                           "std_srvs/srv/Trigger"),
     }
-    value = device("world", "world", description, ops, observation="time")
+    value = device("world", "world", description, ops, observation="now")
     value.update(source="default", method="unknown", bounds=None, surfaces=[],
                  frames={"base": {"parent": None, "translation_m": None, "rotation_xyzw": None}})
     return value
 
 
-def joint(name, description, joints, home, base, *, units="radians", part="arm", tip="flange",
-          model="arm.urdf", pose=None, tip_pose=False, targets=True):
-    """A joint device; tip is its FK/IK link, None for trees such as hands. With pose, a sentence on how the
-    simulator executes them, the device takes pose targets of its tip instead of joint targets. With tip_pose, it
+def joint(name, description, joints, home, base, *, tip="flange", model="arm.urdf", pose=None, tip_pose=False,
+          targets=True):
+    """A joint device; tip is its FK/IK link, None for trees such as hands. With pose, a sentence on how its
+    controller tracks them, the device takes pose targets of its tip instead of joint targets. With tip_pose, it
     reports its tip's measured pose. Without targets it takes no targets on a topic: its actions command it."""
-    count = len(joints)
-    over = f"all {count} {part} joints" if count > 1 else f"the {part} joint"
+    timing = ("with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero "
+              "header stamp not in the past, runs")
     ops = {
         "joint_state": operation(
-            f"Measured positions of {', '.join(joints)} in {units} with velocities and the "
-            "world-clock acquisition stamp; do not infer motion completion from a sent command.",
+            "Measured joint positions and velocities in URDF units, stamped at acquisition.",
             "topic", "output", f"/{name}/joint_state", "sensor_msgs/msg/JointState",
             qos(durability="transient_local")),
     }
     if targets and not pose:
         ops["joint_target"] = operation(
-            f"Joint trajectory over {over} in {units}, timed from receipt by "
-            "strictly increasing time_from_start and finishing within 120 seconds; velocities, "
-            "accelerations and effort must be empty. A zero header stamp selects now; a nonzero "
-            "stamp must not start in the past. Points are absolute native joint positions, "
-            "linearly interpolated at the native control period. Replacement clears pending "
-            "references; invalid trajectories are ignored, so verify measured joint_state.",
+            f"Position trajectory naming every joint once, without velocities, accelerations or effort, {timing} "
+            "linearly from the current target and replaces the active command. One that is malformed or leaves "
+            f"the joint limits {REFUSED}",
             "topic", "input", f"/{name}/joint_target", "trajectory_msgs/msg/JointTrajectory")
     if pose:
         ops["pose_target"] = operation(
-            f"Trajectory of absolute {tip} poses in {name}/base: joint_names [{tip}], one transform per "
-            "point (metres, unit quaternion xyzw), time_from_start strictly increasing and within 120 "
-            "seconds; a zero header stamp starts it now. It is interpolated from the current target. "
-            f"{pose} A new trajectory replaces the active one and an invalid "
-            f"one is ignored; verify the {tip} with pose_state.",
+            f"Trajectory of {tip} poses in {name}/base: joint_names [{tip}] and one transform per point (metres, "
+            f"unit quaternion xyzw), {timing} from the current target and replaces the active command. {pose} "
+            f"A malformed one {REFUSED}",
             "topic", "input", f"/{name}/pose_target", "trajectory_msgs/msg/MultiDOFJointTrajectory")
     if pose or tip_pose:
         ops["pose_state"] = operation(
             f"Measured {tip} pose in {name}/base, stamped with joint_state.",
             "topic", "output", f"/{name}/pose_state", "sensor_msgs/msg/MultiDOFJointState",
             qos(durability="transient_local"))
-    ops["stop"] = operation(f"Stop {part} motion and hold the measured posture.", "service", "input",
-                            f"/{name}/stop", "std_srvs/srv/Trigger")
+    # A device that takes only pose targets holds its tip, as the world's hold does.
+    held = f"{tip} pose" if pose else "posture"
+    ops["stop"] = operation(f"Stop motion and hold the measured {held}.", "service", "input", f"/{name}/stop",
+                            "std_srvs/srv/Trigger")
     return device(name, "joint", description, ops,
                   model={"format": "urdf", "path": model, "base_link": "base_link",
                          "tip_links": [tip] if tip else []},
@@ -133,18 +132,23 @@ def joint(name, description, joints, home, base, *, units="radians", part="arm",
 
 
 # Kinex's grip contract: a stop keeps the applied target, since the measured opening would release a held object.
-GRIP_STOP = ("Stop and keep the active grip target; a held object stays gripped. Before the first command it "
-             "holds the opening at reset. Command an open target to release.")
+GRIP_STOP = ("Keep the active grip target, so a held object stays gripped; before the first command, hold the "
+             "measured opening. An open target releases.")
 
 
-def gripper(name, description, joint, target, base, tcp, *, state=None, opened=1.0, closed=0.0):
+def gripper(name, description, joint, base, tcp, *, quantity="a normalized opening", note="", state=None,
+            opened=1.0, closed=0.0):
+    """A gripper whose grip joint carries quantity, between the profile's open and closed. note: a sentence on
+    how the grip follows a target; state: joint_state's description when the grip joint is not a measured opening."""
     ops = {
         "joint_state": operation(
-            state or f"Measured {joint}, the native normalized gripper opening (0 closed, 1 open), "
-            "stamped at acquisition; the URDF finger links follow it.",
+            state or f"Measured grip joint position, {quantity}, stamped at acquisition.",
             "topic", "output", f"/{name}/joint_state", "sensor_msgs/msg/JointState",
             qos(durability="transient_local")),
-        "target": operation(target, "topic", "input", f"/{name}/target", "std_msgs/msg/Float64"),
+        "target": operation(
+            f"Grip joint position (data), {quantity}, between closed and open. {note + ' ' if note else ''}"
+            f"It persists until replaced or stopped; one out of range {REFUSED}",
+            "topic", "input", f"/{name}/target", "std_msgs/msg/Float64"),
         "stop": operation(GRIP_STOP, "service", "input", f"/{name}/stop", "std_srvs/srv/Trigger"),
     }
     return device(name, "gripper", description, ops, observation="joint_state",
@@ -155,23 +159,17 @@ def gripper(name, description, joint, target, base, tcp, *, state=None, opened=1
 
 
 def locomotion(name, description, axes, base, *, timeout_s, units="normalized"):
-    """A velocity-driven base: axes maps vx, vy, ... to native (min, max) bounds, in [-1, 1] of
-    the controller range (normalized) or m/s and rad/s (si)."""
-    named = ", ".join(f"{field} ({axis})" for axis, field in (
-        ("vx", "linear.x"), ("vy", "linear.y"), ("vz", "linear.z"), ("wx", "angular.x"),
-        ("wy", "angular.y"), ("wz", "angular.z")) if axis in axes)
-    scale = ("each normalized to [-1, 1] of the native controller range" if units == "normalized"
-             else "in m/s and rad/s within the declared bounds")
+    """A velocity-driven base: axes maps vx, vy, ... to (min, max) bounds, in [-1, 1] of the controller range
+    (normalized) or m/s and rad/s (si)."""
     ops = {
         "velocity": operation(
-            f"Body velocity in {name}/base axes as {named}, {scale}; other fields must be "
-            "zero. The body follows the latest "
-            f"twist and stops {timeout_s:g} s of world time after the last one, so re-send to "
-            "keep moving; out-of-range twists are ignored, so verify with odometry.",
+            f"Body velocity in {name}/base axes, in the units and bounds of the profile's velocity; other axes "
+            f"stay zero. The body follows the latest twist and stops {timeout_s:g} s of world time after the "
+            f"last, so re-send to keep moving. One out of bounds {REFUSED}",
             "topic", "input", f"/{name}/velocity", "geometry_msgs/msg/Twist"),
         "odometry": operation(
-            f"Measured body twist in {name}/base (m/s and rad/s at the body origin) and the "
-            f"planar pose in {name}/odom, the body frame at episode start; never a global pose.",
+            f"Measured body twist in {name}/base (m/s, rad/s) and planar pose in {name}/odom, the body frame "
+            "where it started; never a global pose.",
             "topic", "output", f"/{name}/odometry", "nav_msgs/msg/Odometry",
             qos(durability="transient_local")),
         "stop": operation("Command zero velocity.", "service", "input", f"/{name}/stop",
@@ -196,42 +194,27 @@ def camera(name, description, intrinsics, base, depth_range=None, distortion=Non
     color = cameras.color(*intrinsics, distortion)
     rgbd = depth_range is not None
     ops = {
-        "image": operation(
-            "RGB image measurements with encoding, dimensions, row stride and acquisition "
-            "timestamp in the Image header. The frame_id identifies the calibrated optical frame; "
-            "use its stamp for tf2 lookup. A new subscriber receives the current frame at once, "
-            "also while the world is paused, then one per camera sample; reading never "
-            "advances world time.", "topic", "output", f"/{name}/image", "sensor_msgs/msg/Image"),
+        "image": operation(f"rgb8 images stamped at acquisition in optical frame {name}/base.",
+                           "topic", "output", f"/{name}/image", "sensor_msgs/msg/Image"),
     }
     if rgbd:
         ops["depth"] = operation(
-            "16UC1 depth registered to image in millimetres along the optical axis; 0 marks "
-            "missing or out-of-range samples. Rendered with its image: same stamp and frame_id, "
-            "so pair the two by stamp.", "topic", "output", f"/{name}/depth",
-            "sensor_msgs/msg/Image")
-    if distortion is None:
-        info = ("CameraInfo mirroring the profile, with K and P from color.projection, zero plumb_bob "
-                "distortion, image size and optical frame. The camera's geometry is the profile's, "
-                "not this topic's; intrinsics are not TF transforms.")
-    else:
-        info = ("CameraInfo mirroring the profile, with K and P from color.projection, plumb_bob "
-                "distortion from color.distortion, image size and optical frame. The camera's geometry "
-                "is the profile's and the geometry services', not this topic's; intrinsics are not TF "
-                "transforms.")
+            "16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.",
+            "topic", "output", f"/{name}/depth", "sensor_msgs/msg/Image")
+    if distortion is not None:
         for operation_name, text in (
-                ("geometry", "The active lens geometry: {} returns {streams: {color: descriptor}}, the "
-                             "profile's width, height, projection and distortion with the optical frame and "
-                             "a calibration_id."),
-                ("unproject", "Pixels to optical rays through the lens: {stream, calibration_id, pixels: "
-                              "[[u, v], ...]} returns {rays: [[x, y, 1], ...]}, null where invalid; at most "
-                              "8192 pixels."),
-                ("project", "Optical-frame points to pixels through the lens: {stream, calibration_id, "
-                            "points: [[X, Y, Z], ...]} with Z > 0 returns {pixels: [[u, v], ...]}, null "
-                            "where invalid; at most 8192 points.")):
+                ("geometry", "Lens geometry: {} returns {streams: {color: descriptor}} with width, height, "
+                             "projection, distortion, optical frame and calibration_id."),
+                ("unproject", "Pixels to optical-frame rays: {stream, calibration_id, pixels: [[u, v], ...]} "
+                              "returns {rays: [[x, y, 1], ...]}, null where invalid; at most 8192 pixels."),
+                ("project", "Optical-frame points to pixels: {stream, calibration_id, points: [[X, Y, Z], ...]} "
+                            "with Z > 0 returns {pixels: [[u, v], ...]}, null where invalid; at most 8192 "
+                            "points.")):
             ops[operation_name] = operation(text, "service", "input", f"/{name}/{operation_name}",
                                             "custom_interfaces/srv/Json")
-    ops["camera_info"] = operation(info, "topic", "output", f"/{name}/camera_info",
-                                   "sensor_msgs/msg/CameraInfo", qos(durability="transient_local"))
+    ops["camera_info"] = operation("CameraInfo mirroring the profile's color geometry.", "topic", "output",
+                                   f"/{name}/camera_info", "sensor_msgs/msg/CameraInfo",
+                                   qos(durability="transient_local"))
     facts = {"color": color}
     if rgbd:
         near, far = depth_range

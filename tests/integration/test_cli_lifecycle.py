@@ -30,12 +30,12 @@ from kinex_sim.clients import WorldClockClient
 rclpy.init()
 node = Node("cli_control_test")
 result = WorldClockClient(node).wait(.102, timeout_s=10.)
-print(json.dumps({"success":result.success,"waited_s":result.waited_s}))
+print(json.dumps({"success":result.success,"time_s":result.time_s}))
 node.destroy_node()
 rclpy.shutdown()
 '''
     result = invoke("exec", first["id"], "--", "python", "-c", controller)
-    assert json.loads(result.stdout)["waited_s"] == pytest.approx(.102)
+    assert json.loads(result.stdout)["time_s"] == pytest.approx(.102)
     status1 = json.loads(invoke("status", first["id"], "--json").stdout)
     status2 = json.loads(invoke("status", second["id"], "--json").stdout)
     assert status1["ready"] and status2["ready"]

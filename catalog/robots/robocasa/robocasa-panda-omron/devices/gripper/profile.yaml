@@ -6,8 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Integrated native gripper command, -1 (open) to +1 (closed), stamped at acquisition;
-      the URDF finger links follow it. Fingers reach the commanded opening only when unobstructed.
+    description: The applied grip command, not a measured opening, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /gripper/joint_state
@@ -18,10 +17,9 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Integrated native gripper command (data) from -1 (open) to +1 (closed). Every
-      control step kinex-sim moves it by the native 0.2 toward the target while that gets
-      strictly closer, so -1 and +1 are reached exactly within 10 steps. A target persists
-      until replaced or stopped; out-of-range targets are ignored, so verify joint_state.
+    description: Grip joint position (data), a normalized command, between closed and open.
+      The applied command moves 0.2 toward it every 0.05 s. It persists until replaced or
+      stopped; one out of range is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /gripper/target
@@ -32,8 +30,8 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Stop and keep the active grip target; a held object stays gripped. Before
-      the first command it holds the opening at reset. Command an open target to release.
+    description: Keep the active grip target, so a held object stays gripped; before the first
+      command, hold the measured opening. An open target releases.
     transport: service
     direction: input
     endpoint: /gripper/stop
@@ -48,10 +46,9 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: Panda parallel two-finger gripper on the arm flange. Fingers close along the
-  gripper base x axis; the TCP is the native grip site between the pads and +z approaches.
-  The grip joint is robosuite's integrated gripper command, so a closed grip may be stalled
-  on an object; check cameras before assuming a grasp.
+description: Panda parallel two-finger gripper. Fingers close along the base x axis. The grip
+  joint is the applied command, not a measured opening, so fingers stalled on an object do
+  not show in it.
 source: introspected
 calibrated_at: null
 method: introspection

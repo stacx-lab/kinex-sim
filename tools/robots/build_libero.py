@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import rigs  # noqa: E402
 
 CATALOG = ROOT / "catalog/robots/libero"
-OSC = ("LIBERO's own OSC_POSE controller moves the gripper's grip site (gripper/tcp) under it, at most 5 cm "
-       "and 0.5 rad per axis in each 0.05 s step, and may stop short of a pose.")
+OSC = ("An operational-space controller tracks it, by at most 5 cm and 0.5 rad per axis every 0.05 s, and may "
+       "stop short of a pose.")
 
 
 def osc(arm):
@@ -23,11 +23,8 @@ def osc(arm):
     pose = rigs.joint("arm", "", list(arm["home"]), list(arm["home"].values()), arm["frames"]["base"],
                       tip="flange", pose=OSC)["operations"]
     operations = {name: value for name, value in arm["operations"].items() if name != "joint_target"}
-    operations["stop"] = {**operations["stop"], "description": "Stop arm motion and hold the measured flange pose."}
-    return {**arm, "operations": {**operations, "pose_target": pose["pose_target"], "pose_state": pose["pose_state"]},
-            "description": "Panda seven-joint manipulator. Geometry is the sibling arm.urdf with flange as the tip "
-                           "link; its links are the frames arm/<link>. It takes flange pose targets, which "
-                           "upstream's OSC_POSE controller executes as LIBERO's evaluation drives it."}
+    return {**arm, "operations": {**operations, **{name: pose[name] for name in ("stop", "pose_target", "pose_state")}},
+            "description": "Franka Panda seven-joint arm, commanded by the pose of its flange."}
 
 
 def main():

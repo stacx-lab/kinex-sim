@@ -1,20 +1,32 @@
 # Devices and robot catalog
 
 Every device of a run is a set of endpoints on the single `world` node. They use
-standard ROS types, `std_srvs/srv/Trigger` stops and two types of `custom_interfaces`
-(`ros2/custom_interfaces`): `Wait`, the world service, and `Json`, the free-form
-service of a lensed camera's geometry. A ROS 2 program on the run's domain operates the
+standard ROS types, `std_srvs/srv/Trigger` stops and three types of `custom_interfaces`
+(`ros2/custom_interfaces`): `Now` and `Wait`, the world's services, and `Json`, the
+free-form service of a lensed camera's geometry. A ROS 2 program on the run's domain operates the
 devices with nothing else: in the run's environment (`kinex-sim exec`), or anywhere
 `custom_interfaces` is built. Each device is described by a profile of the
 robot catalog (its endpoints, types, QoS, units, limits, frames and URDF), which
 `kinex-sim setup` exports. The device types, operation names and profile format are
 Kinex's, so a Kinex workspace uses an export as it is; see [Kinex](kinex.md).
 
+A profile is what an agent reads, so it reads as any robot's would:
+
+- A fact a field can state is in the field, not in a description: joints and their units
+  (the URDF and `home`), grip range, limits, mounts, image and depth geometry, velocity axes.
+- Nothing in it says a simulator serves the device: no execution mode, upstream name,
+  renderer or evaluator. The world's operations are described alike in a stepped and a
+  realtime run, in the words of Kinex's world device guide.
+- Descriptions are exact and short: an operation's contract, and of a device only what its
+  fields do not say.
+
+What a simulator does behind a device belongs on its page here, not in the profile.
+
 ## Device contract
 
 | Device type | Operations (endpoint, type) |
 |---|---|
-| `world` | `time` (`/clock`, Clock), `wait` (`/world/wait`, Wait), `budget` (`/world/budget`, Float64MultiArray), `stop` (`/world/stop`) |
+| `world` | `now` (`/world/now`, Now), `wait_all` (`/world/wait_all`, Wait), `wait_any` (`/world/wait_any`, Wait), `stop` (`/world/stop`) |
 | `joint` (arm, torso) | `joint_state` (`/<arm>/joint_state`, JointState), `joint_target` (`/<arm>/joint_target`, JointTrajectory), `stop` |
 | `joint` commanded by its tip pose (HandsOn's arms, LIBERO's arm with `--config osc`) | `joint_state`, `pose_target` (`/<arm>/pose_target`, MultiDOFJointTrajectory in `<arm>/base`), `pose_state` (`/<arm>/pose_state`, MultiDOFJointState), `stop` |
 | `joint` that reports its tip (RoboDojo's arms) | `joint_state`, `joint_target`, `pose_state`, `stop` |
@@ -48,10 +60,10 @@ episode start. Its `frames.base` is an unlocalized root; a mobile rig chains its
 other devices from it (`torso` on `base:base`, the arm on `torso:top`).
 
 World waits are sequential: one requested while another is pending is rejected, and
-`world/stop` cancels the pending wait. The latched `world/budget` topic reports the
-episode budget after each step: `data` is `[used_s, max_s]`, seconds of world time, the
-control steps taken and the step limit times the control period (`max_s` inf without a
-limit). Only a stepped run has a budget; a realtime run publishes `[NaN, NaN]`. Realtime observes progress; stepped mode
+`world/stop` cancels the pending wait. `world/now` reports the world's time and the
+episode budget, `used_s` and `max_s` in seconds of world time, the control steps taken
+and the step limit times the control period (`max_s` inf without a limit). Only a
+stepped run has a budget; a realtime run replies NaN for both. Realtime observes progress; stepped mode
 advances only for a pending wait; shutdown interrupts it. Commands are
 validated on the simulator owner thread; invalid ones are logged and keep the held
 target. A device's `stop` holds the measured position, a gripper's keeps its applied grip

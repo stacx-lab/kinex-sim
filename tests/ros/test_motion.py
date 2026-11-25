@@ -144,27 +144,30 @@ def test_a_backends_action_runs_goals_and_a_wait_ends_with_its_goals(tmp_path):
         near = execute(graph, left, goal((.7, -.5, upright)), samples.append)
         far = execute(graph, right, goal((1., -.5, upright)))
         assert graph.wait(0.).time_s == 0.  # goals advance no time
-        both = graph.wait(0., goals=[near, far])  # until the later goal finishes
-        assert both.success and list(both.finished) == [True, True] and both.waited_s == pytest.approx(.5)
+        first = graph.wait(None, goals=[near, far], first=True)  # wait_any: until the first of them finishes
+        assert first.success and first.finished == [True, False] and first.waited_s == pytest.approx(.2)
+        both = graph.wait(None, goals=[near, far])  # wait_all: until the last does
+        assert both.success and both.finished == [True, True] and both.waited_s == pytest.approx(.3)
         assert ended(graph, near) == ended(graph, far) == (GoalStatus.STATUS_SUCCEEDED, 0, 'reached')
         graph.spin(.1)
         commanded = [sample.feedback.multi_dof_desired.transforms[0].translation.x for sample in samples]
         assert commanded == pytest.approx([.6, .7]) and samples[0].feedback.multi_dof_joint_names == ['tip']
-        # A wait without goals runs its duration, whatever goals do.
+        # A wait without goals runs to its time, whatever goals do.
         back = execute(graph, left, goal((.5, -.5, upright)))
         assert graph.wait(1.).waited_s == pytest.approx(1.) and ended(graph, back)[0] == GoalStatus.STATUS_SUCCEEDED
         # A goal the backend ends itself, here stalled at the wall, is aborted with the backend's result.
         blocked = execute(graph, right, goal((1.5, -.5, upright)))
-        assert graph.wait(0., goals=[blocked]).waited_s == pytest.approx(.3)
+        assert graph.wait(None, goals=[blocked]).waited_s == pytest.approx(.3)
         assert ended(graph, blocked) == (GoalStatus.STATUS_ABORTED, -1, 'stalled')
-        # A goal still executing at the wait's goal timeout is ended; the wait then runs out its duration.
+        # A goal still executing at the wait's timeout goes on; a client that gives up on it cancels it.
         slow = execute(graph, left, goal((1.1, -.5, upright)))
-        cut = graph.wait(.4, goals=[slow], goal_timeout=.2)
-        assert cut.success and list(cut.finished) == [True] and cut.waited_s == pytest.approx(.4)
-        assert ended(graph, slow) == (GoalStatus.STATUS_ABORTED, -1, "not finished within the wait's goal_timeout_s")
-        unknown = graph.call(graph.wait_client, Wait.Request(duration_s=1., goals=[UUID(uuid=[7] * 16)]))
+        cut = graph.wait(None, goals=[slow], limit=.2)
+        assert cut.success and cut.timed_out and cut.finished == [False] and cut.waited_s == pytest.approx(.2)
+        graph.until(slow.cancel_goal_async().done)
+        assert ended(graph, slow) == (GoalStatus.STATUS_CANCELED, -1, 'canceled')
+        unknown = graph.call(graph.wait_client, Wait.Request(goals=[UUID(uuid=[7] * 16)]))
         assert not unknown.success and unknown.message == 'goals must be goals this world accepted'
-        assert graph.wait(0.).time_s == pytest.approx(2.2)
+        assert graph.wait(0.).time_s == pytest.approx(2.)
     finally:
         graph.close()
 
@@ -198,7 +201,7 @@ def test_a_goal_ends_when_cancelled_replaced_or_stopped_and_shares_its_arm_with_
         for invalid, reason in ((FollowJointTrajectory.Goal(), 'a goal needs a tip pose'),
                                 (goal((.7, 1.9, upright)), 'the tip pose is beyond the 1.5 m reach')):
             refused = execute(graph, left, invalid)
-            graph.wait(0., goals=[refused])
+            graph.wait(None, goals=[refused])
             assert ended(graph, refused) == (GoalStatus.STATUS_ABORTED, -1, reason)
     finally:
         graph.close()

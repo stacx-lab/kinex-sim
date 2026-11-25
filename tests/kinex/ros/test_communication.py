@@ -1,4 +1,4 @@
-"""Kinex's ROS communication on a kinex-sim overlay: fan-out, bounded queues, service failures and teardown."""
+"""Kinex's devices and world on a kinex-sim overlay: streams, requests, goals, and waits in each kind of world."""
 import asyncio
 import uuid
 
@@ -6,55 +6,24 @@ import pytest
 
 pytest.importorskip('kinex.communication')
 from kinex.communication import communication
-
-
-def test_fanout_precision_bounded_queues_and_teardown():
-    async def run():
-        endpoint = '/test_' + uuid.uuid4().hex
-        operation = {'transport': 'topic', 'direction': 'output', 'endpoint': endpoint,
-                     'type': 'std_msgs/msg/Float64MultiArray', 'qos': {'depth': 2}}
-        catalog = {'test.output': operation, 'test.input': {**operation, 'direction': 'input'}}
-        io = communication(catalog)
-        async with io:
-            streams = [io.subscribe('test.output', depth=2) for _ in range(10)]
-            captures = 0
-            for index in range(30):
-                captures += 1
-                await io.publish('test.input', {'data': [1.2345678901234567, float(index)]})
-                await asyncio.sleep(.02)  # Test producer pacing, not a workflow clock.
-            await asyncio.sleep(.1)
-            assert captures == 30
-            assert all(len(stream.buffer) <= 2 and len(stream.inbox) <= 2 for stream in streams)
-            assert all(stream.latest().data[0] == 1.2345678901234567 for stream in streams)
-            assert all(stream.dropped > 0 for stream in streams)
-            streams[0].close()
-            streams[0].close()
-        assert not io.thread.is_alive()
-        assert not io.context.ok()
-    asyncio.run(run())
-
-
-def test_async_service_failure_deadline_and_temporary_cleanup():
-    async def run():
-        async with communication({}) as io:
-            spec = {'transport': 'service', 'direction': 'input', 'type': 'std_srvs/srv/SetBool',
-                    'endpoint': f'{io.namespace}/echo'}
-            io.catalog['test.echo'] = spec
-            async def handler(request):
-                await asyncio.sleep(.02)
-                return {'success': request.data, 'message': 'expected rejection'}
-            io.serve(spec, handler)
-            assert (await io.request('test.echo', data=True)).success
-            with pytest.raises(RuntimeError, match='expected rejection'):
-                await io.request('test.echo', data=False)
-            io.catalog['test.absent'] = {**spec, 'endpoint': spec['endpoint'] + '_absent'}
-            with pytest.raises(TimeoutError):
-                await io.request('test.absent', data=True, timeout_s=.03)
-        assert not io.thread.is_alive()
-    asyncio.run(run())
-
+from kinex.errors import OperationError, RPCError
 
 SERVICE = {'transport': 'service', 'direction': 'input'}
+LATCHED = {'transport': 'topic', 'direction': 'output', 'qos': {'depth': 1, 'durability': 'transient_local'}}
+
+
+def world():
+    """The operations every world declares, as this one serves them."""
+    return {'world.now': {**SERVICE, 'endpoint': '/world/now', 'type': 'custom_interfaces/srv/Now'},
+            'world.wait_all': {**SERVICE, 'endpoint': '/world/wait_all', 'type': 'custom_interfaces/srv/Wait'},
+            'world.wait_any': {**SERVICE, 'endpoint': '/world/wait_any', 'type': 'custom_interfaces/srv/Wait'},
+            'world.stop': {**SERVICE, 'endpoint': '/world/stop', 'type': 'std_srvs/srv/Trigger'}}
+
+
+def finger():
+    return {'finger.joint_state': {**LATCHED, 'endpoint': '/finger/joint_state', 'type': 'sensor_msgs/msg/JointState'},
+            'finger.target': {'transport': 'topic', 'direction': 'input', 'endpoint': '/finger/target', 'type': 'std_msgs/msg/Float64'},
+            'finger.stop': {**SERVICE, 'endpoint': '/finger/stop', 'type': 'std_srvs/srv/Trigger'}}
 
 
 def arms():
@@ -68,66 +37,170 @@ def arms():
 
 
 def goal(x, y):
-    return {'multi_dof_trajectory': {'joint_names': ['tip'], 'points': [{'transforms': [[x, y, 0, 0, 0, 0, 1]]}]}}
+    return {'multi_dof_trajectory': {'joint_names': ['tip'], 'points': [{'transforms': [{'translation': {'x': x, 'y': y}}]}]}}
 
 
-def test_goals_run_in_parallel_and_a_world_wait_awaits_them(tmp_path):
-    """Kinex sends two arms' move goals and waits for both on the world, the only clock: io.act never steps it."""
-    from tests.ros.support import Graph
-    graph = Graph(tmp_path, backend='pair_pose_toy')  # tips at (0.5, -0.5), 0.1 m a 0.1 s step, a wall at x = 1.2
-    catalog = {**arms(), 'world.wait': {**SERVICE, 'endpoint': '/world/wait', 'type': 'custom_interfaces/srv/Wait'},
-               'world.stop': {**SERVICE, 'endpoint': '/world/stop', 'type': 'std_srvs/srv/Trigger'}}
-
-    async def run():
+def run(graph, catalog, program):
+    """Run program(io) in a Kinex scope on the graph's domain, then close the graph."""
+    async def main():
         async with communication(catalog, domain_id=graph.lease.domain) as io:
-            near, far = await io.act('left.move', goal(.7, -.5)), await io.act('right.move', goal(1., -.5))
-            assert (near.status, near.done, near.result) == ('executing', False, None)
-            cut = await io.request('world.wait', goals=[near, far], goal_timeout_s=.3)  # far needs 0.5 s
-            assert list(cut.finished) == [True, True] and cut.waited_s == pytest.approx(.3)
-            assert (near.status, near.result.error_code) == ('succeeded', 0)
-            assert (far.status, far.result.error_string) == ('aborted', "not finished within the wait's goal_timeout_s")
-            far = await io.act('right.move', goal(1., -.5))
-            both = await io.request('world.wait', duration_s=.5, goals=[near, far])  # its duration and its goals
-            assert list(both.finished) == [True, True] and both.waited_s == pytest.approx(.5)
-            assert (far.status, far.result.error_string) == ('succeeded', 'reached')
-            assert far.feedback.multi_dof_desired.transforms[0].translation.x == pytest.approx(1.)
-            assert (await io.request('world.wait', duration_s=.5)).waited_s == pytest.approx(.5)  # a plain wait
-            blocked = await io.act('right.move', goal(1.5, -.5))
-            await io.request('world.wait', goals=[blocked])
-            assert (blocked.status, blocked.result.error_string) == ('aborted', 'stalled')
-            cancelled = await io.act('left.move', goal(1., -.5))
-            await io.request('world.wait', duration_s=.1)
-            await cancelled.cancel()
-            assert (await cancelled.wait()).error_string == 'canceled' and cancelled.status == 'canceled'
-            refused = await io.act('left.move', {})  # a goal the backend cannot take ends as it starts
-            assert (await refused.wait()).error_string == 'a goal needs a tip pose' and refused.status == 'aborted'
+            await program(io)
     try:
-        asyncio.run(run())
+        asyncio.run(main())
     finally:
         graph.close()
 
 
-def test_kinex_awaits_the_goals_of_a_world_that_does_not_observe_them(tmp_path):
-    """Where time passes by itself, a world's wait may only wait, as Kinex's template world does: its reply says
-    nothing of the goals, and Kinex awaits them and cancels those still executing at their timeout."""
-    from tests.ros.support import Graph
-    graph = Graph(tmp_path, mode='realtime', backend='pair_pose_toy')
-
+def test_fanout_precision_bounded_queues_and_teardown():
     async def run():
-        async with communication(arms(), domain_id=graph.lease.domain) as io:
-            io.catalog['world.wait'] = {**SERVICE, 'type': 'custom_interfaces/srv/Wait', 'endpoint': f'{io.namespace}/wait'}
+        endpoint = '/test_' + uuid.uuid4().hex
+        operation = {'transport': 'topic', 'direction': 'output', 'endpoint': endpoint,
+                     'type': 'std_msgs/msg/Float64MultiArray', 'qos': {'depth': 2}}
+        io = communication({'test.output': operation, 'test.input': {**operation, 'direction': 'input'}})
+        async with io:
+            streams = [io.subscribe(operation, 2) for _ in range(10)]
+            command = io.device('test').topic('input')
+            for index in range(30):
+                await command.publish({'data': [1.2345678901234567, float(index)]})
+                await asyncio.sleep(.02)  # Test producer pacing, not a workflow clock.
+            await asyncio.sleep(.1)
+            assert all(len(stream.buffer) <= 2 and len(stream.inbox) <= 2 for stream in streams)
+            assert all(stream.latest.data[0] == 1.2345678901234567 for stream in streams)
+            assert all(stream.dropped > 0 for stream in streams)
+            streams[0].close()
+            streams[0].close()
+        assert not io.bridge.thread.is_alive()
+        assert not io.bridge.context.ok()
+    asyncio.run(run())
 
-            async def wait(request):
-                await asyncio.sleep(request.duration_s)
-                return {'success': True, 'waited_s': request.duration_s}
-            io.serve(io.catalog['world.wait'], wait)
-            near = await io.act('left.move', goal(.7, -.5))  # 0.2 s away
-            reply = await io.request('world.wait', goals=[near])
-            assert list(reply.finished) == [True] and near.status == 'succeeded' and reply.waited_s > 0
-            far = await io.act('left.move', goal(1.1, -.5))  # 0.4 s away
-            reply = await io.request('world.wait', duration_s=.1, goals=[far], goal_timeout_s=.2)
-            assert list(reply.finished) == [True] and far.status == 'canceled' and .2 <= reply.waited_s < .4
-    try:
-        asyncio.run(run())
-    finally:
-        graph.close()
+
+def test_a_device_reads_commands_and_requests_by_its_declared_operations(tmp_path):
+    from tests.ros.support import Graph
+
+    async def program(io):
+        device, world = io.device('finger'), io.world
+        assert set(device.operations) == {'joint_state', 'target', 'stop'}
+        state = device.topic('joint_state')
+        assert state is device.topic('joint_state') and state.latest is None
+        assert list((await state.next()).position) == [0.]
+        assert list((await state.next()).position) == [0.]  # a retained message is read again while paused
+        await device.topic('target').publish({'data': -.5})
+        assert await world.wait_all([.1]) == [True]
+        assert list((await state.next()).position) == [-.5] and list(state.latest.position) == [-.5]
+        assert (await device.service('stop')()).message == 'keeping the grip target'
+        with pytest.raises(OperationError, match='seconds'):  # a service's rejection
+            await io.device('world').service('wait_all')(seconds=[float('nan')])
+        io.catalog['finger.absent'] = {**SERVICE, 'endpoint': '/finger/absent', 'type': 'std_srvs/srv/Trigger'}
+        with pytest.raises(TimeoutError):
+            await device.service('absent')(timeout_s=.03)
+        for wrong in (lambda: device.service('target'), lambda: device.topic('stop'), lambda: device.action('stop')):
+            with pytest.raises(TypeError):
+                wrong()
+        with pytest.raises(TypeError, match='not a device output'):
+            device.topic('target').next()
+        with pytest.raises(RPCError, match='unknown or unavailable operation finger.missing'):
+            device.topic('missing')
+    run(Graph(tmp_path), {**world(), **finger()}, program)
+
+
+def test_goals_run_in_parallel_and_the_world_waits_for_them(tmp_path):
+    """Kinex sends two arms' move goals and waits for them on the world, the only clock: a goal never steps it."""
+    from tests.ros.support import Graph
+
+    async def program(io):
+        world, left, right = io.world, io.device('left').action('move'), io.device('right').action('move')
+
+        async def time():
+            return (await world.now()).time_s
+        near, far = left(goal(.7, -.5)), right(**goal(1., -.5))  # 0.2 s and 0.5 s away
+        assert near.status == 'sending' and await world.wait_all([0]) == [True] and await time() == 0.
+        assert await world.wait_any([near, far, 5]) == [True, False, False] and await time() == pytest.approx(.2)
+        assert (near.status, near.result.error_code, far.status) == ('succeeded', 0, 'executing')
+        assert await world.wait_all([near, far]) == [True, True] and await time() == pytest.approx(.5)
+        assert (await far).error_string == 'reached'
+        # The latest feedback the device sent; its last may arrive after its result.
+        assert far.feedback.multi_dof_desired.transforms[0].translation.x == pytest.approx(.95, abs=.06)
+        assert await world.wait_all([.5]) == [True] and await time() == pytest.approx(1.)  # a plain wait
+        slow = left(goal(1.1, -.5))  # 0.4 s away
+        assert await world.wait_all([slow, .1], timeout=.2) == [False, True]  # the timeout cancels what is left
+        assert slow.status == 'canceled' and await time() == pytest.approx(1.2)
+        blocked = right(goal(1.5, -.5))  # the wall stops it
+        assert await world.wait_all([blocked]) == [True]  # over, however it ended
+        with pytest.raises(RPCError, match='right.move was aborted: stalled'):
+            await blocked
+        assert (blocked.status, blocked.result.error_string) == ('aborted', 'stalled')
+        refused = left({})  # a goal the backend cannot take ends as it starts
+        assert await world.wait_all([refused]) == [True] and refused.status == 'aborted'
+        with pytest.raises(RPCError, match='a goal needs a tip pose'):
+            await refused
+        assert await world.now() == (pytest.approx(1.5), pytest.approx(1.5), None)  # no step limit: no cap
+    run(Graph(tmp_path, backend='pair_pose_toy'), {**world(), **arms()}, program)
+
+
+def test_loops_at_different_rates_share_a_stepped_world(tmp_path):
+    """Each loop ticks on its own deadlines, the world advances once for all of them and rests while a tick's body
+    runs, and with nothing waiting on it."""
+    from tests.ros.support import Graph
+
+    async def program(io):
+        world, target, ticks = io.world, io.device('finger').topic('target'), {10: [], 5: []}
+
+        async def loop(hz, count):
+            async for now in world.rate(hz):
+                ticks[hz].append(now)
+                await target.publish({'data': .1})  # a command in flight: the world rests
+                await asyncio.sleep(.02)  # and a slow body costs no world time
+                if len(ticks[hz]) == count:
+                    break
+        await asyncio.gather(loop(10, 7), loop(5, 4))
+        assert ticks[10] == pytest.approx([.1 * tick for tick in range(7)])
+        assert ticks[5] == pytest.approx([.2 * tick for tick in range(4)])
+        await asyncio.sleep(.3)
+        assert (await world.now()).time_s == pytest.approx(.6)  # nothing waits: the world is paused
+        assert await world.wait_all([.4]) == [True] and (await world.now()).time_s == pytest.approx(1.)
+    run(Graph(tmp_path), {**world(), **finger()}, program)
+
+
+def test_an_abandoned_wait_stops_a_stepped_world(tmp_path):
+    from tests.ros.support import Graph
+
+    async def program(io):
+        world = io.world
+        assert await world.wait_all([.1]) == [True]
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(world.wait_all([1e6]), .3)
+        await asyncio.sleep(.5)  # the driver stops the world's wait
+        reached = (await world.now()).time_s
+        assert reached > .1
+        await asyncio.sleep(.3)
+        assert (await world.now()).time_s == reached  # it advanced no further
+        # A refused command ends a wait, which raises for every task waiting on the world.
+        await io.device('finger').topic('target').publish({'data': float('nan')})
+        await asyncio.sleep(.2)
+        with pytest.raises(OperationError, match='ended early by a refused command'):
+            await asyncio.gather(world.wait_all([.5]), world.wait_all([1.]))
+    run(Graph(tmp_path), {**world(), **finger()}, program)
+
+
+def test_where_time_passes_by_itself_the_same_waits_only_block(tmp_path):
+    """A realtime simulator, as the real world is: the world's operations are the same, and it never pauses."""
+    from tests.ros.support import Graph
+
+    async def program(io):
+        world, left = io.world, io.device('left').action('move')
+        start = await world.now()
+        await asyncio.sleep(.3)
+        before = await world.now()
+        assert before.time_s > start.time_s and before[1:] == (None, None)  # it runs unwatched, without a budget
+        assert await world.wait_all([.3]) == [True] and (await world.now()).time_s >= before.time_s + .3
+        near = left(goal(.7, -.5))  # 0.2 s away
+        assert await world.wait_all([near]) == [True] and (await near).error_string == 'reached'
+        far = left(goal(1.1, -.5))  # 0.4 s away
+        assert await world.wait_any([far], timeout=.2) == [False] and far.status == 'canceled'
+        ticks = []
+        async for now in world.rate(5):
+            ticks.append(now)
+            if len(ticks) == 4:
+                break
+        assert [later - earlier for earlier, later in zip(ticks, ticks[1:])] == pytest.approx([.2] * 3, abs=.11)
+    run(Graph(tmp_path, mode='realtime', backend='pair_pose_toy'), {**world(), **arms()}, program)

@@ -54,49 +54,34 @@ def main():
         cid = model.camera(camera).id
         return rigs.transform(data.cam_xpos[cid], data.cam_xmat[cid].reshape(3, 3) @ OPTICAL)
 
-    devices = {"world": rigs.world(
-        "Scene reference and authoritative world clock of the ABC bimanual YAM station. This device "
-        "exposes no task instructions or evaluator results.")}
+    devices = {"world": rigs.world("World time and waits of a bimanual tabletop station.")}
     files = {}
     for side in ("left", "right"):
         flange = rigs.body_world(data, model.body(f"{side}_link_6").id)
         base = rigs.pose_frame("world:base", rigs.body_world(data, model.body(f"{side}_arm").id))
         devices[f"{side}_arm"] = rigs.joint(
-            f"{side}_arm",
-            f"YAM six-joint {side} arm of the ABC station. Geometry is the sibling arm.urdf with "
-            f"flange (link_6) as the tip link; its links are the frames {side}_arm/<link>. "
-            "Commands are the native absolute joint positions of upstream's 14-D policy action; kinex-sim rejects "
-            "targets outside the native joint ranges.",
+            f"{side}_arm", f"YAM six-joint {side} arm.",
             [f"{side}_joint{i}" for i in range(1, 7)], HOME[side], base)
         site = model.site(f"{side}_grasp_site").id
         tcp = rigs.transform(model.site_pos[site], rigs.quat_matrix(model.site_quat[site]))
         devices[f"{side}_gripper"] = rigs.gripper(
             f"{side}_gripper",
-            f"YAM {side} parallel two-finger gripper on the {side}_arm flange. The grip joint "
-            f"{side}_gripper is upstream's normalized policy gripper value (0 closed, 1 open); "
-            f"each finger slides {GRIPPER_SCALE} m per unit, so the inner pad gap grows "
-            "from about 0.8 mm to 95.8 mm. The TCP is the native grasp site between the pads; "
-            "+z approaches. A closed or stalled grip alone does not prove a successful grasp.",
+            f"YAM {side} parallel two-finger gripper. The inner pad gap runs from about 0.8 mm closed to 95.8 mm "
+            "open.",
             f"{side}_gripper",
-            f"Native normalized opening (data) from 0 (closed) to 1 (open), the gripper entry of "
-            f"upstream's 14-D policy action; the finger position actuator tracks "
-            f"{GRIPPER_SCALE} m per unit. A target persists until replaced or stopped; "
-            "out-of-range targets are ignored, so verify joint_state.",
             rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
             rigs.pose_frame(f"{side}_gripper:base", tcp))
         files[f"devices/{side}_arm/arm.urdf"] = arm_urdf(model, side)
         files[f"devices/{side}_gripper/gripper.urdf"] = gripper_urdf(model, side)
         devices[f"camera_{side}"] = rigs.camera(
             f"camera_{side}",
-            f"RGB-D camera (D405 model) on the {side} wrist, tilted 50 degrees toward the "
-            "fingers. Image and registered depth calibration and the optical-frame mount on the "
-            f"{side}_arm flange are in the profile.", sim.intrinsics(side),
+            f"D405 RGB-D camera on the {side} wrist, tilted 50 degrees toward the fingers.",
+            sim.intrinsics(side),
             rigs.pose_frame(f"{side}_arm:flange", rigs.relative(flange, optical(side))),
             (near, far))
     devices["camera_top"] = rigs.camera(
         "camera_top",
-        "Fixed RGB-D camera (D405 model) on the overhead gate, looking down at the table. Image "
-        "and registered depth calibration and the optical-frame mount are in the profile.",
+        "D405 RGB-D camera fixed on the overhead gate, looking down at the table.",
         sim.intrinsics("top"),
         rigs.pose_frame("world:base", optical("top")), (near, far))
     order = ["world", "left_arm", "left_gripper", "right_arm", "right_gripper",

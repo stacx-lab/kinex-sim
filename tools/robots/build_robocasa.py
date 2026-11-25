@@ -52,50 +52,33 @@ def main():
 
     low, high = robot.part_controllers["base"].control_limits
     devices = {
-        "world": rigs.world(
-            "Simulation clock of the RoboCasa kitchen. Kitchen fixtures and objects are not "
-            "devices; the mobile robot is not localized in this frame. This device exposes no "
-            "task instructions or evaluator results."),
+        "world": rigs.world("World time and waits of a household kitchen."),
         "base": rigs.locomotion(
             "base",
-            "Omron holonomic mobile base carrying the torso. Commands are upstream's normalized "
-            "base action (vx, vy, wz in [-1, 1]); the native controller scales them to at most "
-            "1 m/s and 1.5 rad/s and saturates its actuators. The base frame is the chassis "
-            "origin, 21 cm ahead of the yaw axis; odometry starts at the episode-start pose.",
+            "Omron holonomic mobile base. Full-scale velocity is 1 m/s and 1.5 rad/s. Its base frame is the "
+            "chassis origin, 21 cm ahead of the yaw axis.",
             dict(zip(("vx", "vy", "wz"), zip(low, high))),
             {"parent": None, "translation_m": None, "rotation_xyzw": None},
             timeout_s=VELOCITY_TIMEOUT_S),
         "torso": rigs.joint(
             "torso",
-            "Prismatic lift of the Omron base. Geometry is the sibling torso.urdf with top, the "
-            "arm mount, as its tip link; commands are absolute native lift heights in metres.",
+            "Prismatic lift of the Omron base.",
             ["mobilebase0_joint_torso_height"], robot.init_torso_qpos,
-            rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)),
-            units="metres", part="torso", tip="top", model="torso.urdf"),
+            rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)), tip="top", model="torso.urdf"),
         "arm": rigs.joint(
             "arm",
-            "Franka Panda seven-joint arm on the torso. Geometry is the sibling arm.urdf with "
-            "flange as the tip link; its links are the frames arm/<link>. Commands are absolute native "
-            "joint positions; kinex-sim rejects targets outside the native joint ranges.",
+            "Franka Panda seven-joint arm.",
             list(robot.robot_joints), robot.init_qpos,
             rigs.pose_frame("torso:top", rigs.relative(top, pose["robot0_link0"]))),
         "gripper": rigs.gripper(
             "gripper",
-            "Panda parallel two-finger gripper on the arm flange. Fingers close along the gripper "
-            "base x axis; the TCP is the native grip site between the pads and +z approaches. The "
-            "grip joint is robosuite's integrated gripper command, so a closed grip may be "
-            "stalled on an object; check cameras before assuming a grasp.",
+            "Panda parallel two-finger gripper. Fingers close along the base x axis. The grip joint is the "
+            "applied command, not a measured opening, so fingers stalled on an object do not show in it.",
             "gripper",
-            "Integrated native gripper command (data) from -1 (open) to +1 (closed). Every "
-            "control step kinex-sim moves it by the native 0.2 toward the target while that "
-            "gets strictly closer, so -1 and +1 are reached exactly within 10 steps. A target "
-            "persists until replaced or stopped; out-of-range targets are ignored, so verify "
-            "joint_state.",
             rigs.pose_frame("arm:flange", rigs.relative(flange, hand)),
             rigs.pose_frame("gripper:base", rigs.relative(hand, pose["gripper0_right_eef"])),
-            state="Integrated native gripper command, -1 (open) to +1 (closed), stamped at "
-                  "acquisition; the URDF finger links follow it. Fingers reach "
-                  "the commanded opening only when unobstructed.",
+            quantity="a normalized command", note="The applied command moves 0.2 toward it every 0.05 s.",
+            state="The applied grip command, not a measured opening, stamped at acquisition.",
             opened=-1.0, closed=1.0),
     }
     for name, camera, parent, frame in (
@@ -105,11 +88,8 @@ def main():
         side = name.split("_")[1]
         devices[name] = rigs.camera(
             name,
-            (f"RGB-D camera on the torso lift, behind and above the robot's {side} side, looking "
-             f"forward and down past the arm (upstream {camera})" if side != "wrist" else
-             f"RGB-D camera on the Panda hand looking along the fingers (upstream {camera})") +
-            ". Image and registered depth calibration and the optical-frame mount are in the "
-            "profile; the depth near plane scales with each kitchen's extent.",
+            (f"RGB-D camera on the torso lift, behind and above the robot's {side} side, looking forward and "
+             "down past the arm." if side != "wrist" else "RGB-D camera on the hand, looking along the fingers."),
             sim.intrinsics(camera),
             rigs.pose_frame(parent, rigs.relative(frame, optical(camera))), (near, far))
     files = {

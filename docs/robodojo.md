@@ -64,7 +64,7 @@ changed files replaced, bumps the pin without copying.
 
 | Device | Interfaces |
 |---|---|
-| `world` | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/joint_target`, `<arm>/pose_state`, `<arm>/stop`; `<arm>/move` in place of `<arm>/joint_target` with `--config move` |
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/camera_info`; `<camera>/depth` with `--config depth` |
@@ -117,12 +117,12 @@ step, and the world only carries the goal, its feedback and its result (see
 5. It is aborted, the arm holding its measured joints, when the flange stalls (`error_code` -4: over four
    frames it gains less than a tenth of the tolerance), when it is not there `goal_time_tolerance` (1 s
    when zero) after its nominal end (-5), or when a frame has no IK solution (-1). `error_string` says
-   why and how far from the goal it ended. A cancel, a newer goal, a stop or a wait's `goal_timeout_s`
+   why and how far from the goal it ended. A cancel, a newer goal or a stop
    ends it the same way (-1, with that reason).
 
-A goal advances no time. Send both arms their goals, then give the goals' ids to one `world/wait`: it ends
-on the frame the last goal finishes, so the wait costs no more budget than the motion, and its
-`goal_timeout_s` cancels a goal that takes longer. A goal is the world's from its acceptance; a wait that names
+A goal advances no time. Send both arms their goals, then give the goals' ids to `world/wait_all`: it ends
+on the frame the last of them finishes, so the wait costs no more budget than the motion, and its `timeout`
+ends it sooner. A client that gives up on a goal cancels it. A goal is the world's from its acceptance; a wait that names
 any other is refused.
 
 The joints run through `EvalEnv.take_action`, as joint targets do, so evaluation and scoring are

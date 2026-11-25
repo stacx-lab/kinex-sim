@@ -1,54 +1,58 @@
 name: world
 runtime:
   domain_id: 0
-  observation: time
+  observation: now
   nodes: []
   ready_timeout_s: 30
 operations:
-  time:
-    description: Authoritative world clock
-    transport: topic
-    direction: output
-    endpoint: /clock
-    type: rosgraph_msgs/msg/Clock
+  now:
+    description: 'World time, time_s, and the time budget in seconds of world time: used_s
+      spent of max_s allowed. Without a budget both are NaN; without a limit max_s is inf.'
+    transport: service
+    direction: input
+    endpoint: /world/now
+    type: custom_interfaces/srv/Now
     qos:
       depth: 1
       reliability: reliable
-      durability: transient_local
+      durability: volatile
     timeout_s: 10
-  wait:
-    description: 'Advance or await duration_s of world time (finite and nonnegative). Zero
-      is an observation barrier. Waits are sequential; one requested while another is pending
-      is rejected. With goals, executing action goals, it also waits until all have finished;
-      goals still executing goal_timeout_s into the wait are cancelled (zero: none). It ends
-      once duration_s has passed and the goals have finished. A terminal episode rejects further
-      progression. A device command refused during a wait, or before it and not yet reported,
-      ends it there (success false; waited_s is how far it ran): the rest is never stepped,
-      so it costs no budget. The reply''s message names the commands refused since the previous
-      reply, with their reasons.'
+  wait_all:
+    description: 'Wait until every entry is over: each of seconds, a duration of world time
+      from now, and each of goals, the id of an executing action goal, once it finishes. A
+      positive timeout, in seconds of world time, ends the wait with entries left (timed_out).
+      The reply gives time_s, the world time reached, and whether each entry was over: elapsed
+      for seconds, finished for goals. One wait at a time: a second is rejected. With no entries
+      it returns at once. A command a device refused since the previous reply ends the wait
+      at once with success false; message names it and why. Once the episode has ended, a
+      wait with entries left fails and message says why.'
     transport: service
     direction: input
-    endpoint: /world/wait
+    endpoint: /world/wait_all
     type: custom_interfaces/srv/Wait
     qos:
       depth: 1
       reliability: reliable
       durability: volatile
     timeout_s: 120
-  budget:
-    description: 'The episode budget, published with every world step: data is [used_s, max_s],
-      the seconds of world time the episode has used and is allowed, its control steps and
-      step limit times the control period (max_s inf without a limit). Only a stepped run
-      has a budget; a realtime run publishes [NaN, NaN].'
-    transport: topic
-    direction: output
-    endpoint: /world/budget
-    type: std_msgs/msg/Float64MultiArray
+  wait_any:
+    description: 'Wait until one entry is over: each of seconds, a duration of world time
+      from now, and each of goals, the id of an executing action goal, once it finishes. A
+      positive timeout, in seconds of world time, ends the wait with entries left (timed_out).
+      The reply gives time_s, the world time reached, and whether each entry was over: elapsed
+      for seconds, finished for goals. One wait at a time: a second is rejected. A command
+      a device refused since the previous reply ends the wait at once with success false;
+      message names it and why. Once the episode has ended, a wait with entries left fails
+      and message says why.'
+    transport: service
+    direction: input
+    endpoint: /world/wait_any
+    type: custom_interfaces/srv/Wait
     qos:
       depth: 1
       reliability: reliable
-      durability: transient_local
-    timeout_s: 10
+      durability: volatile
+    timeout_s: 120
   stop:
     description: Cancel the pending wait.
     transport: service
@@ -65,7 +69,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: world
-description: World clock of the BEHAVIOR house.
+description: World time and waits of a household.
 source: default
 calibrated_at: null
 method: unknown

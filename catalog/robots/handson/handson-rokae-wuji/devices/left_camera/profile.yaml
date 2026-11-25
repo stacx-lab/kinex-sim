@@ -5,11 +5,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   image:
-    description: RGB image measurements with encoding, dimensions, row stride and acquisition
-      timestamp in the Image header. The frame_id identifies the calibrated optical frame;
-      use its stamp for tf2 lookup. A new subscriber receives the current frame at once, also
-      while the world is paused, then one per camera sample; reading never advances world
-      time.
+    description: rgb8 images stamped at acquisition in optical frame left_camera/base.
     transport: topic
     direction: output
     endpoint: /left_camera/image
@@ -20,9 +16,7 @@ operations:
       durability: volatile
     timeout_s: 10
   camera_info:
-    description: CameraInfo mirroring the profile, with K and P from color.projection, zero
-      plumb_bob distortion, image size and optical frame. The camera's geometry is the profile's,
-      not this topic's; intrinsics are not TF transforms.
+    description: CameraInfo mirroring the profile's color geometry.
     transport: topic
     direction: output
     endpoint: /left_camera/camera_info

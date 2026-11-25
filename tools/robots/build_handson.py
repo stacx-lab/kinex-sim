@@ -39,7 +39,7 @@ def home(side):
 
 def main():
     cameras = current()["cameras"]  # the default profile
-    devices = {"world": rigs.world("World clock of the HandsOn station.")}
+    devices = {"world": rigs.world("World time and waits of a bimanual assembly station.")}
     files = {}
     for side in SIDES:
         model = mujoco.MjModel.from_xml_path(str(PACKAGE / f"sim/envs/xmls/rokae_wuji1_{side}.xml"))
@@ -48,11 +48,10 @@ def main():
         palm = f"{side}_palm_link"
         devices[f"{side}_arm"] = rigs.joint(
             f"{side}_arm",
-            f"Seven-joint ROKAE AR5 {side} arm, commanded by the pose of its tip link palm, where the "
-            f"{side} hand is mounted.",
+            f"ROKAE AR5 seven-joint {side} arm, commanded by the pose of its palm link.",
             [f"joint{i}_{side}" for i in range(1, 8)], home(side),
             rigs.pose_frame("world:base", rigs.body_world(data, model.body(f"link0_{side}").id)),
-            tip="palm", pose="HandsOn's own IK tracks it and may stop short of a pose.")
+            tip="palm", pose="The arm's own IK tracks it and may stop short of a pose.")
         files[f"devices/{side}_arm/arm.urdf"] = rigs.mujoco_chain(
             model, [f"link{i}_{side}" for i in range(1, 8)] + [f"attachment_{side}", f"{side}_hand_mount", palm],
             f"rokae_ar5_{side}_arm",
@@ -61,10 +60,9 @@ def main():
         joints = [f"{side}_finger{finger}_joint{joint}" for finger in range(1, 6) for joint in range(1, 5)]
         devices[f"{side}_hand"] = rigs.joint(
             f"{side}_hand",
-            f"Wuji 20-joint {side} hand on the {side}_arm palm; finger1 is the thumb and finger5 the "
-            "little finger.",
+            f"Wuji 20-joint {side} hand; finger1 is the thumb and finger5 the little finger.",
             joints, [float(np.clip(0., *model.joint(joint).range)) for joint in joints],
-            rigs.frame(f"{side}_arm:palm", (0, 0, 0), (0, 0, 0, 1)), part="hand", tip=None, model="hand.urdf")
+            rigs.frame(f"{side}_arm:palm", (0, 0, 0), (0, 0, 0, 1)), tip=None, model="hand.urdf")
         files[f"devices/{side}_hand/hand.urdf"] = rigs.mujoco_tree(
             model, palm, f"wuji_{side}_hand",
             f"HandsOn Wuji {side} hand from rokae_wuji1_{side}.xml: base_link is the {palm} body frame.")

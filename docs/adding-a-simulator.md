@@ -207,7 +207,7 @@ lists, carries its goals, feedback and results, and lets waits name its goals.
   `<device>/<name>`, of any installed action type.
 - **Start and end.** `start(operation, goal)` takes a goal as the fields of the type's `Goal`, in place
   of the operation's active one. `end(operation, reason)` ends the active one at once: a cancel, a
-  stop, a newer command, a wait's `goal_timeout_s` or the episode's end. Neither raises for the goal's
+  stop, a newer command or the episode's end. Neither raises for the goal's
   sake; a goal the backend cannot take ends as it starts, with the reason in its result.
 - **Advance.** Goals advance in `step`, one `period` each as everything does, and a goal's commands
   replace the action's for the groups it commands.
@@ -219,7 +219,7 @@ lists, carries its goals, feedback and results, and lets waits name its goals.
 - **Commanded only by goals.** A group with `targets=False` serves no target topic.
 - **Native worker.** `start`, `end`, `actions` and `goals` cross to a `WorkerBackend` as they are.
 - **Profile.** `rigs.action(profile, name, type, description)` adds the operation to the device's
-  profile; the description is the backend's to write.
+  profile; the description is the backend's to write, by the rules of [profile text](devices.md).
 - **Tests.** The lifecycle is covered generically (`tests/unit/test_goals.py`, `tests/ros/test_motion.py`,
   on the toy backend's own action). Test what the action does: its executor without a simulator, as
   `simulators/robodojo/tests/unit/test_robodojo_move.py` does, and a goal in the graph test.
@@ -265,6 +265,10 @@ Rigs of one simulator share files through symlinks into a common directory, as L
 configuration's profile changes go to `configurations/NAME/profiles.yaml`, through
 `write_rig(..., configurations=...)`. Never hand-edit generated profiles; change the builder and
 rerun it.
+
+The templates word every operation; a builder writes only each device's description and what its
+gripper or pose controller adds. Keep to the rules of [Devices](devices.md): fields before prose,
+no word of the simulator, upstream or the execution mode, and nothing an agent cannot use.
 
 ## 11. Tests
 

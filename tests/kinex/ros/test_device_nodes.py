@@ -51,9 +51,9 @@ def create(profile, context, name, value):
                              [{"entry": str(entry), "factory": name} for name in ("first", "second")])
         try:
             await host.load(definition)
-            assert {node.get_name() for node in host.io.extra_nodes} == {"first", "second"}
+            assert {node.get_name() for node in host.io.bridge.extra_nodes} == {"first", "second"}
             for name, value in (("first", 1.), ("second", 2.)):
-                assert (await host.io.subscribe("pair." + name).next(timeout_s=3)).data == value
+                assert (await host.io.device("pair").topic(name).next(timeout_s=3)).data == value
         finally:
             await host.run("unload", {})
         assert host.io is None
@@ -68,22 +68,23 @@ def test_two_devices_can_borrow_endpoints_from_one_node():
         hosts = []
         async with communication({}, domain_id=201) as backend:
             operations = [stream(prefix + "/a"), stream(prefix + "/b")]
-            publishers = [backend.node.create_publisher(Float64, op["endpoint"], qos(op)) for op in operations]
+            node = backend.bridge.node
+            publishers = [node.create_publisher(Float64, op["endpoint"], qos(op)) for op in operations]
             command = {**stream(prefix + "/command"), "direction": "input"}
             received = []
-            backend.node.create_subscription(Float64, command["endpoint"], received.append, qos(command))
+            node.create_subscription(Float64, command["endpoint"], received.append, qos(command))
             try:
                 for index, operation in enumerate(operations):
                     host = DeviceHost()
                     hosts.append(host)
                     await host.load(profile("device" + str(index), {"value": operation, "command": command}))
-                    assert host.io.extra_nodes == []
+                    assert host.io.bridge.extra_nodes == []
                 await hosts.pop().run("unload", {})
-                assert backend.context.ok()
+                assert backend.bridge.context.ok()
                 publishers[0].publish(Float64(data=1.2345678901234567))
-                message = await hosts[0].io.subscribe("device0.value").next(timeout_s=3)
+                message = await hosts[0].io.device("device0").topic("value").next(timeout_s=3)
                 assert message.data == 1.2345678901234567
-                await hosts[0].io.publish("device0.command", {"data": 9.5})
+                await hosts[0].io.device("device0").topic("command").publish({"data": 9.5})
                 async with asyncio.timeout(3):
                     while not received:
                         await asyncio.sleep(.02)
@@ -91,7 +92,7 @@ def test_two_devices_can_borrow_endpoints_from_one_node():
             finally:
                 for host in reversed(hosts):
                     await host.run("unload", {})
-            assert backend.context.ok()
+            assert backend.bridge.context.ok()
     asyncio.run(run())
 
 
@@ -114,13 +115,14 @@ def test_catalog_camera_borrows_kinex_sim_endpoints_and_checks_readiness():
         async with communication({}, domain_id=201) as backend:
             image = Image(width=1, height=1, encoding="rgb8", step=3, data=[1, 2, 3])
             image.header.frame_id = "camera_agentview/base"
-            publisher = backend.node.create_publisher(Image, operations["image"]["endpoint"], qos(operations["image"]))
-            backend.node.create_publisher(CameraInfo, operations["camera_info"]["endpoint"], qos(operations["camera_info"]))
+            publisher = backend.bridge.node.create_publisher(Image, operations["image"]["endpoint"], qos(operations["image"]))
+            backend.bridge.node.create_publisher(CameraInfo, operations["camera_info"]["endpoint"], qos(operations["camera_info"]))
             definition["runtime"]["ready_timeout_s"] = 5
             host = DeviceHost()
             try:
                 await host.load(definition)
-                observation = host.io.subscribe("camera_agentview.image")
+                observation = host.io.device("camera_agentview").topic("image")
+                assert observation.latest is None  # reading a topic subscribes to it
                 async with asyncio.timeout(3):
                     while not publisher.get_subscription_count():
                         await asyncio.sleep(.02)
@@ -140,5 +142,5 @@ def test_catalog_camera_borrows_kinex_sim_endpoints_and_checks_readiness():
                 assert Path(sample["file"]).is_file() and "depth_file" not in sample
             finally:
                 await host.run("unload", {})
-            assert backend.context.ok()
+            assert backend.bridge.context.ok()
     asyncio.run(run())

@@ -52,7 +52,7 @@ def build(rig, task, place, orientations):
         cid = model.camera(camera).id
         return rigs.transform(data.cam_xpos[cid], data.cam_xmat[cid].reshape(3, 3) @ OPTICAL)
 
-    devices = {"world": rigs.world(f"World clock of the BiDex-100 scene with the {robot} {place}.")}
+    devices = {"world": rigs.world("World time and waits of a bimanual tabletop scene.")}
     files, flanges, bases = {}, {}, {}
     for side in SIDES:
         if franka:
@@ -65,7 +65,7 @@ def build(rig, task, place, orientations):
         bases[side], flanges[side] = world(base), world(chain[-1])
         devices[f"{side}_arm"] = rigs.joint(
             f"{side}_arm",
-            f"{arm}; its flange carries the {side} hand and wrist camera.",
+            f"{arm}.",
             joints(f"{side}_arm"), [home.get(joint, 0.) for joint in joints(f"{side}_arm")],
             rigs.pose_frame("world:base", bases[side]))
         files[f"devices/{side}_arm/arm.urdf"] = rigs.mujoco_chain(
@@ -74,11 +74,10 @@ def build(rig, task, place, orientations):
         hand = f"{side}_hand_C_MC"
         devices[f"{side}_hand"] = rigs.joint(
             f"{side}_hand",
-            f"Sharpa Wave 22-joint {side} hand on the {side}_arm flange; joints run thumb first, then "
-            "the index, middle, ring and little fingers.",
+            f"Sharpa Wave 22-joint {side} hand.",
             joints(f"{side}_hand"), [float(np.clip(0., *model.joint(joint).range)) for joint in joints(f"{side}_hand")],
             rigs.pose_frame(f"{side}_arm:flange", rigs.relative(flanges[side], world(hand))),
-            part="hand", tip=None, model="hand.urdf")
+            tip=None, model="hand.urdf")
         files[f"devices/{side}_hand/hand.urdf"] = rigs.mujoco_tree(
             model, hand, f"sharpa_{side}_hand",
             f"BiDex-100 Sharpa Wave {side} hand from MuJoCo: base_link is the {hand} body frame.")
@@ -87,7 +86,7 @@ def build(rig, task, place, orientations):
         if side == "head":
             parent, frame = ("right_arm:base", bases["right"]) if franka else ("world:base", np.eye(4))
             where = ("above and behind the arms, looking down at the table" if franka else
-                     "in the Astribot head, looking down at the table")
+                     "in the head, looking down at the table")
         else:
             parent, frame = f"{side}_arm:flange", flanges[side]
             where = f"on the {side} wrist, looking along the hand"

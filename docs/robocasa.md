@@ -44,7 +44,7 @@ KINEX_SIM_ASSET_SEED=DIR kinex-sim prepare robocasa
 
 | Device | Type | Interfaces |
 | --- | --- | --- |
-| `world` | world | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
+| `world` | world | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `base` | locomotion | `base/velocity`, `base/odometry`, `base/stop` |
 | `torso` | joint | `torso/joint_state`, `torso/joint_target`, `torso/stop` |
 | `arm` | joint | `arm/joint_state`, `arm/joint_target`, `arm/stop` |

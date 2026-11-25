@@ -5,8 +5,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Measured positions of mobilebase0_joint_torso_height in metres with velocities
-      and the world-clock acquisition stamp; do not infer motion completion from a sent command.
+    description: Measured joint positions and velocities in URDF units, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /torso/joint_state
@@ -17,12 +16,11 @@ operations:
       durability: transient_local
     timeout_s: 10
   joint_target:
-    description: Joint trajectory over the torso joint in metres, timed from receipt by strictly
-      increasing time_from_start and finishing within 120 seconds; velocities, accelerations
-      and effort must be empty. A zero header stamp selects now; a nonzero stamp must not
-      start in the past. Points are absolute native joint positions, linearly interpolated
-      at the native control period. Replacement clears pending references; invalid trajectories
-      are ignored, so verify measured joint_state.
+    description: Position trajectory naming every joint once, without velocities, accelerations
+      or effort, with strictly increasing time_from_start ending within 120 s. It starts on
+      receipt, or at a nonzero header stamp not in the past, runs linearly from the current
+      target and replaces the active command. One that is malformed or leaves the joint limits
+      is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /torso/joint_target
@@ -33,7 +31,7 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Stop torso motion and hold the measured posture.
+    description: Stop motion and hold the measured posture.
     transport: service
     direction: input
     endpoint: /torso/stop
@@ -48,8 +46,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: Prismatic lift of the Omron base. Geometry is the sibling torso.urdf with top,
-  the arm mount, as its tip link; commands are absolute native lift heights in metres.
+description: Prismatic lift of the Omron base.
 source: introspected
 calibrated_at: null
 method: introspection

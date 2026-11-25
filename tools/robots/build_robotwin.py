@@ -40,9 +40,7 @@ def main():
     root = runtime()
     urdf = root / "assets/embodiments/aloha-agilex/urdf/arx5_description_isaac.urdf"
     source = rigs.urdf_joints(urdf)
-    devices = {"world": rigs.world(
-        "Scene reference and authoritative world clock of the RoboTwin 2.0 table. This device "
-        "exposes no task instructions or evaluator results.")}
+    devices = {"world": rigs.world("World time and waits of a bimanual tabletop station.")}
     files = {}
     sim.env._update_render()
     for side in ("left", "right"):
@@ -52,29 +50,16 @@ def main():
         base = pose_matrix(entity.find_link_by_name(f"{p}_base_link").get_pose())
         devices[f"{side}_arm"] = rigs.joint(
             f"{side}_arm",
-            f"ARX5 six-joint {side} arm of the RoboTwin ALOHA AgileX. Geometry is the sibling "
-            f"arm.urdf with flange ({p}_link6) as the tip link; its links are the frames "
-            f"{side}_arm/<link>. "
-            "Commands are upstream's absolute joint positions (the arm part of its 14-D qpos "
-            "action), applied as native drive targets once per 0.04 s frame. The native URDF "
-            "limits are +/-10 rad placeholders.",
+            f"ARX5 six-joint {side} arm of an ALOHA AgileX. Its URDF joint limits, +/-10 rad, are placeholders.",
             [f"{p}_joint{i}" for i in range(1, 7)], [0.0] * 6, rigs.pose_frame("world:base", base))
         lower, upper = map(float, getattr(robot, f"{side}_gripper_scale"))
         tcp = getattr(robot, f"get_{side}_tcp_pose")()
         tcp = rigs.transform(tcp[:3], rigs.quat_matrix(tcp[3:]))
         devices[f"{side}_gripper"] = rigs.gripper(
             f"{side}_gripper",
-            f"ALOHA AgileX {side} parallel two-finger gripper on the {side}_arm flange. The grip "
-            f"joint {side}_gripper is upstream's normalized gripper value (0 closed, 1 open): "
-            f"finger targets are {lower} + {upper - lower} m per unit, so a closed command "
-            "squeezes past the finger stop. The TCP is upstream's tcp pose, gripper_bias ahead "
-            "of the wrist joint with +x approaching. A closed or stalled grip alone does not "
-            "prove a successful grasp.",
+            f"ALOHA AgileX {side} parallel two-finger gripper. A closed target squeezes past the finger stop. "
+            "The TCP approaches along +x.",
             f"{side}_gripper",
-            "Native normalized opening (data) from 0 (closed) to 1 (open), the gripper entry of "
-            "upstream's 14-D qpos action. The native setter runs on every 250 Hz substep and "
-            "moves the drive target at most 0.1 per call toward it. A target persists until "
-            "replaced or stopped; out-of-range targets are ignored, so verify joint_state.",
             rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
             rigs.pose_frame(f"{side}_gripper:base", rigs.relative(flange, tcp)))
         files[f"devices/{side}_arm/arm.urdf"] = arm_urdf(source, side)
@@ -84,9 +69,7 @@ def main():
         optical[:3, :3] = optical[:3, :3] @ OPTICAL
         devices[f"{side}_camera"] = rigs.camera(
             f"{side}_camera",
-            f"RGB-D camera (D435 model) on the {side} wrist. Native ray-traced RGB with "
-            "pixel-center depth from a raster twin; calibration and the optical-frame mount on "
-            f"the {side}_arm flange are in the profile.", sim.intrinsics(f"{side}_camera"),
+            f"D435 RGB-D camera on the {side} wrist.", sim.intrinsics(f"{side}_camera"),
             rigs.pose_frame(f"{side}_arm:flange", rigs.relative(flange, optical)),
             (camera.get_near(), camera.get_far()))
     camera = sim._camera("head_camera")
@@ -94,9 +77,7 @@ def main():
     optical[:3, :3] = optical[:3, :3] @ OPTICAL
     devices["head_camera"] = rigs.camera(
         "head_camera",
-        "Fixed RGB-D head camera (D435 model) above the table. Native ray-traced RGB with "
-        "pixel-center depth from a raster twin; calibration and the optical-frame mount are in "
-        "the profile.", sim.intrinsics("head_camera"),
+        "D435 RGB-D head camera fixed above the table.", sim.intrinsics("head_camera"),
         rigs.pose_frame("world:base", optical), (camera.get_near(), camera.get_far()))
     order = ["world", "left_arm", "left_gripper", "right_arm", "right_gripper",
              "head_camera", "left_camera", "right_camera"]

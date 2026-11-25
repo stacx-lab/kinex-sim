@@ -25,7 +25,7 @@ the [robot catalog](devices.md).
 
 | Device | Interfaces |
 | --- | --- |
-| `world` | `/clock`, `world/wait`, `world/stop`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `arm` | `arm/joint_state`, `arm/joint_target`, `arm/stop`; with `--config osc`, `arm/pose_target` and `arm/pose_state` instead of `arm/joint_target` |
 | `gripper` | `gripper/joint_state`, `gripper/target`, `gripper/stop` |
 | `camera_agentview` | `camera_agentview/{image,camera_info}` |
@@ -102,7 +102,7 @@ pose. The gripper device is the same in both configurations.
 ## Episode timing
 
 Each action interval advances 0.05 simulation seconds (25 MuJoCo substeps).
-Stepped mode advances only through `world/wait`; realtime mode advances on its
+Stepped mode advances only during `world/wait_all` and `world/wait_any`; realtime mode advances on its
 own and a wait observes elapsed time. See the shared [wait semantics](README.md).
 
 The episode starts from an official initial state: seed k loads the task's initial state k

@@ -57,7 +57,7 @@ def test_an_undistorted_camera_serves_no_geometry_services(tmp_path):
     try:
         graph.frame("camera")  # the camera is discovered
         services = dict(graph.node.get_service_names_and_types())
-        assert "/world/wait" in services
+        assert "/world/wait_all" in services
         assert not any(name.startswith("/camera/") for name in services)
     finally:
         graph.close()

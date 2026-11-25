@@ -1,5 +1,6 @@
 """Backend conformance and shared timing without ROS, MuJoCo or ABC."""
 from concurrent.futures import Future, ThreadPoolExecutor
+from types import SimpleNamespace
 
 import pytest
 
@@ -21,10 +22,16 @@ def world(mode="stepped", max_steps=None, backend=ToyBackend, task="toy", early_
     return runtime, published
 
 
-def wait(runtime, duration):
-    """Admit a world wait on the owner thread; the future completes with its result."""
+def wait(runtime, duration, reply=False):
+    """Admit a world wait of duration on the owner thread; the future completes with its result and how long it
+    waited as waited_s. reply: as the world node admits it, naming the commands refused since the previous reply."""
     result = Future()
-    runtime.submit(lambda: runtime.wait(duration, result.set_result))
+
+    def admit():
+        start = runtime.time_s
+        runtime.wait(False, [duration], [], 0., lambda done: result.set_result(SimpleNamespace(
+            **vars(runtime.reply(done) if reply else done), waited_s=done.time_s - start)))
+    runtime.submit(admit).add_done_callback(lambda admitted: admitted.exception() and result.set_exception(admitted.exception()))
     return result
 
 
@@ -39,34 +46,61 @@ def test_bad_wait_does_not_step(duration):
     runtime, _ = world()
     future = wait(runtime, duration)
     finish(runtime)
-    assert not future.result().success
+    with pytest.raises(ValueError, match="seconds"):
+        future.result()
     assert runtime.steps == 0
 
 
-def test_zero_rounding_and_shared_deadlines():
+def test_zero_rounding_and_sequential_waits():
     runtime, published = world()
-    zero = wait(runtime, 0.)
+    zero = wait(runtime, 0.)  # nothing left to wait for: an observation barrier
+    runtime.drain()
+    assert zero.result().success and zero.result().waited_s == 0 and runtime.steps == 0
     first = wait(runtime, 0.21)
-    same = wait(runtime, 0.21)
-    longer = wait(runtime, 0.41)
+    second = wait(runtime, 0.1)
     runtime.drain()
-    assert zero.result().waited_s == 0
-    assert runtime.steps == 0
+    with pytest.raises(ValueError, match="sequential"):
+        second.result()
     runtime.tick()
-    later = wait(runtime, 0.2)
-    runtime.drain()
     runtime.tick()
     assert not first.done()
     runtime.tick()
-    assert first.result() == same.result()
-    assert first.result().waited_s == pytest.approx(.3)
-    assert later.result().waited_s == pytest.approx(.2)
+    assert first.result().waited_s == pytest.approx(.3) and first.result().done == (True,)
     assert published[-1] == 3  # completion follows observation publication
-    assert not longer.done()
-    finish(runtime)
-    assert longer.result().waited_s == pytest.approx(.5)
-    assert runtime.steps == 5
     assert not runtime.tick()
+
+
+def test_a_wait_computed_from_the_worlds_own_time_is_due_on_its_step():
+    """A loop of deadlines a control period apart takes one step a tick, whatever floating point adds."""
+    runtime, _ = world()
+    for tick in range(1, 40):
+        done = Future()
+        runtime.wait(False, [tick * .1 - runtime.time_s], [], 0., done.set_result)
+        finish(runtime)
+        assert done.result().success and runtime.steps == tick
+
+
+def test_wait_all_wait_any_and_their_timeout():
+    runtime, _ = world()
+    flags = {"held": False}
+
+    def run(first, seconds, timeout=0.):
+        done, start = Future(), runtime.time_s
+        runtime.wait(first, seconds, [lambda: flags["held"]], timeout, done.set_result)
+        finish(runtime)
+        return done.result(), round(done.result().time_s - start, 6)
+    result, waited = run(True, [.3, .1])  # the first entry to be over
+    assert (result.done, result.timed_out, waited) == ((False, True, False), False, .1)
+    result, waited = run(False, [.3, .1], timeout=.5)  # every entry, or what is left at the timeout
+    assert (result.success, result.done, result.timed_out, waited) == (True, (True, True, False), True, .5)
+    flags["held"] = True
+    result, waited = run(False, [.2])
+    assert (result.done, result.timed_out, waited) == ((True, True), False, .2)
+    with pytest.raises(ValueError, match="needs an entry"):
+        runtime.wait(True, [], [], 1., lambda _: None)
+    done = Future()
+    runtime.wait(False, [], [], 0., done.set_result)  # nothing to wait for: at once
+    assert done.result().success and done.result().done == ()
 
 
 def test_wait_completion_after_publication():
@@ -77,16 +111,14 @@ def test_wait_completion_after_publication():
     assert published == [1, "completed"]
 
 
-def test_terminal_tick_completes_due_waits_then_fails_others():
+def test_terminal_tick_completes_a_due_wait_and_fails_an_unfinished_one():
     runtime, _ = world(max_steps=2)
     early = wait(runtime, .1)
-    due = wait(runtime, .2)
-    late = wait(runtime, .3)
+    finish(runtime)
+    due = wait(runtime, .1)
     finish(runtime)
     assert early.result().message == "ok"
     assert due.result().success and due.result().message == f"ok; {TIME_LIMIT}"
-    assert not late.result().success and late.result().waited_s == pytest.approx(.2)
-    assert late.result().message == f"episode ended during wait; {TIME_LIMIT}"
     assert not runtime.tick()
     with pytest.raises(CommandError):
         runtime.commands.set_group("finger", [0.])
@@ -95,6 +127,11 @@ def test_terminal_tick_completes_due_waits_then_fails_others():
     runtime.drain()
     assert zero.result().success and zero.result().message == f"ok; {TIME_LIMIT}"
     assert not future.result().success and future.result().message == f"episode is done; {TIME_LIMIT}"
+    runtime, _ = world(max_steps=2)
+    late = wait(runtime, .3)
+    finish(runtime)
+    assert not late.result().success and late.result().waited_s == pytest.approx(.2)
+    assert late.result().message == f"episode ended during wait; {TIME_LIMIT}"
 
 
 @pytest.mark.parametrize("task, early_stop, max_steps, end_step, cause", [
@@ -131,9 +168,7 @@ def test_records_say_why_the_episode_ended(tmp_path, monkeypatch, task, early_st
 
 def replied(runtime, duration):
     """A world wait as the world node admits it: its reply names the commands refused since the previous one."""
-    result = Future()
-    runtime.submit(lambda: runtime.wait(duration, lambda done: result.set_result(runtime.reply(done))))
-    return result
+    return wait(runtime, duration, reply=True)
 
 
 def refuse(runtime, endpoint, reason, times=1):
@@ -220,11 +255,12 @@ def test_realtime_runs_without_waits_and_wait_does_not_add_extra_ticks():
 def test_cross_thread_requests_and_owner_enforcement():
     runtime, _ = world()
     with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = list(pool.map(lambda _: wait(runtime, .3), range(40)))
+        futures = list(pool.map(lambda _: runtime.submit(lambda: runtime.steps), range(40)))
+        pending = wait(runtime, .3)
         with pytest.raises(RuntimeError, match="owner thread"):
             pool.submit(runtime.tick).result()
     finish(runtime)
-    assert all(f.result().success for f in futures)
+    assert [f.result() for f in futures] == [0] * 40 and pending.result().success
     assert runtime.steps == 3
     runtime.close()
     assert runtime.sim.closed

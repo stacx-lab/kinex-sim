@@ -70,15 +70,15 @@ class WorldRuntime:
         self._assert_owner()
         key = (endpoint, str(reason))
         self.refused[key] = self.refused.get(key, 0) + 1
-        self.waits.interrupt(self.time_s, REFUSED)
+        self.waits.interrupt(self.time_s, self.steps, REFUSED)
 
-    def wait(self, duration_s, complete, until=(), timeout_s=0., expire=None):
-        """Admit a world wait; complete receives its WaitResult. One admitted while a refusal awaits its reply ends at
-        once, as refuse ends a pending one. until, timeout_s, expire: what the wait also waits for, such as goals
-        to finish, and how they are cut short (WaitScheduler.admit). Owner thread."""
+    def wait(self, first, seconds, events, timeout_s, complete):
+        """Admit the world's wait, for seconds of world time and events, all of them or with first the first, up to a
+        positive timeout_s; complete receives its WaitResult. One admitted while a refusal awaits its reply ends
+        at once, as refuse ends the pending one (WaitScheduler.admit). Owner thread."""
         self._assert_owner()
-        self.waits.admit(duration_s, self.time_s, self.steps, self.sim.period, self.ended, complete,
-                         REFUSED if self.refused else None, until, timeout_s, expire)
+        self.waits.admit(first, seconds, events, timeout_s, self.time_s, self.steps, self.sim.period, self.ended,
+                         complete, REFUSED if self.refused else None)
 
     def start(self, operation, goal, complete, feedback):
         """Start a goal of one of the backend's actions (SimulatorBackend), given as its Goal's fields, in place of
@@ -267,7 +267,7 @@ class WorldRuntime:
         self._assert_owner()
         with self._lock:
             self._closed = True
-        self.waits.interrupt(self.time_s, "runtime stopped")
+        self.waits.interrupt(self.time_s, self.steps, "runtime stopped")
         while True:
             try:
                 _, future = self._requests.get_nowait()

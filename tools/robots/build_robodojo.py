@@ -19,29 +19,22 @@ from kinex_sim_robodojo.backend import RoboDojoSim, runtime  # noqa: E402
 
 # RoboEnv's parallel-gripper geometry: the pad center ahead of link6, in the flange frame.
 TCP = (0.15007, -0.000002, -0.00144)
-ARM = ("ARX X5 six-joint {side} arm of the RoboDojo rig. Geometry is the sibling arm.urdf with flange (link6) "
-       "as the tip link; its links are the frames {side}_arm/<link>. {control} Both arms use the native joint "
-       "names joint1..joint6.")
-JOINTS = ("It takes joint targets, upstream's absolute joint positions ({side}_arm_joint_state of "
-          "EvalEnv.take_action), which the native controller interpolates over each 0.04 s frame.")
+ARM = "ARX X5 six-joint {side} arm"
 # The move configuration: what an arm's move goal does (kinex_sim_robodojo.move).
-GOALS = ("It takes move goals for its flange, which upstream's cuRobo IK turns into upstream's absolute joint "
-         "positions ({side}_arm_joint_state of EvalEnv.take_action), a step every 0.04 s frame.")
-MOVE = (f"Move the flange through poses in a straight line at the arm's own pace: multi_dof_trajectory with "
-        f"joint_names [flange] and one transform per point, poses in {{side}}_arm/base (metres, unit quaternion "
-        f"xyzw). A time_from_start of zero moves at up to {move.SPEED[0]:g} m/s and {move.SPEED[1]:g} rad/s; a later "
-        f"time moves slower. The goal succeeds within {move.TOLERANCE[0]:g} m and {move.TOLERANCE[1]:g} rad of the "
-        f"last pose, or within component_goal_tolerance (joint_name flange; component 4 in metres, 5 in radians). It "
-        f"is aborted where the arm is when the flange stalls, as against an obstacle, is not there "
-        f"{move.SETTLE_S:g} s (or goal_time_tolerance) after the motion should end, or has no IK solution. The "
-        f"result's error_code is 0 reached, -4 stalled, -5 late and -1 otherwise; error_string says why and how far "
-        f"from the goal. A goal advances no time: give it to the world wait's goals. A newer goal or a stop ends it.")
+GOALS = ", moved by flange goals through its own IK"
+MOVE = (f"Move the flange in straight lines through poses at the arm's own pace: multi_dof_trajectory with "
+        f"joint_names [flange] and one transform per point, in {{side}}_arm/base (metres, unit quaternion xyzw). A "
+        f"zero time_from_start moves at up to {move.SPEED[0]:g} m/s and {move.SPEED[1]:g} rad/s; a later one moves "
+        f"slower. It succeeds within {move.TOLERANCE[0]:g} m and {move.TOLERANCE[1]:g} rad of the last pose, or "
+        f"within component_goal_tolerance (joint_name flange; component 4 metres, 5 radians). It aborts where the "
+        f"arm is when the flange stalls, is still short {move.SETTLE_S:g} s (or goal_time_tolerance) after the "
+        f"motion should end, or has no IK solution. Result error_code: 0 reached, -4 stalled, -5 late, -1 "
+        f"otherwise; error_string says why and how far from the goal. A newer goal or a stop ends it.")
 
 
 def arm(side, base, goals=False):
-    control = (GOALS if goals else JOINTS).format(side=side)
-    profile = rigs.joint(f"{side}_arm", ARM.format(side=side, control=control), [f"joint{i}" for i in range(1, 7)],
-                         [0.0] * 6, base, tip_pose=True, targets=not goals)
+    profile = rigs.joint(f"{side}_arm", ARM.format(side=side) + (GOALS if goals else "") + ".",
+                         [f"joint{i}" for i in range(1, 7)], [0.0] * 6, base, tip_pose=True, targets=not goals)
     return rigs.action(profile, "move", move.TYPE, MOVE.format(side=side)) if goals else profile
 
 
@@ -51,16 +44,11 @@ def link(sim, side, name):
     return rigs.transform(pose[:3], rigs.quat_matrix(pose[3:7]))
 
 
-def camera(sim, name, view, parent, mount, mounted=""):
+def camera(sim, name, view, parent, mount):
     """A camera's RGB profile and its RGB-D one in the depth configuration; view names the kind as {}."""
     intrinsics, base = sim.intrinsics(name), rigs.pose_frame(parent, mount)
-    rgb = rigs.camera(
-        name, f"{view.format('RGB')}, rendered by RoboDojo's tiled Isaac renderer. Calibration and the "
-        f"optical-frame mount{mounted} are in the profile.", intrinsics, base)
-    rgbd = rigs.camera(
-        name, f"{view.format('RGB-D')}, rendered by RoboDojo's tiled Isaac renderer with upstream's "
-        f"distance_to_image_plane depth. Image and registered depth calibration and the optical-frame "
-        f"mount{mounted} are in the profile.", intrinsics, base, sim._camera(name).get_clipping_range())
+    rgb = rigs.camera(name, view.format("RGB") + ".", intrinsics, base)
+    rgbd = rigs.camera(name, view.format("RGB-D") + ".", intrinsics, base, sim._camera(name).get_clipping_range())
     return rgb, rgbd
 
 
@@ -69,9 +57,7 @@ def main():
     sim.reset(sim.default_task, 0)
     x5 = runtime() / "Assets/Robots/x5"
     source = rigs.urdf_joints(x5 / "X5A.urdf")
-    devices = {"world": rigs.world(
-        "Scene reference and authoritative world clock of the RoboDojo table. This device exposes "
-        "no task instructions or evaluator results.")}
+    devices = {"world": rigs.world("World time and waits of a bimanual tabletop station.")}
     files, depth, goals = {}, {}, {}
     for side in ("left", "right"):
         robot = sim._actuators[side][0]
@@ -81,16 +67,9 @@ def main():
         devices[f"{side}_arm"], goals[f"{side}_arm"] = arm(side, base), arm(side, base, goals=True)
         devices[f"{side}_gripper"] = rigs.gripper(
             f"{side}_gripper",
-            f"ARX X5 {side} parallel two-finger gripper on the {side}_arm flange. The grip joint "
-            f"{side}_gripper is upstream's normalized ee value (0 closed, 1 open): finger targets "
-            f"are {lower} + {upper - lower} m per unit, so a closed command squeezes past the "
-            "finger stop. The TCP is the pad center, +x approaching. A closed or stalled grip "
-            "alone does not prove a successful grasp.",
+            f"ARX X5 {side} parallel two-finger gripper. A closed target squeezes past the finger stop. The TCP "
+            "is the pad centre and approaches along +x.",
             f"{side}_gripper",
-            f"Native normalized opening (data) from 0 (closed) to 1 (open), the "
-            f"{side}_ee_joint_state of upstream's EvalEnv.take_action, which interpolates the "
-            "fingers within each frame. A target persists until replaced or stopped; "
-            "out-of-range targets are ignored, so verify joint_state.",
             rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
             rigs.frame(f"{side}_gripper:base", TCP, (0, 0, 0, 1)))
         files[f"devices/{side}_arm/arm.urdf"] = rigs.source_arm(
@@ -106,11 +85,11 @@ def main():
         position, quaternion = sim.camera_pose(f"{side}_camera")
         optical = rigs.transform(position, rigs.quat_matrix(quaternion))
         devices[f"{side}_camera"], depth[f"{side}_camera"] = camera(
-            sim, f"{side}_camera", f"{{}} camera (D435 model) on the {side} wrist", f"{side}_arm:flange",
-            rigs.relative(flange, optical), f" on the {side}_arm flange")
+            sim, f"{side}_camera", f"D435 {{}} camera on the {side} wrist", f"{side}_arm:flange",
+            rigs.relative(flange, optical))
     position, quaternion = sim.camera_pose("head_camera")
     devices["head_camera"], depth["head_camera"] = camera(
-        sim, "head_camera", "Fixed {} head camera (Gemini 345Lg model) above the table", "world:base",
+        sim, "head_camera", "Gemini 345Lg {} head camera fixed above the table", "world:base",
         rigs.transform(position, rigs.quat_matrix(quaternion)))
     order = ["world", "left_arm", "left_gripper", "right_arm", "right_gripper",
              "head_camera", "left_camera", "right_camera"]

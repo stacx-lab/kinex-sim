@@ -9,8 +9,8 @@ separate from simulator environments.
 
 Linux x86-64, Git, uv, Pixi, and an EGL-capable graphics driver are required.
 ROS Jazzy and Python 3.12 come from the locked RoboStack/Pixi environment; a system
-ROS installation is not required. Every graph serves the world service
-`custom_interfaces/srv/Wait`, which kinex-sim builds from `ros2/custom_interfaces`.
+ROS installation is not required. Every graph serves the world's `custom_interfaces` services,
+which kinex-sim builds from `ros2/custom_interfaces`.
 
 ```bash
 bash tools/bootstrap.sh
@@ -98,23 +98,25 @@ the graph instead of leaving an unresponsive simulation running.
 ## Timing and public interfaces
 
 `--execution-mode realtime` is the default: world continually steps with monotonic
-wall-clock pacing. `stepped` advances only while an admitted `world/wait` needs more
+wall-clock pacing. `stepped` advances only while an admitted wait needs more
 simulation time. Commands, zero waits, discovery, and camera reads do not step.
 Both modes retain the backend's native control period and physics decimation.
 Rendering can make realtime slower than wall time; it never changes simulated dt.
 
-`world/wait` uses `custom_interfaces/srv/Wait`: `duration_s` in, then `success`,
-`message`, `time_s` and actual `waited_s` out. A wait may name `goals`, the ids of executing action
-goals: it then also waits until all of them have finished, and ends once `duration_s` has passed and they
-have. With a positive `goal_timeout_s`, goals still executing that long into the wait are cancelled, where
-they are. `finished` says of each goal whether it had finished when the wait ended. Without goals a wait
-lasts `duration_s`, whatever goals do. A goal advances no time. The latched `world/budget`
-(`std_msgs/msg/Float64MultiArray`) publishes the episode budget after every step: `data`
-is `[used_s, max_s]`, the seconds of world time the episode has used and is allowed
+The world serves the operations Kinex's world device declares, the same in both modes: `world/now`,
+`world/wait_all`, `world/wait_any` and `world/stop`. The two waits use `custom_interfaces/srv/Wait`. Their
+entries are `seconds`, a list of seconds of world time from now, and `goals`, the ids of executing action
+goals, each over once the goal has finished; `wait_all` ends once every entry is over and `wait_any` once
+one is. A positive `timeout`, in seconds of world time, ends the wait with what is left and `timed_out`
+true; the goals go on, and a client cancels a goal it gives up on. The reply gives `success`, `message`,
+`time_s`, the world time reached, and whether each entry was over as `elapsed` and `finished`. A goal
+advances no time. `world/now` (`custom_interfaces/srv/Now`) replies `time_s` and the episode budget,
+`used_s` and `max_s`, the seconds of world time the episode has used and is allowed
 (control steps times the control period; `max_s` inf without a step limit). Only a
-stepped run has a budget; a realtime run publishes `[NaN, NaN]`. Positive durations round up to whole
-native control steps; zero is immediate; negative, nonfinite or unrepresentable
-waits fail. Waits are sequential: a wait requested while another is pending is
+stepped run has a budget; a realtime run replies NaN for both. A wait rounds up to whole
+native control steps, a millionth of a step counting as none, so a wait computed from the
+world's own time is due on its step; a wait with no entry left is immediate, an observation barrier;
+negative or nonfinite seconds, and a `wait_any` without an entry, fail. Waits are sequential: a wait requested while another is pending is
 rejected, and `world/stop` (`std_srvs/srv/Trigger`) cancels the pending one. A run
 is one episode, of the task, seed and scene options it was launched with. There is no reset: to
 start over, stop the run and launch another. An episode ends at its step limit, if it
@@ -134,10 +136,8 @@ timeouts.
 ```python
 from kinex_sim.clients import WorldClockClient
 world = WorldClockClient(node)
-result = world.wait(1.0, timeout_s=30.0)  # node not already attached to an executor
+result = world.wait(1.0, timeout_s=30.0)  # a second of world time; the node is not attached to an executor
 assert result.success, result.message
-# In a callback with an executor already spinning:
-result = await world.wait_async(1.0)
 ```
 
 The ROS graph inventory remains fixed during a run. Native evaluator results are
@@ -165,10 +165,10 @@ held for 0.5 s of world time after the last one, and publish `nav_msgs/msg/Odome
 on `<base>/odometry`. Invalid targets are logged
 and rejected; a target within 0.001 (rad or m) of a limit, such as a measured
 position slightly past it, is held at the limit. A topic publisher gets no reply,
-so the message of the next `world/wait` reply names each refused command's topic
+so the message of the next wait's reply names each refused command's topic
 and reason, once (at most five kinds, then a count). A refusal also ends the pending
 wait at once, as does one made before a wait and not yet reported: the reply has
-`success` false, `ended early by a refused command`, and the `waited_s` it ran. The rest
+`success` false, `ended early by a refused command`, and the `time_s` it reached. The rest
 of the wait is never stepped, so in stepped mode it costs no budget. A zero wait, an observation barrier, still succeeds and names
 the refusals. The latest valid target is
 held until replaced or stopped. `<device>/stop` holds the measured position; a gripper's
@@ -223,7 +223,7 @@ RoboStack supplies rosbag2; Pixi supplies FFmpeg.
 
 The recorder is a separate ROS process in the run's domain. Launch waits for
 calibration, clock, and the initial frame of every spectator view before allowing
-any physics steps. `world/wait` still controls stepped execution; recording itself
+any physics steps. The world's waits still control stepped execution; recording itself
 never advances simulation. MP4 timing follows simulation timestamps: paused
 thinking time adds no footage, and missing sampling intervals hold the last frame.
 Odd image dimensions are padded to even dimensions for H.264. Each view is one

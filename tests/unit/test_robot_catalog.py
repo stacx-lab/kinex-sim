@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from kinex_sim.catalog.robots import list_robots, merge, setup
+from kinex_sim.core.commands import VELOCITY_TIMEOUT_S
 
 
 PROJECT = Path(__file__).resolve().parents[2]
@@ -31,9 +32,9 @@ TIP = {**OPERATIONS["joint"], "pose_state": POSE["pose_state"]}
 MOVE = {**POSE, "pose_target": None, "move": "control_msgs/action/FollowJointTrajectory"}
 # The world node also serves the geometry of a camera rendered through a lens.
 GEOMETRY = {op: "custom_interfaces/srv/Json" for op in ("geometry", "unproject", "project")}
-WORLD = {"time": ("/clock", "rosgraph_msgs/msg/Clock"),
-         "wait": ("/world/wait", "custom_interfaces/srv/Wait"),
-         "budget": ("/world/budget", "std_msgs/msg/Float64MultiArray"),
+WORLD = {"now": ("/world/now", "custom_interfaces/srv/Now"),
+         "wait_all": ("/world/wait_all", "custom_interfaces/srv/Wait"),
+         "wait_any": ("/world/wait_any", "custom_interfaces/srv/Wait"),
          "stop": ("/world/stop", "std_srvs/srv/Trigger")}
 
 
@@ -280,8 +281,8 @@ def test_every_gripper_stop_keeps_its_grip_target_as_the_rig_builders_say():
 
 
 def test_every_world_serves_the_operations_the_rig_builders_declare():
-    """Every catalog world, the hand-maintained LIBERO ones included, declares rigs.world()'s operations: the clock,
-    waits, the latched episode budget topic and stop."""
+    """Every catalog world, the hand-maintained LIBERO ones included, declares rigs.world()'s operations: now,
+    wait_all, wait_any and stop, the ones Kinex's world device guide states."""
     sys.path.insert(0, str(PROJECT / "tools/robots"))
     try:
         import rigs
@@ -292,7 +293,43 @@ def test_every_world_serves_the_operations_the_rig_builders_declare():
     for path in worlds:
         operations = yaml.safe_load(path.read_text())["operations"]
         assert operations == rigs.world("")["operations"], path
-        assert operations["budget"]["type"] == "std_msgs/msg/Float64MultiArray"
+        assert list(operations) == ["now", "wait_all", "wait_any", "stop"]
+
+
+def test_profiles_read_as_any_robots_in_the_rig_builders_words():
+    """A profile is what an agent reads: no description says a simulator serves the device, and the operations
+    every rig shares are described as the builders' templates word them, the hand-maintained LIBERO ones too."""
+    import re
+    sys.path.insert(0, str(PROJECT / "tools/robots"))
+    try:
+        import rigs
+    finally:
+        sys.path.remove(str(PROJECT / "tools/robots"))
+    simulators = "|".join(path.name for path in (PROJECT / "simulators").iterdir() if (path / "simulator.toml").is_file())
+    told = re.compile(rf"simulat|upstream|native|kinex-sim|render|paused|stepped|realtime|evaluat|polic|reset|{simulators}",
+                      re.IGNORECASE)
+    lens, pinhole = (640, 480, 300., 300., 320., 240.), None
+    for identifier, configuration in configured(list_robots(PROJECT)):
+        from kinex_sim.catalog.robots import catalog_profiles
+        for name, profile in catalog_profiles(PROJECT, identifier, configuration).items():
+            operations = profile["operations"]
+            texts = [profile["description"], *(operation["description"] for operation in operations.values())]
+            assert not [text for text in texts if told.search(text)], (identifier, configuration, name)
+            kind = profile["type"]
+            if kind == "joint":
+                tip = (profile["model"]["tip_links"] or [None])[0]
+                written = rigs.joint(name, "", [], [], None, tip=tip, tip_pose=True)
+            elif kind == "locomotion":
+                written = rigs.locomotion(name, "", {}, None, timeout_s=VELOCITY_TIMEOUT_S)
+            elif kind in ("rgb", "rgbd"):
+                written = rigs.camera(name, "", lens, pinhole, (.1, 10.))
+            else:
+                continue
+            for operation in ("joint_state", "joint_target", "pose_state", "velocity", "odometry", "image", "depth",
+                              "camera_info"):
+                if operation in operations:
+                    assert operations[operation]["description"] == written["operations"][operation]["description"], (
+                        identifier, configuration, name, operation)
 
 
 def test_rig_builders_write_configurations_as_patches_that_merge_back():

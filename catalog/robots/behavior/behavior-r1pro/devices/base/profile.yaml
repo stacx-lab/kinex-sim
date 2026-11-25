@@ -6,10 +6,10 @@ runtime:
   ready_timeout_s: 30
 operations:
   velocity:
-    description: Body velocity in base/base axes as linear.x (vx), linear.y (vy), angular.z
-      (wz), each normalized to [-1, 1] of the native controller range; other fields must be
-      zero. The body follows the latest twist and stops 0.5 s of world time after the last
-      one, so re-send to keep moving; out-of-range twists are ignored, so verify with odometry.
+    description: Body velocity in base/base axes, in the units and bounds of the profile's
+      velocity; other axes stay zero. The body follows the latest twist and stops 0.5 s of
+      world time after the last, so re-send to keep moving. One out of bounds is refused,
+      which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /base/velocity
@@ -20,8 +20,8 @@ operations:
       durability: volatile
     timeout_s: 10
   odometry:
-    description: Measured body twist in base/base (m/s and rad/s at the body origin) and the
-      planar pose in base/odom, the body frame at episode start; never a global pose.
+    description: Measured body twist in base/base (m/s, rad/s) and planar pose in base/odom,
+      the body frame where it started; never a global pose.
     transport: topic
     direction: output
     endpoint: /base/odometry
@@ -47,8 +47,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: locomotion
-description: R1Pro holonomic wheeled base carrying the torso; a velocity is the evaluator's
-  normalized base action, which its controller scales to 0.75 m/s and 1 rad/s.
+description: R1Pro holonomic wheeled base. Full-scale velocity is 0.75 m/s and 1 rad/s.
 source: introspected
 calibrated_at: null
 method: introspection

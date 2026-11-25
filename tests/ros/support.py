@@ -5,9 +5,10 @@ import signal
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 
 import rclpy
-from custom_interfaces.srv import Wait
+from custom_interfaces.srv import Now, Wait
 from rclpy.context import Context
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
@@ -49,7 +50,9 @@ class Graph:
         self.node = Node("probe", context=self.context)
         self.last = {}
         self.node.create_subscription(Clock, "/clock", lambda msg: self.last.update(clock=msg), STREAM_QOS)
-        self.wait_client = self.node.create_client(Wait, "world/wait")
+        self.wait_client = self.node.create_client(Wait, "world/wait_all")
+        self.any_client = self.node.create_client(Wait, "world/wait_any")
+        self.now_client = self.node.create_client(Now, "world/now")
         self.stop_client = self.node.create_client(Trigger, "world/stop")
         self.tmp_path = tmp_path
         # Scene options travel as one JSON object, as launch passes them.
@@ -135,11 +138,20 @@ class Graph:
             for subscription in subscriptions:
                 self.node.destroy_subscription(subscription)
 
-    def wait(self, duration, timeout=15., goals=(), goal_timeout=0.):
-        """goals: handles of executing action goals the wait is for, cancelled goal_timeout into it if positive."""
-        request = Wait.Request(duration_s=float(duration), goals=[handle.goal_id for handle in goals],
-                               goal_timeout_s=float(goal_timeout))
-        return self.call(self.wait_client, request, timeout)
+    def now(self):
+        return self.call(self.now_client, Now.Request())
+
+    def wait(self, duration=0., timeout=15., goals=(), first=False, limit=0.):
+        """The world's wait_all, or with first its wait_any: for duration of world time (None for none) and goals,
+        handles of executing action goals, up to limit seconds of world time. The reply, with how long it waited
+        as waited_s."""
+        start = self.now().time_s
+        reply = self.call(self.any_client if first else self.wait_client, Wait.Request(
+            seconds=[] if duration is None else [duration], goals=[handle.goal_id for handle in goals],
+            timeout=float(limit)), timeout)
+        return SimpleNamespace(success=reply.success, message=reply.message, time_s=reply.time_s,
+                               finished=list(reply.finished), timed_out=reply.timed_out,
+                               waited_s=reply.time_s - start)
 
     def stop(self, process):
         if process.poll() is None:

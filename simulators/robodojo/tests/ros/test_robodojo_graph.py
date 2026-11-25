@@ -116,8 +116,8 @@ def test_robodojo_arms_take_move_goals_in_the_move_configuration(tmp_path):
 
         heights, goals = zip(*(raised(key, dz) for key, dz in (("flange", .06), ("right_flange", .04))))
         handles = [execute(graph, move, goal) for move, goal in zip(moves, goals)]
-        both = graph.wait(0., timeout=120., goals=handles, goal_timeout=3.)
-        assert both.success and list(both.finished) == [True, True] and both.waited_s < .5
+        both = graph.wait(None, 120., goals=handles, limit=3.)
+        assert both.success and both.finished == [True, True] and both.waited_s < .5
         for handle in handles:
             status, code, text = ended(graph, handle)
             assert (status, code) == (GoalStatus.STATUS_SUCCEEDED, 0) and text.startswith("reached: "), text
@@ -126,7 +126,7 @@ def test_robodojo_arms_take_move_goals_in_the_move_configuration(tmp_path):
             assert abs(last[key].transforms[0].translation.z - height) < .03
         # A goal beyond reach is aborted where upstream's IK has no next step, with the reason.
         beyond = execute(graph, moves[0], raised("flange", 3.)[1])
-        assert list(graph.wait(0., timeout=120., goals=[beyond]).finished) == [True]
+        assert graph.wait(None, 120., goals=[beyond]).finished == [True]
         status, code, text = ended(graph, beyond)
         assert (status, code) == (GoalStatus.STATUS_ABORTED, -1) and " IK " in text, text
     finally:

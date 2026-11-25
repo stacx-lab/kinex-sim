@@ -17,19 +17,19 @@ simulator instead of relaying it. What Kinex adds runs in Kinex:
 
 - the links of each joint and gripper device's URDF, which Kinex publishes on TF from
   `joint_state` while the device is loaded;
-- its frame host, which publishes the mounts and fixed frames of the profiles' `frames`,
-  such as `gripper/tcp`, and answers frame lookups;
+- the mounts and fixed frames of the profiles' `frames`, such as `gripper/tcp`, which it
+  publishes on TF and looks up from its own tf2 history;
 - FK and IK from the URDFs, and the rays of undistorted pinhole cameras from their profiles.
 
 ## Interface types
 
-The world's `wait` is `custom_interfaces/srv/Wait` and a lensed camera's `geometry`,
+The world's `now` is `custom_interfaces/srv/Now`, its `wait_all` and `wait_any` are
+`custom_interfaces/srv/Wait`, and a lensed camera's `geometry`,
 `unproject` and `project` are `custom_interfaces/srv/Json`. An arm's `move` is the standard
 `control_msgs/action/FollowJointTrajectory`. kinex-sim and Kinex each build an
 identical copy of the package, from `ros2/custom_interfaces` here and from Kinex's own assets
 there, so the types are the same on the wire and neither project needs the other to build or
-to call them. The package also holds `LookupTransform`, the type of Kinex's frame service;
-kinex-sim carries it to keep the two copies the same and does not serve it. The camera
+to call them. The camera
 operations take and return the JSON of Kinex's camera geometry operations.
 
 ## Compatibility checks

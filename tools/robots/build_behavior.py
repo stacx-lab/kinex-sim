@@ -29,20 +29,18 @@ def body(sim, source):
     robot = sim.episode.robot
     home = dict(zip(robot.dof_names_ordered, robot.reset_joint_pos.tolist()))  # the evaluator's reset posture
     devices = {
-        "world": rigs.world("World clock of the BEHAVIOR house."),
+        "world": rigs.world("World time and waits of a household."),
         "base": rigs.locomotion(
             "base",
-            "R1Pro holonomic wheeled base carrying the torso; a velocity is the evaluator's normalized "
-            "base action, which its controller scales to 0.75 m/s and 1 rad/s.",
+            "R1Pro holonomic wheeled base. Full-scale velocity is 0.75 m/s and 1 rad/s.",
             {axis: (-1., 1.) for axis in ("vx", "vy", "wz")},
             {"parent": None, "translation_m": None, "rotation_xyzw": None},
             timeout_s=VELOCITY_TIMEOUT_S),
         "torso": rigs.joint(
             "torso",
-            "R1Pro four-joint torso on the base; the arms and head camera mount on its top link.",
+            "R1Pro four-joint torso.",
             [f"torso_joint{i}" for i in range(1, 5)], [home[f"torso_joint{i}"] for i in range(1, 5)],
-            rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)), part="torso", tip="top",
-            model="torso.urdf"),
+            rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)), tip="top", model="torso.urdf"),
     }
     files = {"devices/torso/torso.urdf": rigs.source_arm(
         source, [f"torso_joint{i}" for i in range(1, 5)], "r1pro_torso",
@@ -52,8 +50,7 @@ def body(sim, source):
         joints = [f"{side}_arm_joint{i}" for i in range(1, 8)]
         devices[f"{side}_arm"] = rigs.joint(
             f"{side}_arm",
-            f"R1Pro seven-joint {side} arm on the torso; its flange carries the {side} gripper and "
-            "wrist camera.",
+            f"R1Pro seven-joint {side} arm.",
             joints, [home[joint] for joint in joints],
             rigs.pose_frame("torso:top", rigs.urdf_origin(source[f"{side}_arm_base_joint"])))
         files[f"devices/{side}_arm/arm.urdf"] = rigs.source_arm(
@@ -86,15 +83,11 @@ def main():
         hand = link(f"{side}_gripper_link")
         devices[f"{side}_gripper"] = rigs.gripper(
             f"{side}_gripper",
-            f"R1Pro {side} parallel two-finger gripper on the {side}_arm flange. An object between "
-            "closing fingers is held by assisted grasping; a closed grip alone does not prove a grasp.",
+            f"R1Pro {side} parallel two-finger gripper.",
             f"{side}_gripper",
-            "Smooth native gripper command (data) from -1 (closed) to 1 (open), held until "
-            "replaced or stopped; out-of-range targets are ignored, so verify joint_state.",
             rigs.pose_frame(f"{side}_arm:flange", rigs.relative(flange, hand)),
             rigs.pose_frame(f"{side}_gripper:base", mount(sim, f"{side}_gripper_link", link(f"{side}_eef_link"))),
-            state="The smooth command the mean finger opening reaches, -1 (closed) to 1 (open), "
-                  "stamped at acquisition; the URDF finger links follow it.",
+            state="Measured mean finger opening as a normalized grip joint position, stamped at acquisition.",
             opened=1.0, closed=-1.0)
         files[f"devices/{side}_gripper/gripper.urdf"] = rigs.source_gripper(
             source, f"{side}_gripper", [f"{side}_gripper_finger_joint{i}" for i in (1, 2)], lower, upper,

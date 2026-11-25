@@ -6,8 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Measured left_gripper, the native normalized gripper opening (0 closed, 1
-      open), stamped at acquisition; the URDF finger links follow it.
+    description: Measured grip joint position, a normalized opening, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /left_gripper/joint_state
@@ -18,10 +17,9 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Native normalized opening (data) from 0 (closed) to 1 (open), the left_ee_joint_state
-      of upstream's EvalEnv.take_action, which interpolates the fingers within each frame.
-      A target persists until replaced or stopped; out-of-range targets are ignored, so verify
-      joint_state.
+    description: Grip joint position (data), a normalized opening, between closed and open.
+      It persists until replaced or stopped; one out of range is refused, which the world's
+      next wait reply reports.
     transport: topic
     direction: input
     endpoint: /left_gripper/target
@@ -32,8 +30,8 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Stop and keep the active grip target; a held object stays gripped. Before
-      the first command it holds the opening at reset. Command an open target to release.
+    description: Keep the active grip target, so a held object stays gripped; before the first
+      command, hold the measured opening. An open target releases.
     transport: service
     direction: input
     endpoint: /left_gripper/stop
@@ -48,10 +46,8 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: 'ARX X5 left parallel two-finger gripper on the left_arm flange. The grip joint
-  left_gripper is upstream''s normalized ee value (0 closed, 1 open): finger targets are -0.01
-  + 0.054 m per unit, so a closed command squeezes past the finger stop. The TCP is the pad
-  center, +x approaching. A closed or stalled grip alone does not prove a successful grasp.'
+description: ARX X5 left parallel two-finger gripper. A closed target squeezes past the finger
+  stop. The TCP is the pad centre and approaches along +x.
 source: introspected
 calibrated_at: null
 method: introspection
