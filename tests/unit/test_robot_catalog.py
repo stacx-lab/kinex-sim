@@ -36,8 +36,7 @@ GRIP = {**OPERATIONS["gripper"], "target": None, "grasp": JSON, "release": JSON}
 # The world node also serves the geometry of a camera rendered through a lens.
 GEOMETRY = {op: "custom_interfaces/srv/Json" for op in ("geometry", "unproject", "project")}
 WORLD = {"now": ("/world/now", "custom_interfaces/srv/Now"),
-         "wait_all": ("/world/wait_all", "custom_interfaces/srv/Wait"),
-         "wait_any": ("/world/wait_any", "custom_interfaces/srv/Wait"),
+         "wait": ("/world/wait", "custom_interfaces/srv/Wait"),
          "stop": ("/world/stop", "std_srvs/srv/Trigger")}
 
 
@@ -289,7 +288,7 @@ def test_every_gripper_stop_keeps_its_grip_target_as_the_rig_builders_say():
 
 def test_every_world_serves_the_operations_the_rig_builders_declare():
     """Every catalog world, the hand-maintained LIBERO ones included, declares rigs.world()'s operations: now,
-    wait_all, wait_any and stop, the ones Kinex's world device guide states."""
+    wait and stop, the ones Kinex's world device guide states."""
     sys.path.insert(0, str(PROJECT / "tools/robots"))
     try:
         import rigs
@@ -300,7 +299,7 @@ def test_every_world_serves_the_operations_the_rig_builders_declare():
     for path in worlds:
         operations = yaml.safe_load(path.read_text())["operations"]
         assert operations == rigs.world("")["operations"], path
-        assert list(operations) == ["now", "wait_all", "wait_any", "stop"]
+        assert list(operations) == ["now", "wait", "stop"]
 
 
 def test_profiles_read_as_any_robots_in_the_rig_builders_words():

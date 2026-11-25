@@ -3,6 +3,9 @@
 The pair toy's move steps an arm's tip 0.1 m a 0.1 s step from (0.5, -0.5) to the goal's {x, y}, and its home
 back there; a wall stops the tips at x = 1.2.
 """
+import math
+from types import SimpleNamespace
+
 import pytest
 
 from kinex_sim.runtime.world import WorldRuntime
@@ -30,15 +33,22 @@ def start(runtime, arm, x=None, y=None):
     return end, commanded
 
 
-def wait(runtime, *ends, seconds=(), first=False, timeout=0.):
-    """A world wait run to its reply: for seconds of world time and for the goals with these ends, all of them or
-    with first the first, up to timeout. Its result, whose done says which entries were over, the seconds then
-    the goals, and how long it waited."""
-    replies, start = [], runtime.time_s
-    runtime.wait(first, list(seconds), [lambda end=end: bool(end) for end in ends], timeout, replies.append)
-    while not replies:
-        runtime.tick()
-    return replies[0], replies[0].time_s - start
+def wait(runtime, *ends, seconds=None, first=False, timeout=math.inf):
+    """Wait as a client does, by the world's waits, each of which a goal's end ends: for seconds of world time, or
+    without them until the goals with these ends have ended, all of them or with first the first, at most timeout.
+    The last reply, with whether each goal had ended as done and whether the timeout ended it, and how long it took."""
+    start, limit = runtime.time_s, timeout if seconds is None else seconds
+    while True:
+        replies = []
+        runtime.wait(max(0., start + limit - runtime.time_s), replies.append)
+        while not replies:
+            runtime.tick()
+        done = tuple(bool(end) for end in ends)
+        met = seconds is None and (any if first else all)(done)
+        late = runtime.time_s >= start + limit - 1e-9
+        if met or late or not replies[0].success:
+            return SimpleNamespace(**vars(replies[0]), done=done, timed_out=late and not met and seconds is None), \
+                runtime.time_s - start
 
 
 def test_a_goal_runs_in_the_backend_and_the_wait_for_it_ends_with_it():
@@ -65,7 +75,7 @@ def test_a_wait_ends_at_its_timeout_and_leaves_its_goals_running():
     assert left == [REACHED] and not right
     runtime.end("right/move", "too slow")  # as a client cancels a goal it gives up on
     assert right == [aborted("too slow")]
-    result, _ = wait(runtime, seconds=[.5], timeout=1.)
+    result, _ = wait(runtime, seconds=.5)
     assert not result.timed_out and sim.position[2] == pytest.approx(.8)  # it stays where the backend left it
 
 
@@ -80,19 +90,19 @@ def test_a_goal_the_backend_ends_leaves_its_group_where_the_backend_puts_it():
 def test_a_goal_and_a_groups_targets_replace_each_other():
     runtime, sim = world()
     goal, _ = start(runtime, "left", 1., -.5)
-    wait(runtime, seconds=[.2])
+    wait(runtime, seconds=.2)
     runtime.commands.set_trajectory("left", runtime.time_s, [.2], [[.5, -.5]])  # as a joint_target does
     runtime.release("left", "replaced by a command")
     assert goal == [aborted("replaced by a command")]
-    wait(runtime, seconds=[.1])
+    wait(runtime, seconds=.1)
     assert sim.position[:2] == pytest.approx([.65, -.5])  # from the goal's command, 0.8: no jump back
-    wait(runtime, seconds=[.1])
+    wait(runtime, seconds=.1)
     runtime.commands.set_trajectory("left", runtime.time_s, [1.], [[1.1, -.5]])
-    wait(runtime, seconds=[.2])
+    wait(runtime, seconds=.2)
     goal, _ = start(runtime, "left", .5, 0.)  # a goal takes the group from its trajectory
     wait(runtime, goal)
     assert goal == [REACHED] and sim.position[:2] == pytest.approx([.5, 0.])
-    wait(runtime, seconds=[1.])
+    wait(runtime, seconds=1.)
     assert sim.position[:2] == pytest.approx([.5, 0.])  # the trajectory is gone
 
 
@@ -101,12 +111,12 @@ def test_a_newer_goal_a_stop_and_the_episodes_end_end_the_active_goal():
     first, _ = start(runtime, "left", 1., -.5)
     second, _ = start(runtime, "left", .5, 0.)
     assert first == [aborted("replaced by a newer goal")]
-    wait(runtime, seconds=[.1])
+    wait(runtime, seconds=.1)
     home, _ = start(runtime, "left")  # another action's goal for the same arm takes it too
     assert second == [aborted("replaced by a newer goal")] and not home
     second, _ = start(runtime, "left", .5, 0.)
     assert home == [aborted("replaced by a newer goal")] and sim.position[:2] == pytest.approx([.5, -.4])
-    wait(runtime, seconds=[.1])
+    wait(runtime, seconds=.1)
     runtime.hold("left")
     assert second == [aborted("stopped")] and sim.position[:2] == pytest.approx([.5, -.3])
     result, _ = wait(runtime, second)  # finished already: no step

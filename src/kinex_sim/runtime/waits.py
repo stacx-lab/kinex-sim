@@ -8,8 +8,6 @@ class WaitResult:
     success: bool
     message: str
     time_s: float
-    done: tuple = ()  # whether each entry was over: the seconds, then the events
-    timed_out: bool = False
 
 
 def control_steps(seconds, period):
@@ -20,55 +18,45 @@ def control_steps(seconds, period):
 
 
 class WaitScheduler:
-    """One wait at a time: the world advances until its entries are over, all of them or the first."""
+    """One wait at a time: the world advances until its time is over, or something ends it sooner."""
 
     def __init__(self):
-        self._pending = None  # (first, entries, the step of its timeout, complete)
+        self._pending = None  # (the step its time is over at, complete)
 
     @property
     def pending(self):
         return self._pending is not None
 
-    def admit(self, first, seconds, events, timeout_s, time_s, step, period, ended, complete, interrupted=None):
-        """Wait for entries: seconds of world time from now, and events, predicates such as a goal having finished.
-        The wait ends once all are over, or with first once one is, and at a positive timeout_s whatever is left.
-        ended: None while the episode runs, then why it ended, which every reply adds. interrupted: why a wait
-        with anything left to wait for ends at once, as interrupt ends the pending one. A wait with nothing left,
-        an observation barrier, still succeeds."""
+    def admit(self, seconds, time_s, step, period, ended, complete, interrupted=None):
+        """Wait seconds of world time from now; infinite seconds wait until interrupt ends the wait.
+        ended: None while the episode runs, then why it ended, which every reply adds. interrupted: (success,
+        message) with which a wait that has time left ends at once, as interrupt ends the pending one. A wait
+        with no time left, an observation barrier, still succeeds."""
         if self._pending:
             raise ValueError("another wait is pending; world waits are sequential")
-        if not all(math.isfinite(value) and value >= 0 for value in (*seconds, timeout_s)):
-            raise ValueError("seconds and timeout must be finite and nonnegative")
-        if first and not (seconds or events):
-            raise ValueError("wait_any needs an entry to wait for")
-        ends = [step + control_steps(value, period) for value in seconds]
-        if math.inf in ends:
-            raise ValueError("seconds are too many to count in control steps")
-        entries = [*(lambda now, end=end: now >= end for end in ends), *(lambda now, done=done: done() for done in events)]
-        wait = first, entries, step + control_steps(timeout_s, period) if timeout_s else math.inf, complete
-        done = tuple(entry(step) for entry in entries)
-        if (any if first else all)(done):
-            complete(WaitResult(True, f"ok; {ended}" if ended else "ok", time_s, done))
+        if math.isnan(seconds) or seconds < 0:
+            raise ValueError("seconds must be nonnegative")
+        end = step + control_steps(seconds, period)
+        if step >= end:
+            complete(WaitResult(True, f"ok; {ended}" if ended else "ok", time_s))
         elif ended:
-            complete(WaitResult(False, f"episode is done; {ended}", time_s, done))
+            complete(WaitResult(False, f"episode is done; {ended}", time_s))
         elif interrupted:
-            complete(WaitResult(False, interrupted, time_s, done))
+            complete(WaitResult(*interrupted, time_s))
         else:
-            self._pending = wait
+            self._pending = end, complete
 
     def settle(self, time_s, step, ended=None):
         """ended: as for admit; the end completes the pending wait."""
         if not self._pending:
             return
-        first, entries, limit, _ = self._pending
-        met = (any if first else all)(entry(step) for entry in entries)
-        if met or step >= limit:
-            self.interrupt(time_s, step, f"ok; {ended}" if ended else "ok", True, not met)
+        if step >= self._pending[0]:
+            self.interrupt(time_s, f"ok; {ended}" if ended else "ok", True)
         elif ended:
-            self.interrupt(time_s, step, f"episode ended during wait; {ended}")
+            self.interrupt(time_s, f"episode ended during wait; {ended}")
 
-    def interrupt(self, time_s, step, message, success=False, timed_out=False):
+    def interrupt(self, time_s, message, success=False):
         """End the pending wait now, with message."""
         if self._pending:
-            (_, entries, _, complete), self._pending = self._pending, None
-            complete(WaitResult(success, message, time_s, tuple(entry(step) for entry in entries), timed_out))
+            (_, complete), self._pending = self._pending, None
+            complete(WaitResult(success, message, time_s))

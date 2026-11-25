@@ -64,7 +64,7 @@ changed files replaced, bumps the pin without copying.
 
 | Device | Interfaces |
 |---|---|
-| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/pose_state`, `<arm>/move`, `<arm>/stop`; `<arm>/joint_target` in place of `<arm>/move` with `--config basic` |
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/grasp`, `<gripper>/release`, `<gripper>/stop`; `<gripper>/target` in place of the two goals with `--config basic` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/camera_info`; `<camera>/depth` with `--config depth` |
@@ -148,10 +148,9 @@ frames (`stalled`: for a grasp, they have stopped on an object), or after 24 fra
 succeeds reached or stalled, a release only reached. The result gives `stop_reason`, the measured
 `opening` and `steps`. The arms hold while a gripper goal runs: nothing moves them.
 
-A goal advances no time. Send both arms their goals, then give the goals' ids to `world/wait_all`: it ends
-on the frame the last of them finishes, so the wait costs no more budget than the motion, and its `timeout`
-ends it sooner. A client that gives up on a goal cancels it. A goal is the world's from its acceptance; a wait that names
-any other is refused.
+Sending a goal advances no time. Send both arms their goals, then wait on the world: a wait ends on the
+frame a goal ends and names it, so waiting for goals costs no more budget than their motion (see the
+shared [wait semantics](README.md)). A client that gives up on a goal cancels it.
 
 The joints run through `EvalEnv.take_action`, as joint targets do, so evaluation and scoring are
 unchanged. To solve them, kinex-sim builds upstream's cuRobo planner for the arms, as upstream's

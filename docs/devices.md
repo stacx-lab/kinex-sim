@@ -26,7 +26,7 @@ What a simulator does behind a device belongs on its page here, not in the profi
 
 | Device type | Operations (endpoint, type) |
 |---|---|
-| `world` | `now` (`/world/now`, Now), `wait_all` (`/world/wait_all`, Wait), `wait_any` (`/world/wait_any`, Wait), `stop` (`/world/stop`) |
+| `world` | `now` (`/world/now`, Now), `wait` (`/world/wait`, Wait), `stop` (`/world/stop`) |
 | `joint` (arm, torso) | `joint_state` (`/<arm>/joint_state`, JointState), `joint_target` (`/<arm>/joint_target`, JointTrajectory), `stop` |
 | `joint` commanded by its tip pose (HandsOn's arms, LIBERO's arm with `--config osc`) | `joint_state`, `pose_target` (`/<arm>/pose_target`, MultiDOFJointTrajectory in `<arm>/base`), `pose_state` (`/<arm>/pose_state`, MultiDOFJointState), `stop` |
 | `joint` commanded by its backend's action (RoboDojo's arms) | `joint_state`, `pose_state`, `move` (`/<arm>/move`, a Json action), `stop`; the action is the simulator's own ([Goals](robodojo.md#goals)): a newer goal replaces the active one, and a stop ends it |

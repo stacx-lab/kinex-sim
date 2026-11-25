@@ -5,7 +5,6 @@ import pytest
 from action_msgs.msg import GoalStatus
 from builtin_interfaces.msg import Duration
 from custom_interfaces.action import Json
-from custom_interfaces.srv import Wait
 from rclpy.action import ActionClient
 from sensor_msgs.msg import JointState, MultiDOFJointState
 from std_msgs.msg import Float64, Header
@@ -14,7 +13,6 @@ from geometry_msgs.msg import Quaternion, Transform, Twist, Vector3
 from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
                                  MultiDOFJointTrajectoryPoint)
 from kinex_sim_runtime.devices import STREAM_QOS
-from unique_identifier_msgs.msg import UUID
 from tests.ros.support import Graph, ended, execute
 
 
@@ -145,9 +143,9 @@ def test_a_backends_action_runs_goals_and_a_wait_ends_with_its_goals(tmp_path):
         near = execute(graph, left, goal(.7, -.5), samples.append)
         far = execute(graph, right, goal(1., -.5))
         assert graph.wait(0.).time_s == 0.  # goals advance no time
-        first = graph.wait(None, goals=[near, far], first=True)  # wait_any: until the first of them finishes
+        first = graph.wait(None, goals=[near, far], first=True)  # until the first of them ends
         assert first.success and first.finished == [True, False] and first.waited_s == pytest.approx(.2)
-        both = graph.wait(None, goals=[near, far])  # wait_all: until the last does
+        both = graph.wait(None, goals=[near, far])  # until the last does
         assert both.success and both.finished == [True, True] and both.waited_s == pytest.approx(.3)
         assert ended(graph, near) == ended(graph, far) == (GoalStatus.STATUS_SUCCEEDED, True, 'reached')
         result = far.get_result_async()
@@ -168,8 +166,6 @@ def test_a_backends_action_runs_goals_and_a_wait_ends_with_its_goals(tmp_path):
         assert cut.success and cut.timed_out and cut.finished == [False] and cut.waited_s == pytest.approx(.2)
         graph.until(slow.cancel_goal_async().done)
         assert ended(graph, slow) == (GoalStatus.STATUS_CANCELED, False, 'canceled')
-        unknown = graph.call(graph.wait_client, Wait.Request(goals=[UUID(uuid=[7] * 16)]))
-        assert not unknown.success and unknown.message == 'goals must be goals this world accepted'
         assert graph.wait(0.).time_s == pytest.approx(2.)
     finally:
         graph.close()

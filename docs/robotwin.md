@@ -76,7 +76,7 @@ the store instead of being downloaded.
 
 | Device | Interfaces |
 |---|---|
-| `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
+| `world` | `world/now`, `world/wait`, `world/stop`, `/clock`, `world/spectator/*` while recording |
 | `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/joint_target`, `<arm>/stop` |
 | `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/depth`, `<camera>/camera_info` |

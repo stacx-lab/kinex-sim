@@ -201,7 +201,7 @@ Implement `SimulatorBackend` (`src/kinex_sim/core/backend.py`). Its docstring is
 
 A command that runs over several steps and ends by itself, such as RoboDojo's `move`, is a ROS action
 the backend defines and executes. The world knows no action by name: it serves each one the backend
-lists, carries its goals, feedback and results, and lets waits name its goals.
+lists, carries its goals, feedback and results, and ends its wait when one of them ends.
 
 - **Declare.** `actions` lists an `Action(device, name, type)` per operation; the world serves it as
   `<device>/<name>`, of any installed action type. `custom_interfaces/action/Json` is the free-form one:

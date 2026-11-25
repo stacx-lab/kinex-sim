@@ -28,8 +28,7 @@ async def clock():
     return (await world.now()).time_s
 async def after(seconds):
     """World time once seconds of it have passed."""
-    await world.wait_all([seconds])
-    return await clock()
+    return await world.wait(seconds)
 async def main():
 ${body.split('\n').map(line=>'    '+line).join('\n')}
 asyncio.run(main())`,timeout_s})
@@ -41,7 +40,7 @@ asyncio.run(main())`,timeout_s})
 }
 try {
   const profiles = await runtime.devices.list()
-  assert.deepEqual(Object.keys(profiles.find(d=>d.name==='world').operations), ['now','wait_all','wait_any','stop'])
+  assert.deepEqual(Object.keys(profiles.find(d=>d.name==='world').operations), ['now','wait','stop'])
   assert.deepEqual(Object.keys(profiles.find(d=>d.name==='gripper').operations), ['joint_state','target','stop'])
   for (const name of ['world','arm','gripper','camera_agentview','camera_wrist']) {
     await (await runtime.devices.load(name)).ready
@@ -52,7 +51,7 @@ try {
   assert.deepEqual(started.refusals,{})
   const first = await exec(`assert runtime.describe('gripper.target')['message'] == {'data': 'double'}
 from kinex.communication import scope
-assert set(runtime.describe('world.wait_all')['request']) == {'seconds', 'goals', 'timeout'}
+assert set(runtime.describe('world.wait')['request']) == {'seconds'}
 assert all(not name.endswith(('/task/status','/task/instruction')) for name,_ in scope().bridge.node.get_topic_names_and_types())
 state = await device('arm').topic('joint_state').next(timeout_s=5)
 await lib.frames.lookup_transform('world:base','gripper:tcp',state.header.stamp)
@@ -94,8 +93,9 @@ finish({'ticks': ticks, 'elapsed': round(await clock() - start, 6), 'budget': (a
   assert.deepEqual(ticks.ticks, {10: [0, .1, .2, .3, .4, .5], 4: [0, .25, .5]})
   assert.equal(ticks.elapsed, .5)
   // A program's waits are one wait on the world at a time; an abandoned wait stops the world.
-  await exec(`assert await asyncio.gather(world.wait_all([.2]), world.wait_any([.1, 5])) == [[True], [True, False]]
-pending=asyncio.create_task(world.wait_all([60]))
+  await exec(`start=await clock()
+assert [round(now - start, 6) for now in await asyncio.gather(world.wait(.2), world.wait(.1))] == [.2, .1]
+pending=asyncio.create_task(world.wait(60))
 await asyncio.sleep(.5)
 pending.cancel()
 await asyncio.gather(pending,return_exceptions=True)
@@ -105,11 +105,11 @@ await asyncio.sleep(1)
 assert await clock()==before
 finish({'abandoned_wait_stopped':True})`)
   // A script killed mid-wait leaves no wait advancing the world.
-  await exec(`await world.wait_all([60])`,{error:true,timeout_s:3})
+  await exec(`await world.wait(60)`,{error:true,timeout_s:3})
   const settled = await exec(`before=await clock()
 await asyncio.sleep(1)
 later=await clock()
-await world.wait_all([0])
+await world.wait(0)
 finish({'advanced_s':later-before})`)
   assert.equal(settled.advanced_s,0)
   // A device stop cancels the running script that commanded it.
@@ -117,7 +117,7 @@ finish({'advanced_s':later-before})`)
   const marker = path.join(markers,'commanded')
   const running = exec(`await device('gripper').topic('target').publish({'data':.04})
 open(${JSON.stringify(marker)},'w').close()
-await world.wait_all([60])`,{error:true})
+await world.wait(60)`,{error:true})
   while (!await access(marker).then(()=>true,()=>false)) await delay(20)
   assert.ok(!(await call('device_stop',{deviceID:'gripper'})).isError)
   assert.match(await running,/device stop cancelled this invocation/)

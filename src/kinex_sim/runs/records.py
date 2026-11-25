@@ -34,6 +34,16 @@ def directory(root):
     return root / ".cache/kinex-sim/runs"
 
 
+def own(root):
+    """This user's run records by path. What else lies in the directory, such as a record another schema or user
+    left, is not a run to select."""
+    for path in directory(root).glob("*/run.json"):
+        try:
+            yield path, read(path)
+        except ValueError:
+            continue
+
+
 def select(root, run=None):
     if run:
         candidate = Path(run).expanduser()
@@ -46,11 +56,8 @@ def select(root, run=None):
         if not candidate.is_file():
             raise ValueError(f"Unknown run: {run}")
         return candidate, read(candidate)
-    matches = []
-    for path in directory(root).glob("*/run.json"):
-        record = read(path)
-        if alive(record) and record["state"] in ("starting", "ready", "stopping"):
-            matches.append((path, record))
+    matches = [(path, record) for path, record in own(root)
+               if alive(record) and record["state"] in ("starting", "ready", "stopping")]
     if len(matches) != 1:
         raise ValueError(f"Found {len(matches)} live runs; select an explicit RUN_ID")
     return matches[0]
@@ -58,8 +65,7 @@ def select(root, run=None):
 
 def on_domain(root, domain):
     """The live run on a ROS domain; each live run leases its own."""
-    for path in directory(root).glob("*/run.json"):
-        record = read(path)
+    for path, record in own(root):
         if alive(record) and record.get("domain_id") == domain:
             return path, record
     raise ValueError(f"No live run on ROS domain {domain}; launch one first")

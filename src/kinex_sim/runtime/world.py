@@ -12,7 +12,7 @@ import traceback
 
 from kinex_sim.core import CommandBuffer
 from .pacing import Pacer
-from .waits import WaitScheduler
+from .waits import WaitScheduler, control_steps
 
 # Why a wait with time left ends at once: a refusal its reply must name. The rest of the wait is never stepped, so a
 # stepped run never charges it.
@@ -48,6 +48,7 @@ class WorldRuntime:
         self.waits = WaitScheduler()
         self.pacer = Pacer(mode, sim.period, **pacer_options)
         self.refused = {}  # (endpoint, reason) -> commands refused since the last wait reply
+        self.finished = False  # whether a goal has ended since the last wait reply
         self.goals = {}  # operation -> (complete, feedback) of the goal a backend's action is executing
 
     def _assert_owner(self):
@@ -70,15 +71,19 @@ class WorldRuntime:
         self._assert_owner()
         key = (endpoint, str(reason))
         self.refused[key] = self.refused.get(key, 0) + 1
-        self.waits.interrupt(self.time_s, self.steps, REFUSED)
+        self.waits.interrupt(self.time_s, REFUSED)
 
-    def wait(self, first, seconds, events, timeout_s, complete):
-        """Admit the world's wait, for seconds of world time and events, all of them or with first the first, up to a
-        positive timeout_s; complete receives its WaitResult. One admitted while a refusal awaits its reply ends
-        at once, as refuse ends the pending one (WaitScheduler.admit). Owner thread."""
+    def wait(self, seconds, complete):
+        """Admit the world's wait, for seconds of world time; complete receives its WaitResult, which names the
+        commands refused since the previous one. A goal's end ends the wait, as a refusal does, and one admitted
+        while either awaits its reply ends at once (WaitScheduler.admit). So does one for infinite seconds while
+        no goal executes: nothing would end it. Owner thread."""
         self._assert_owner()
-        self.waits.admit(first, seconds, events, timeout_s, self.time_s, self.steps, self.sim.period, self.ended,
-                         complete, REFUSED if self.refused else None)
+        endless = control_steps(seconds, self.sim.period) == math.inf
+        at_once = ((False, REFUSED) if self.refused else
+                   (True, "ok") if self.finished or endless and not self.goals else None)
+        self.waits.admit(seconds, self.time_s, self.steps, self.sim.period, self.ended,
+                         lambda result: complete(self._reply(result)), at_once)
 
     def start(self, operation, goal, complete, feedback):
         """Start a goal of one of the backend's actions (SimulatorBackend), given as its Goal's fields, in place of
@@ -106,6 +111,9 @@ class WorldRuntime:
             if goal["status"]:
                 del self.goals[operation]
                 complete(goal["status"], goal["result"])
+                # A goal's end ends the wait: whoever waits decides whether to go on.
+                self.finished = True
+                self.waits.interrupt(self.time_s, f"ok; {self.ended}" if self.ended else "ok", True)
             elif goal["feedback"]:
                 feedback(goal["feedback"])
 
@@ -146,10 +154,10 @@ class WorldRuntime:
         limit = getattr(self.sim, "max_steps", None)
         return self.steps * self.sim.period, limit * self.sim.period if limit else math.inf
 
-    def reply(self, result):
+    def _reply(self, result):
         """A wait's result with the commands refused since the previous reply added to its message: a client
-        publishing commands on topics learns of a refusal no other way. Owner thread."""
-        self._assert_owner()
+        publishing commands on topics learns of a refusal no other way."""
+        self.finished = False
         if not self.refused:
             return result
         refused, self.refused = list(self.refused.items()), {}
@@ -270,7 +278,7 @@ class WorldRuntime:
         self._assert_owner()
         with self._lock:
             self._closed = True
-        self.waits.interrupt(self.time_s, self.steps, "runtime stopped")
+        self.waits.interrupt(self.time_s, "runtime stopped")
         while True:
             try:
                 _, future = self._requests.get_nowait()

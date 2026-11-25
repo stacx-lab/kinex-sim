@@ -23,7 +23,7 @@ simulator instead of relaying it. What Kinex adds runs in Kinex:
 
 ## Interface types
 
-The world's `now` is `custom_interfaces/srv/Now`, its `wait_all` and `wait_any` are
+The world's `now` is `custom_interfaces/srv/Now`, its `wait` is
 `custom_interfaces/srv/Wait`, and a lensed camera's `geometry`,
 `unproject` and `project` are `custom_interfaces/srv/Json`. A device's goals, such as RoboDojo's `move`,
 `grasp` and `release`, are `custom_interfaces/action/Json`. kinex-sim and Kinex each build an

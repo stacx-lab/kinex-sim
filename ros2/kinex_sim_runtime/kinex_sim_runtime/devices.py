@@ -129,9 +129,9 @@ class Actuator:
 
 class Goals:
     """A backend's action as a ROS action server, `<device>/<name>` of the type it names. A goal starts in the world
-    before the server accepts it, so the world has every goal a client holds; its messages cross to the backend as
-    their fields, and those of the free-form Json action as the objects they carry: a result's message apart, as
-    the action's own."""
+    before the server accepts it, and the node lists its id once it has ended, for the world's wait to name; its
+    messages cross to the backend as their fields, and those of the free-form Json action as the objects they
+    carry: a result's message apart, as the action's own."""
 
     def __init__(self, action, node):
         self.node, self.operation, self.type = node, f'{action.device}/{action.name}', get_action(action.type)
@@ -156,9 +156,12 @@ class Goals:
             return GoalResponse.REJECT
         if not isinstance(fields, dict):
             return GoalResponse.REJECT
+        def complete(*end):
+            goal.done.set_result(end)
+            if goal.handle is not None:  # else it ended as it started, and is listed once it has its id
+                self.node.ended.append(bytes(goal.handle.goal_id.uuid))
         try:
-            await self.node.request(lambda: self.node.world.start(
-                self.operation, fields, lambda *end: goal.done.set_result(end), feedback))
+            await self.node.request(lambda: self.node.world.start(self.operation, fields, complete, feedback))
         except Exception as error:
             self.node.executor_error = error  # rclpy drops what a goal callback raises once it has awaited
             raise
@@ -170,6 +173,8 @@ class Goals:
         goal = self.node.goals[bytes(handle.goal_id.uuid)] = self.node.starting[id(handle.request)]
         del self.node.starting[id(handle.request)]
         goal.handle = handle
+        if goal.done.done():
+            self.node.ended.append(bytes(handle.goal_id.uuid))
         if goal.sample is not None:  # the feedback of its start, given before it had a handle
             handle.publish_feedback(goal.sample)
         handle.execute()

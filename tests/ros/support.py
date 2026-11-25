@@ -1,5 +1,6 @@
 """Subprocess ROS graphs, each on its own leased domain, with explicit cleanup."""
 import json
+import math
 import os
 import signal
 import subprocess
@@ -50,8 +51,8 @@ class Graph:
         self.node = Node("probe", context=self.context)
         self.last = {}
         self.node.create_subscription(Clock, "/clock", lambda msg: self.last.update(clock=msg), STREAM_QOS)
-        self.wait_client = self.node.create_client(Wait, "world/wait_all")
-        self.any_client = self.node.create_client(Wait, "world/wait_any")
+        self.wait_client = self.node.create_client(Wait, "world/wait")
+        self.ended = set()  # the ids of the goals the world's waits have said ended
         self.now_client = self.node.create_client(Now, "world/now")
         self.stop_client = self.node.create_client(Trigger, "world/stop")
         self.tmp_path = tmp_path
@@ -142,16 +143,24 @@ class Graph:
         return self.call(self.now_client, Now.Request())
 
     def wait(self, duration=0., timeout=15., goals=(), first=False, limit=0.):
-        """The world's wait_all, or with first its wait_any: for duration of world time (None for none) and goals,
-        handles of executing action goals, up to limit seconds of world time. The reply, with how long it waited
-        as waited_s."""
+        """Wait as a client does, by the world's waits, each of which a goal's end ends: for duration of world
+        time, or with None until goals, handles of action goals, have ended, all of them or with first the first, at
+        most limit seconds of world time. The last reply, with which goals had ended as finished, whether the
+        limit ended it as timed_out and how long it took as waited_s."""
         start = self.now().time_s
-        reply = self.call(self.any_client if first else self.wait_client, Wait.Request(
-            seconds=[] if duration is None else [duration], goals=[handle.goal_id for handle in goals],
-            timeout=float(limit)), timeout)
-        return SimpleNamespace(success=reply.success, message=reply.message, time_s=reply.time_s,
-                               finished=list(reply.finished), timed_out=reply.timed_out,
-                               waited_s=reply.time_s - start)
+        left = span = (limit or math.inf) if duration is None else duration
+        while True:
+            reply = self.call(self.wait_client, Wait.Request(seconds=float(left)), timeout)
+            left = max(0., start + span - reply.time_s)
+            self.ended |= {bytes(goal.uuid) for goal in reply.ended}
+            finished = [bytes(handle.goal_id.uuid) in self.ended or handle.status >= 4 for handle in goals]
+            met = duration is None and (any if first else all)(finished)
+            late = reply.time_s >= start + span - 1e-9
+            if met or late or not reply.success:
+                return SimpleNamespace(success=reply.success, message=reply.message, time_s=reply.time_s,
+                                       finished=finished, timed_out=late and not met and duration is None,
+                                       waited_s=reply.time_s - start)
+            self.spin(.02)  # a goal that ended as it started is known by its status
 
     def stop(self, process):
         if process.poll() is None:

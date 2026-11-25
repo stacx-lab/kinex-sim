@@ -64,8 +64,9 @@ def test_stepped_pause_validation_and_rounding(stepped):
     pub.publish(Float64(data=-.5))
     graph.spin(.3)
     assert ticks(graph) == 0  # commands do not step the world
-    for duration in (-1., float("nan"), float("inf")):
+    for duration in (-1., float("nan")):
         assert not graph.wait(duration).success
+    assert graph.wait(None).success and ticks(graph) == 0  # without end, and no goal to end it: at once
     result = graph.wait(.21)
     assert result.success and result.waited_s == pytest.approx(.3)
     graph.until(lambda: ticks(graph) == 3)
@@ -77,8 +78,8 @@ def test_stepped_pause_validation_and_rounding(stepped):
 
 def test_waits_are_sequential_and_stop_ends_them(stepped):
     graph = stepped
-    assert set(Wait.Request.get_fields_and_field_types()) == {"seconds", "goals", "timeout"}
-    pending = graph.wait_client.call_async(Wait.Request(seconds=[1e8]))
+    assert set(Wait.Request.get_fields_and_field_types()) == {"seconds"}
+    pending = graph.wait_client.call_async(Wait.Request(seconds=1e8))
     graph.spin(.2)
     assert "sequential" in graph.wait(0.).message
     assert graph.call(graph.stop_client, Trigger.Request()).success
@@ -175,7 +176,7 @@ def test_wall_timeout_leaves_the_admitted_wait_to_stop(stepped):
 def test_runtime_loss_interrupts_an_inflight_wait(tmp_path):
     graph = Graph(tmp_path, mode="realtime")
     try:
-        future = graph.wait_client.call_async(Wait.Request(seconds=[1e6]))
+        future = graph.wait_client.call_async(Wait.Request(seconds=1e6))
         graph.spin(.2)
         assert not future.done()
         graph.stop(graph.owner)
@@ -209,4 +210,4 @@ def test_no_task_judge_or_reset_interfaces(stepped):
     topics = {name for name, _ in graph.node.get_topic_names_and_types()}
     assert not {"/task/status", "/task/instruction", "/joint_states", "/action"} & topics
     services = {name for name, _ in graph.node.get_service_names_and_types()}
-    assert {"/world/now", "/world/wait_all", "/world/wait_any", "/world/stop"} <= services and "/world/reset" not in services
+    assert {"/world/now", "/world/wait", "/world/stop"} <= services and "/world/reset" not in services

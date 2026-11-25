@@ -22,15 +22,15 @@ def world(mode="stepped", max_steps=None, backend=ToyBackend, task="toy", early_
     return runtime, published
 
 
-def wait(runtime, duration, reply=False):
+def wait(runtime, duration):
     """Admit a world wait of duration on the owner thread; the future completes with its result and how long it
-    waited as waited_s. reply: as the world node admits it, naming the commands refused since the previous reply."""
+    waited as waited_s."""
     result = Future()
 
     def admit():
         start = runtime.time_s
-        runtime.wait(False, [duration], [], 0., lambda done: result.set_result(SimpleNamespace(
-            **vars(runtime.reply(done) if reply else done), waited_s=done.time_s - start)))
+        runtime.wait(duration, lambda done: result.set_result(SimpleNamespace(
+            **vars(done), waited_s=done.time_s - start)))
     runtime.submit(admit).add_done_callback(lambda admitted: admitted.exception() and result.set_exception(admitted.exception()))
     return result
 
@@ -41,7 +41,7 @@ def finish(runtime):
         pass
 
 
-@pytest.mark.parametrize("duration", [-1., float("nan"), float("inf"), -float("inf"), 1e308])
+@pytest.mark.parametrize("duration", [-1., float("nan"), -float("inf")])
 def test_bad_wait_does_not_step(duration):
     runtime, _ = world()
     future = wait(runtime, duration)
@@ -49,6 +49,15 @@ def test_bad_wait_does_not_step(duration):
     with pytest.raises(ValueError, match="seconds"):
         future.result()
     assert runtime.steps == 0
+
+
+@pytest.mark.parametrize("duration", [float("inf"), 1e308])
+def test_a_wait_without_end_returns_at_once_while_no_goal_executes(duration):
+    """Infinite seconds wait for a goal's end alone: with none executing, nothing would end the wait."""
+    runtime, _ = world()
+    future = wait(runtime, duration)
+    finish(runtime)
+    assert future.result().success and runtime.steps == 0
 
 
 def test_zero_rounding_and_sequential_waits():
@@ -65,7 +74,7 @@ def test_zero_rounding_and_sequential_waits():
     runtime.tick()
     assert not first.done()
     runtime.tick()
-    assert first.result().waited_s == pytest.approx(.3) and first.result().done == (True,)
+    assert first.result().waited_s == pytest.approx(.3)
     assert published[-1] == 3  # completion follows observation publication
     assert not runtime.tick()
 
@@ -75,32 +84,9 @@ def test_a_wait_computed_from_the_worlds_own_time_is_due_on_its_step():
     runtime, _ = world()
     for tick in range(1, 40):
         done = Future()
-        runtime.wait(False, [tick * .1 - runtime.time_s], [], 0., done.set_result)
+        runtime.wait(tick * .1 - runtime.time_s, done.set_result)
         finish(runtime)
         assert done.result().success and runtime.steps == tick
-
-
-def test_wait_all_wait_any_and_their_timeout():
-    runtime, _ = world()
-    flags = {"held": False}
-
-    def run(first, seconds, timeout=0.):
-        done, start = Future(), runtime.time_s
-        runtime.wait(first, seconds, [lambda: flags["held"]], timeout, done.set_result)
-        finish(runtime)
-        return done.result(), round(done.result().time_s - start, 6)
-    result, waited = run(True, [.3, .1])  # the first entry to be over
-    assert (result.done, result.timed_out, waited) == ((False, True, False), False, .1)
-    result, waited = run(False, [.3, .1], timeout=.5)  # every entry, or what is left at the timeout
-    assert (result.success, result.done, result.timed_out, waited) == (True, (True, True, False), True, .5)
-    flags["held"] = True
-    result, waited = run(False, [.2])
-    assert (result.done, result.timed_out, waited) == ((True, True), False, .2)
-    with pytest.raises(ValueError, match="needs an entry"):
-        runtime.wait(True, [], [], 1., lambda _: None)
-    done = Future()
-    runtime.wait(False, [], [], 0., done.set_result)  # nothing to wait for: at once
-    assert done.result().success and done.result().done == ()
 
 
 def test_wait_completion_after_publication():
@@ -168,7 +154,7 @@ def test_records_say_why_the_episode_ended(tmp_path, monkeypatch, task, early_st
 
 def replied(runtime, duration):
     """A world wait as the world node admits it: its reply names the commands refused since the previous one."""
-    return wait(runtime, duration, reply=True)
+    return wait(runtime, duration)
 
 
 def refuse(runtime, endpoint, reason, times=1):

@@ -1,6 +1,5 @@
 """The world node: ROS callbacks queue work; the main thread owns the simulator and publishers."""
 import faulthandler
-from functools import partial
 import json
 import math
 import os
@@ -19,6 +18,7 @@ from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.task import Future
 from std_srvs.srv import Trigger
+from unique_identifier_msgs.msg import UUID
 
 from kinex_sim.core import load_backend
 from kinex_sim.runtime.description import logged, task_description
@@ -51,9 +51,10 @@ class SimNode(Node):
         self.get_logger().info(logged(task_description(p["task"], self.sim)))
         self.world = WorldRuntime(self.sim, p["mode"], lambda: self.observations.publish(),
                                   early_stop=p["early_stop"])
-        # Action goals by id, each with the future of its end (done) and end(reason); and those a server is still
-        # accepting, by the id of their request, which have no goal id yet (devices.Goals).
-        self.goals, self.starting = {}, {}
+        # Action goals by id, each with the future of its end (done) and end(reason); those a server is still
+        # accepting, by the id of their request, which have no goal id yet; and the ids of those that have ended
+        # since the last wait reply, which names them (devices.Goals).
+        self.goals, self.starting, self.ended = {}, {}, []
         self.devices = [device(spec, self) for spec in self.sim.devices]
         self.actions = [Goals(action, self) for action in getattr(self.sim, "actions", ())]
         self.declare_parameter("spectator_views", [v.name for v in self.sim.spectators],
@@ -62,8 +63,7 @@ class SimNode(Node):
         # World waits are sequential; stop cancels the pending one.
         services = ReentrantCallbackGroup()
         self.create_service(Now, "world/now", self._now, callback_group=services)
-        self.create_service(Wait, "world/wait_all", partial(self._wait, False), callback_group=services)
-        self.create_service(Wait, "world/wait_any", partial(self._wait, True), callback_group=services)
+        self.create_service(Wait, "world/wait", self._wait, callback_group=services)
         self.create_service(Trigger, "world/stop", self._stop, callback_group=services)
         self.observations.publish()
         scene = "".join(f" {name}={value}" for name, value in sorted({**options, **p["scene"]}.items()))
@@ -103,30 +103,18 @@ class SimNode(Node):
         self.world.submit(function).add_done_callback(complete)
         return await ready
 
-    async def _wait(self, first, request, response):
-        """wait_all, or with first wait_any: its entries are seconds of world time and the goals it names."""
+    async def _wait(self, request, response):
+        """Wait seconds of world time, or until a goal ends: the reply names the goals ended since the last one."""
         ready = Future(executor=self.executor)
 
-        def admit():
-            goals = [self.goals.get(bytes(goal.uuid)) for goal in request.goals]
-            if None in goals:  # unless it is one the server has just accepted, which gets its id at once
-                raise (LookupError if self.starting else ValueError)("goals must be goals this world accepted")
-            # The reply carries the commands refused since the previous one.
-            self.world.wait(first, list(request.seconds), [goal.done.done for goal in goals], request.timeout,
-                            lambda result: ready.set_result(self.world.reply(result)))
+        def complete(result):
+            ended, self.ended = self.ended, []
+            ready.set_result((result, ended))
         try:
-            for _ in range(100):
-                try:
-                    await self.request(admit)
-                    break
-                except LookupError as unnamed:
-                    error = ValueError(unnamed)
-            else:
-                raise error
-            result = await ready
+            await self.request(lambda: self.world.wait(request.seconds, complete))
+            result, ended = await ready
             response.success, response.message, response.time_s = result.success, result.message, result.time_s
-            response.elapsed, response.finished = result.done[:len(request.seconds)], result.done[len(request.seconds):]
-            response.timed_out = result.timed_out
+            response.ended = [UUID(uuid=list(goal)) for goal in ended]
         except Exception as error:
             response.success, response.message = False, str(error)
         return response
@@ -138,7 +126,7 @@ class SimNode(Node):
 
     async def _stop(self, request, response):
         try:
-            await self.request(lambda: self.world.waits.interrupt(self.world.time_s, self.world.steps, "cancelled"))
+            await self.request(lambda: self.world.waits.interrupt(self.world.time_s, "cancelled"))
             response.success = True
         except Exception as error:
             response.success, response.message = False, str(error)

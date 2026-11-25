@@ -61,25 +61,23 @@ def device(name, kind, description, operations, *, observation=None, layout=None
 REFUSED = "is refused, which the world's next wait reply reports."
 
 
+# The world's wait as Kinex's world device guide words it; what this world adds follows it.
+WAIT = ("Wait seconds of world time: the reply gives time_s, the world time reached. A world that executes goals ends "
+        "the wait when one ends, and names it in ended. One wait at a time: a second is rejected.")
+
+
 def world(description):
     """The world: the operations every world declares, in the words of Kinex's world device guide, and what this
-    one's waits add to them. Its clock is the domain's /clock."""
-    entries = ("is over: each of seconds, a duration of world time from now, and each of goals, the id of an "
-               "executing action goal, once it finishes. A positive timeout, in seconds of world time, ends the "
-               "wait with entries left (timed_out). The reply gives time_s, the world time reached, and whether "
-               "each entry was over: elapsed for seconds, finished for goals. One wait at a time: a second is "
-               "rejected.")
-    ends = ("A command a device refused since the previous reply ends the wait at once with success false; message "
-            "names it and why. Once the episode has ended, a wait with entries left fails and message says why.")
+    one's wait adds to them. Its clock is the domain's /clock."""
     ops = {
         "now": operation(
             "World time, time_s, and the time budget in seconds of world time: used_s spent of max_s allowed. "
             "Without a budget both are NaN; without a limit max_s is inf.", "service", "input", "/world/now",
             "custom_interfaces/srv/Now"),
-        "wait_all": operation(f"Wait until every entry {entries} With no entries it returns at once. {ends}",
-                              "service", "input", "/world/wait_all", "custom_interfaces/srv/Wait", timeout_s=120),
-        "wait_any": operation(f"Wait until one entry {entries} {ends}", "service", "input", "/world/wait_any",
-                              "custom_interfaces/srv/Wait", timeout_s=120),
+        "wait": operation(
+            f"{WAIT} A command a device refused since the previous reply ends the wait at once with success false; "
+            "message names it and why. Once the episode has ended, a wait with seconds left fails and message says "
+            "why.", "service", "input", "/world/wait", "custom_interfaces/srv/Wait", timeout_s=120),
         "stop": operation("Cancel the pending wait.", "service", "input", "/world/stop",
                           "std_srvs/srv/Trigger"),
     }

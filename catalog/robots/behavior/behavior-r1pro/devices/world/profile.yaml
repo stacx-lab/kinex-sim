@@ -17,36 +17,15 @@ operations:
       reliability: reliable
       durability: volatile
     timeout_s: 10
-  wait_all:
-    description: 'Wait until every entry is over: each of seconds, a duration of world time
-      from now, and each of goals, the id of an executing action goal, once it finishes. A
-      positive timeout, in seconds of world time, ends the wait with entries left (timed_out).
-      The reply gives time_s, the world time reached, and whether each entry was over: elapsed
-      for seconds, finished for goals. One wait at a time: a second is rejected. With no entries
-      it returns at once. A command a device refused since the previous reply ends the wait
-      at once with success false; message names it and why. Once the episode has ended, a
-      wait with entries left fails and message says why.'
+  wait:
+    description: 'Wait seconds of world time: the reply gives time_s, the world time reached.
+      A world that executes goals ends the wait when one ends, and names it in ended. One
+      wait at a time: a second is rejected. A command a device refused since the previous
+      reply ends the wait at once with success false; message names it and why. Once the episode
+      has ended, a wait with seconds left fails and message says why.'
     transport: service
     direction: input
-    endpoint: /world/wait_all
-    type: custom_interfaces/srv/Wait
-    qos:
-      depth: 1
-      reliability: reliable
-      durability: volatile
-    timeout_s: 120
-  wait_any:
-    description: 'Wait until one entry is over: each of seconds, a duration of world time
-      from now, and each of goals, the id of an executing action goal, once it finishes. A
-      positive timeout, in seconds of world time, ends the wait with entries left (timed_out).
-      The reply gives time_s, the world time reached, and whether each entry was over: elapsed
-      for seconds, finished for goals. One wait at a time: a second is rejected. A command
-      a device refused since the previous reply ends the wait at once with success false;
-      message names it and why. Once the episode has ended, a wait with entries left fails
-      and message says why.'
-    transport: service
-    direction: input
-    endpoint: /world/wait_any
+    endpoint: /world/wait
     type: custom_interfaces/srv/Wait
     qos:
       depth: 1

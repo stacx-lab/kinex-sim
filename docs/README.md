@@ -104,19 +104,20 @@ Both modes retain the backend's native control period and physics decimation.
 Rendering can make realtime slower than wall time; it never changes simulated dt.
 
 The world serves the operations Kinex's world device declares, the same in both modes: `world/now`,
-`world/wait_all`, `world/wait_any` and `world/stop`. The two waits use `custom_interfaces/srv/Wait`. Their
-entries are `seconds`, a list of seconds of world time from now, and `goals`, the ids of executing action
-goals, each over once the goal has finished; `wait_all` ends once every entry is over and `wait_any` once
-one is. A positive `timeout`, in seconds of world time, ends the wait with what is left and `timed_out`
-true; the goals go on, and a client cancels a goal it gives up on. The reply gives `success`, `message`,
-`time_s`, the world time reached, and whether each entry was over as `elapsed` and `finished`. A goal
-advances no time. `world/now` (`custom_interfaces/srv/Now`) replies `time_s` and the episode budget,
+`world/wait` and `world/stop`. The wait (`custom_interfaces/srv/Wait`) takes `seconds` of world time and
+replies `success`, `message` and `time_s`, the world time reached. The world has two things to advance
+for, and one request carries both: seconds of time, and the goals of its devices. So a goal's end ends
+the wait, on the step it ends at, and the reply names in `ended` the goals that have ended since the
+previous reply; a wait admitted after one has ended returns at once to say so. A client that waits for a
+goal alone sends infinite `seconds`, a wait only a goal's end ends: while no goal executes it returns at
+once, so a goal the world does not execute costs no world time. Sending a goal advances no time.
+`world/now` (`custom_interfaces/srv/Now`) replies `time_s` and the episode budget,
 `used_s` and `max_s`, the seconds of world time the episode has used and is allowed
 (control steps times the control period; `max_s` inf without a step limit). Only a
 stepped run has a budget; a realtime run replies NaN for both. A wait rounds up to whole
 native control steps, a millionth of a step counting as none, so a wait computed from the
-world's own time is due on its step; a wait with no entry left is immediate, an observation barrier;
-negative or nonfinite seconds, and a `wait_any` without an entry, fail. Waits are sequential: a wait requested while another is pending is
+world's own time is due on its step; a wait of no seconds is immediate, an observation barrier;
+negative or NaN seconds fail. Waits are sequential: a wait requested while another is pending is
 rejected, and `world/stop` (`std_srvs/srv/Trigger`) cancels the pending one. A run
 is one episode, of the task, seed and scene options it was launched with. There is no reset: to
 start over, stop the run and launch another. An episode ends at its step limit, if it

@@ -14,7 +14,7 @@ def probe(timeout=10.):
     node = Node("kinex_sim_probe")
     clock = []
     node.create_subscription(Clock, "/clock", clock.append, STREAM_QOS)
-    wait = node.create_client(Wait, "world/wait_all")
+    wait = node.create_client(Wait, "world/wait")
     deadline = time.monotonic() + timeout
     try:
         while time.monotonic() < deadline:

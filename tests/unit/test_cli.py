@@ -98,6 +98,12 @@ def test_default_selection_requires_one_live_run(tmp_path):
         write_json(path, {"schema": SCHEMA, "uid": os.getuid(), "state": "ready", "owner": identity(os.getpid())})
     with pytest.raises(ValueError, match="2 live runs"):
         select(tmp_path)
+    # A record of another schema in the directory, as an older version left them, is not a run to select.
+    stale = tmp_path / ".cache/kinex-sim/runs/old/run.json"
+    stale.parent.mkdir()
+    write_json(stale, {"schema": "other/run/1", "uid": os.getuid(), "state": "ready", "owner": identity(os.getpid())})
+    (tmp_path / ".cache/kinex-sim/runs/two/run.json").unlink()
+    assert select(tmp_path)[0].parent.name == "one"
 
 
 def test_describe_prints_the_task_description_of_the_live_run_on_a_domain(tmp_path, capsys):
