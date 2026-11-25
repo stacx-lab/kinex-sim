@@ -17,27 +17,31 @@ import rigs  # noqa: E402
 from kinex_sim_robodojo import grip, move  # noqa: E402
 from kinex_sim_robodojo.backend import JSON, RoboDojoSim, runtime  # noqa: E402
 
-# RoboEnv's parallel-gripper geometry: the pad center ahead of link6, in the flange frame.
-TCP = (0.15007, -0.000002, -0.00144)
 ARM = "ARX X5 six-joint {side} arm"
 # What the devices' goals do (kinex_sim_robodojo.move and grip), each a Json action's objects. A gear is named with
 # its step in cm and its tolerances in m and rad.
-GOALS = ", moved by flange goals through its own IK"
+GOALS = ", moved by goals of {side}_gripper/tcp through its own IK"
 GEARS = ", ".join(f"{name} {100 * step:g} cm within {reach:g} m and {turn:g} rad"
                   for name, (step, reach, turn) in move.PROFILES.items())
-ENDS = "A newer goal or a stop ends it."
+(POSITION, ORIENTATION), ENDS = move.LIMITS.values(), "A newer goal or a stop ends it."
 # A step that moves an arm too far ends the goals it concerns (move.unsafe).
-UNSAFE = (f"a step moves a flange more than {move.MOVED[0]:g} m or {move.MOVED[1]:g} rad, or that of an arm holding "
+UNSAFE = (f"a step moves a TCP more than {move.MOVED[0]:g} m or {move.MOVED[1]:g} rad, or that of an arm holding "
           f"still more than {move.HELD[0]:g} m or {move.HELD[1]:g} rad (unsafe_motion)")
-MOVE = ("Move the flange in a straight line to a pose: {{pose: [x, y, z, qx, qy, qz, qw] in {side}_arm/base, "
-        "profile}}. profile is the gear, the most a {period:g} s step moves the flange and how near the pose it "
-        f"has reached it: {GEARS}; standard by default. The goal aborts when the flange stalls, moves away from "
-        f"the pose on two steps running (diverging), when {UNSAFE}, when a step has no IK solution (unreachable) or "
-        f"{move.SETTLE} steps after the gear would have arrived (late). Before it is unreachable the flange goes, "
-        "once, for a pose the arm can reach within the gear's tolerance of the goal's, if there is one. Result: "
-        "{{stop_reason: reached | stalled | diverging | unsafe_motion | unreachable | late | ended, pose, "
-        "position_error_m, orientation_error_rad, steps, recovered: whether it went for such a pose}}; feedback: "
-        f"the errors and steps. {ENDS}")
+MOVE = ("Move {side}_gripper/tcp in a straight line to a pose: {{pose: [x, y, z, qx, qy, qz, qw] of {side}_gripper/tcp "
+        "in {side}_arm/base, profile, position_tolerance_m, orientation_tolerance_rad, max_steps}}. profile is the "
+        "gear, the most a {period:g} s step moves the TCP and how near the pose it has reached it: "
+        f"{GEARS}; standard by default. A turn about the TCP takes part of the step: it sweeps the flange, "
+        f"{move.RADIUS:.3f} m away, at most half the step. position_tolerance_m ({POSITION[0]:g} to {POSITION[1]:g}) "
+        f"and orientation_tolerance_rad ({ORIENTATION[0]:g} to {ORIENTATION[1]:g}) replace the gear's tolerances. "
+        f"max_steps (1 to {move.MAX_STEPS}, {move.MAX_STEPS} by default) bounds the goal's steps. The goal succeeds "
+        "once the TCP is within the tolerance of the pose (reached) or has taken max_steps steps (max_steps, the "
+        "result's errors saying how far it is from the pose), and aborts when the TCP stalls, moves away from the "
+        f"pose on two steps running (diverging), when {UNSAFE} or when a step has no IK solution (unreachable). "
+        "Before it is unreachable the TCP "
+        "goes, once, for a pose the arm can reach within the tolerance of the goal's, if there is one. Result: "
+        "{{stop_reason: reached | stalled | diverging | unsafe_motion | unreachable | max_steps | ended, pose of the "
+        "TCP, position_error_m, orientation_error_rad, steps, recovered: whether it went for such a pose}}; "
+        f"feedback: the errors and steps. {ENDS}")
 GRASP = (f"Close the fingers and keep squeezing: {{}}, no fields. The goal succeeds once the fingers have closed "
          f"(reached: nothing is between them) or have stopped short (stalled, as on an object), and aborts if they "
          f"are still moving after {grip.MAX_STEPS} steps (late) or {UNSAFE}. Result: {{stop_reason: reached | "
@@ -50,7 +54,7 @@ RELEASE = (f"Open the fingers: {{opening}}, a grip joint position, fully open by
 
 def arm(side, base, period, goals=True):
     """An arm, moved by goals, or in the basic configuration by joint targets."""
-    profile = rigs.joint(f"{side}_arm", ARM.format(side=side) + (GOALS if goals else "") + ".",
+    profile = rigs.joint(f"{side}_arm", ARM.format(side=side) + (GOALS.format(side=side) if goals else "") + ".",
                          [f"joint{i}" for i in range(1, 7)], [0.0] * 6, base, tip_pose=True, targets=not goals)
     return rigs.action(profile, "move", JSON, MOVE.format(side=side, period=period)) if goals else profile
 
@@ -63,7 +67,7 @@ def gripper(side, goals=True):
         "pad centre and approaches along +x.",
         f"{side}_gripper",
         rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
-        rigs.frame(f"{side}_gripper:base", TCP, (0, 0, 0, 1)), targets=not goals)
+        rigs.frame(f"{side}_gripper:base", move.TCP, (0, 0, 0, 1)), targets=not goals)
     for name, text in (("grasp", GRASP), ("release", RELEASE)) if goals else ():
         rigs.action(profile, name, JSON, text)
     return profile

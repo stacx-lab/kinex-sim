@@ -89,7 +89,8 @@ at (∓0.3, −0.45, 0.765) with a 90° yaw, RoboEnv's TCP (the pad center, 0.15
 ahead of `link6`) and the measured camera mounts.
 
 The flange is `link6`, upstream's `ee_link` and cuRobo's tool frame, and `pose_state` reports its
-measured pose in `<arm>/base`.
+measured pose in `<arm>/base`. Move goals control the TCP, `<gripper>/tcp`, as uni-robot-agent's
+`move` controls its grasp site.
 
 ### Goals
 
@@ -100,43 +101,51 @@ advances each goal inside its step, and the world only carries them (see
 [Actions](adding-a-simulator.md#actions)). A goal ends other goals of its device, and a stop ends it.
 Nothing plans a path around objects.
 
-`<arm>/move` takes `{pose, profile}`: the `flange` pose to reach, `[x, y, z, qx, qy, qz, qw]` in
-`<arm>/base`, and a gear, uni-robot-agent's motion profile.
+`<arm>/move` takes uni-robot-agent's `move` parameters for one arm,
+`{pose, profile, position_tolerance_m, orientation_tolerance_rad, max_steps}`: the pose of
+`<gripper>/tcp` to reach, `[x, y, z, qx, qy, qz, qw]` in `<arm>/base`; a gear, uni-robot-agent's motion
+profile; tolerances that replace the gear's, 0.001–0.1 m and 0.02–0.5 rad; and the most frames the goal
+takes, 1–24 and 24 by default.
 
-| `profile` | Most a 0.04 s frame moves the flange | Reached within |
+| `profile` | Most a 0.04 s frame moves the TCP | Reached within |
 |---|---|---|
-| `standard` (default) | 4 cm, 0.13 rad | 0.03 m, 0.1 rad |
-| `approach` | 4 cm, 0.13 rad | 0.02 m, 0.05 rad |
-| `precision` | 1 cm, 0.033 rad | 0.005 m, 0.05 rad |
+| `standard` (default) | 4 cm | 0.03 m, 0.1 rad |
+| `approach` | 4 cm | 0.02 m, 0.05 rad |
+| `precision` | 1 cm | 0.005 m, 0.05 rad |
 
-1. Each frame commands a pose at most the gear's step from the measured one, on the straight line to the
-   goal, so a blocked flange is never driven far past where it is.
+1. Each frame commands a TCP pose at most the gear's step from the measured one, uni-robot-agent's
+   waypoint: the TCP turns toward the goal's orientation by at most the angle that sweeps the flange,
+   0.150 m away, through half the step (0.13 rad at 4 cm, 0.033 rad at 1 cm), and moves on the straight
+   line to the goal by what the sweep leaves of the step. A blocked TCP is never driven far past where
+   it is.
 2. cuRobo's `InverseKinematics`, the solver upstream's `ee_pose` action uses (32 seeds, self and table
-   collision, 1 mm and 0.02 rad), solves that pose from the measured joints (`RoboDojoSim.joint_step`).
+   collision, 1 mm and 0.02 rad), solves the flange of that pose from the measured joints
+   (`RoboDojoSim.joint_step`).
    Of its solutions, the one nearest the measured joints is taken that lies within the joint limits, a
    whole turn nearer where they allow, asks no joint for more than 1 rad, and has a joint path, sampled
    every 0.025 rad, that passes cuRobo's self and table constraints. These checks follow
    uni-robot-agent's RoboDojo adapter, with the nearest solution in place of cuRobo's first. A joint
    asked for more than a frame's 0.2 rad (the X5 actuators' 5 rad/s `velocity_limit_sim`) saturates, and
    the next frame goes on from where the arm is.
-3. The goal succeeds once the flange is within the gear's tolerance of the pose (`stop_reason` `reached`),
-   the arm holding its last step.
-4. It is aborted, the arm holding its measured joints, when the flange stalls (over four frames it gains
-   less than a tenth of the tolerance), when it moves away from the pose on two frames running
-   (`diverging`: its distance in metres plus a tenth of its radians grows by more than 0.01 each time),
-   when a frame has no IK solution (`unreachable`), or 25 frames after the gear's steps would have
-   arrived (`late`). A cancel, a newer goal or a stop ends it the same way (`ended`). The result's
-   `message` says why and how far from the pose it ended; the result also gives the measured `pose`,
-   `position_error_m`, `orientation_error_rad`, `steps` and `recovered`.
+3. The goal is judged after each frame, never before the first, as uni-robot-agent's `move` is. It
+   succeeds, the arm holding its last step, once the TCP is within the tolerance of the pose
+   (`stop_reason` `reached`) or after `max_steps` frames (`max_steps`, message "reached max_steps"),
+   whose errors say how far it still is from the pose.
+4. It is aborted, the arm holding its measured joints, when the TCP moves away from the pose on two
+   frames running (`diverging`: its distance in metres plus a tenth of its radians grows by more than
+   0.01 each time), when it stalls (over four frames it gains less than a tenth of the tolerance), or
+   when a frame has no IK solution (`unreachable`). A cancel, a newer goal or a stop ends it the same way
+   (`ended`). The result's `message` says why and how far from the pose it ended; the result also gives
+   the measured TCP `pose`, `position_error_m`, `orientation_error_rad`, `steps` and `recovered`.
 5. Before a goal is unreachable it is recovered, once, as uni-robot-agent recovers a move
-   (`kinex_sim_robodojo.region`): the flange goes on to a pose the arm can reach within 80% of the
-   gear's tolerance of the goal's, and still arrives when it is within the tolerance of the goal's own
-   pose. That pose is the flange of one of the IK's own solutions for the goal, converged or not, that
+   (`kinex_sim_robodojo.region`): the TCP goes on to a pose the arm can reach within 80% of the
+   goal's tolerance, and still arrives when it is within the tolerance of the goal's own pose. That
+   pose is the TCP of one of the IK's own solutions for the goal, converged or not, that
    cuRobo's constraints allow; failing one, of the joints nearest the measured ones that a search
    finds, by the arm's kinematics from `X5A.urdf` and within 10 s of wall time. No world time passes
    meanwhile.
 
-A frame that moves a flange too far ends goals as `unsafe_motion`: more than 0.2 m or 0.8 rad for an arm
+A frame that moves a TCP too far ends goals as `unsafe_motion`: more than 0.2 m or 0.8 rad for an arm
 its goal moves, which ends that goal; more than 0.05 m or 0.25 rad for an arm that holds still, which
 ends every goal that runs, a gripper's too.
 

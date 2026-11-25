@@ -174,6 +174,37 @@ def test_a_goal_step_becomes_joints_through_curobo_ik_or_has_none():
         sim.close()
 
 
+def test_a_move_goal_steps_the_tcp_to_its_pose_within_its_steps():
+    """A move goal controls the gripper's TCP: a 5 cm lift with a 0.3 rad turn about it arrives within the goal's
+    own tolerance, and a goal given too few steps succeeds at max_steps, short of its pose."""
+    from scipy.spatial.transform import Rotation
+    from kinex_sim_robodojo import move
+    sim = native(max_steps=200)
+    try:
+        sim.reset("stack_bowls", 0)
+
+        def tcp():
+            return move.tcp(np.asarray(sim.tip_pose("left_arm")))
+
+        def run(goal):
+            sim.start("left_arm/move", goal)
+            while sim.goals["left_arm/move"]["status"] is None:
+                sim.step(sim.state()[0])
+            return sim.goals["left_arm/move"]
+
+        start = tcp()
+        turned = (Rotation.from_euler("z", .3) * Rotation.from_quat(start[3:])).as_quat()
+        goal = np.r_[start[:3] + [0., 0., .05], turned]
+        done = run({"pose": goal.tolist(), "profile": "approach", "position_tolerance_m": .003})
+        assert (done["status"], done["result"]["stop_reason"]) == ("succeeded", "reached")
+        assert done["result"]["steps"] <= 24 and np.all(move.offset(tcp(), goal) <= [.003, .05])
+        short = run({"pose": start.tolist(), "max_steps": 2})
+        assert (short["status"], short["result"]["stop_reason"], short["result"]["steps"]) == ("succeeded", "max_steps", 2)
+        assert short["result"]["message"].startswith("reached max_steps: ") and short["result"]["position_error_m"] > .01
+    finally:
+        sim.close()
+
+
 @pytest.mark.parametrize("task", SELECTED)
 def test_catalog_task_loads_describes_itself_and_steps(task):
     sim = native()
