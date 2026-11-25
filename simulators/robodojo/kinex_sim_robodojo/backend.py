@@ -4,7 +4,7 @@ Isaac Sim 5.1 needs Python 3.11, so the world node proxies this class through
 kinex_sim.core.worker. Every 0.04 s frame passes absolute arm joints and the
 native normalized gripper value to upstream's EvalEnv.take_action, which
 interpolates the arm over its ten 250 Hz substeps. The devices take goals, as
-uni-robot-agent's tools do: an arm's move steps its flange to a pose
+uni-robot-agent's tools do: an arm's move steps its gripper's TCP to a pose
 (kinex_sim_robodojo.move), each step becoming joints through the cuRobo IK
 upstream's ee_pose action uses, checked as uni-robot-agent's RoboDojo adapter
 checks it, and a gripper's grasp and release run its fingers until they stop
@@ -31,7 +31,8 @@ SIDES = ("left", "right")
 SPECTATORS = (("third_person", "head_camera"), ("left_wrist", "left_camera"),
               ("right_wrist", "right_camera"))
 UNSTABLE_RETRIES = 3
-# An arm's goals are poses of its flange, link6: upstream's ee_link and its cuRobo tool frame.
+# An arm's tip, which pose_state reports, is its flange, link6: upstream's ee_link and its cuRobo tool frame. Its goals
+# move the gripper's TCP (move.TCP).
 TIP = "flange"
 # The devices' goals are free-form: each action's profile description states its objects.
 JSON = "custom_interfaces/action/Json"
@@ -300,9 +301,10 @@ class RoboDojoSim:
             # One frame's joint travel at the native velocity limit (upstream's 5 rad/s actuators), for the rig.
             step = float(np.min(values(key.data.joint_vel_limits[0])[arm])) * self.period
             self._limits[side] = (limits[:, 0], limits[:, 1], step)
-            # The flange in the arm's base at given joints, for poses the IK has not solved.
+            # The TCP in the arm's base at given joints, for poses the IK has not solved.
             from .region import chain  # SciPy, which the native environment has
-            self._chains[side] = chain(runtime() / "Assets/Robots/x5/X5A.urdf", list(robot.arm_joints_name))
+            fk = chain(runtime() / "Assets/Robots/x5/X5A.urdf", list(robot.arm_joints_name))
+            self._chains[side] = lambda q, fk=fk: fk(q) @ move.TOOL
             # The openings the fingers can reach: a closed command lies past the finger stop.
             stops = values(key.data.joint_pos_limits[0])[robot.gripper_joint_indices[0]]
             self._spans[f"{side}_gripper"] = np.clip(sorted(self._fraction(robot, stop) for stop in stops), 0., 1.)
@@ -345,7 +347,7 @@ class RoboDojoSim:
             group = next(group for group in self.layout.groups if group.name == operation.partition("/")[0])
             action[list(group.indices)] = active.command
         # While goals run, each step is checked for an arm it moved too far.
-        before = {f"{side}_arm": self.tip_pose(f"{side}_arm") for side in SIDES} if self._active else {}
+        before = {f"{side}_arm": self.tcp_pose(f"{side}_arm") for side in SIDES} if self._active else {}
         manager, native = self.env.robot_manager, {}
         for side, offset in zip(SIDES, (0, 7)):
             robot, key, arm, fingers = self._actuators[side]
@@ -377,7 +379,7 @@ class RoboDojoSim:
             elif found or self.steps < self.max_steps:
                 self.stop = ("failure", found or "a task constraint failed")
         self.done = bool(self.env.end_flag[0] or self.steps >= self.max_steps)
-        poses = {arm: self.tip_pose(arm) for arm in before}
+        poses = {arm: self.tcp_pose(arm) for arm in before}
         moving = {operation.partition("/")[0] for operation in self._active if operation.endswith("/move")}
         unsafe = move.unsafe({arm: move.offset(before[arm], poses[arm]) for arm in before}, moving)
         for operation in list(self._active):
@@ -402,7 +404,7 @@ class RoboDojoSim:
         self._active.pop(operation, None)
         arm = name == "move"
         try:
-            active = move.motion(goal, self.tip_pose(group)) if arm else grip.grip(name, goal, self._spans[group])
+            active = move.motion(goal, self.tcp_pose(group)) if arm else grip.grip(name, goal, self._spans[group])
         except ValueError as error:  # it commands nothing: the device goes on as it was
             self.goals[operation] = {"status": "aborted", "feedback": None, "commands": {},
                                      "result": {"stop_reason": "invalid", "message": str(error)}}
@@ -426,12 +428,12 @@ class RoboDojoSim:
                                  "commands": {group: held}, "result": active.result(reason, text)}
 
     def _follow(self, operation, poses=None, unsafe=""):
-        """Judge a goal by what it measures, its flange's pose or its gripper's opening, and command its next step,
-        an arm's through cuRobo's IK, or end it. poses are the flanges' measured poses, where a step has measured
+        """Judge a goal by what it measures, its TCP's pose or its gripper's opening, and command its next step,
+        an arm's through cuRobo's IK, or end it. poses are the TCPs' measured poses, where a step has measured
         them, and unsafe says which arms that step moved too far, which ends the goal."""
         group, name = operation.split("/")
         active, arm, text = self._active[operation], name == "move", None
-        reason = active.observe(self._opening(group) if not arm else poses[group] if poses else self.tip_pose(group))
+        reason = active.observe(self._opening(group) if not arm else poses[group] if poses else self.tcp_pose(group))
         if unsafe:
             reason, text = "unsafe_motion", f"unsafe motion, {unsafe}"
         if reason is None and arm:
@@ -465,6 +467,10 @@ class RoboDojoSim:
         w, x, y, z = t3d.quaternions.mat2quat(relative[:3, :3])
         return np.r_[relative[:3, 3], x, y, z, w]
 
+    def tcp_pose(self, group):
+        """The measured pose of the arm's gripper's TCP in <arm>/base, which the arm's goals move."""
+        return move.tcp(self.tip_pose(group))
+
     def _native_pose(self, side, pose):
         """A flange pose in <arm>/base as upstream's <side>_ee_pose: the link6 pose in the environment frame,
         [x, y, z, qw, qx, qy, qz], as its observation reports it."""
@@ -493,10 +499,11 @@ class RoboDojoSim:
         return q
 
     def _next(self, group, motion):
-        """The joints of a move's next step. When cuRobo's IK has none, the move goes on, once, to a pose near its
-        goal's that the arm can reach, if there is one: uni-robot-agent's goal recovery."""
+        """The joints of a move's next step, the flange's for its TCP's pose. When cuRobo's IK has none, the move
+        goes on, once, to a pose near its goal's that the arm can reach, if there is one: uni-robot-agent's goal
+        recovery."""
         try:
-            return self.joint_step(group, motion.reference())
+            return self.joint_step(group, move.flange(motion.reference()))
         except ValueError:
             if motion.recovery is not None:
                 raise
@@ -505,17 +512,17 @@ class RoboDojoSim:
             if pose is None:
                 raise
             motion.recover(pose)
-            return self.joint_step(group, motion.reference())
+            return self.joint_step(group, move.flange(motion.reference()))
 
     def reachable(self, group, goal, tolerance):
-        """A flange pose within tolerance (m, rad) of goal that cuRobo's constraints allow the arm, or None
+        """A TCP pose within tolerance (m, rad) of goal, the TCP's, that cuRobo's constraints allow the arm, or None
         (kinex_sim_robodojo.region): among the IK's own solutions for goal, converged or not, then by search."""
         side = group.removesuffix("_arm")
         robot = self._actuators[side][0]
         planner = self.env.robot_manager.ik_solver[robot.robot_name]
         lower, upper, _ = self._limits[side]
         joints = self._joints(group)
-        found = self._candidates(planner, robot, self._native_pose(side, np.asarray(goal, dtype=float)), joints, True)
+        found = self._candidates(planner, robot, self._native_pose(side, move.flange(goal)), joints, True)
         from .region import search
         return search(self._chains[side], [nearest_turn(q, joints, lower, upper) for q in found],
                       lambda rows: self._constraints(planner, rows), joints, goal, (lower, upper), tolerance)

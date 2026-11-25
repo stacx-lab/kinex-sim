@@ -42,11 +42,12 @@ def chain(urdf, joints):
 def search(fk, candidates, constraints, current, goal, limits, tolerance):
     """A pose within MARGIN of tolerance (m, rad) of goal that the arm can take, or None.
 
-    fk(q) is the flange's 4x4 transform at joints q; candidates are joints an IK for goal returned, converged or
-    not; constraints(rows) gives, for joint rows, whether each satisfies the arm's constraints and each one's
-    constraint costs, none positive when it does; current are the measured joints and limits their (lower, upper).
+    fk(q) is the 4x4 transform at joints q of the frame a move controls; candidates are joints an IK for goal
+    returned, converged or not; constraints(rows) gives, for joint rows, whether each satisfies the arm's
+    constraints and each one's constraint costs, none positive when it does; current are the measured joints and
+    limits their (lower, upper).
     A candidate already inside the region is taken, the nearest first; otherwise the joints nearest current are
-    sought whose flange lies inside it. The pose is for a move's steps to go to: its joints are not commanded.
+    sought whose frame lies inside it. The pose is for a move's steps to go to: its joints are not commanded.
     """
     current, (low, high) = np.asarray(current, float), limits
     reach, turn = np.asarray(tolerance) * MARGIN

@@ -32,10 +32,10 @@ operations:
     description: 'Close the fingers and keep squeezing: {}, no fields. The goal succeeds once
       the fingers have closed (reached: nothing is between them) or have stopped short (stalled,
       as on an object), and aborts if they are still moving after 24 steps (late) or a step
-      moves a flange more than 0.2 m or 0.8 rad, or that of an arm holding still more than
-      0.05 m or 0.25 rad (unsafe_motion). Result: {stop_reason: reached | stalled | late |
-      unsafe_motion | ended, opening, steps}, opening as joint_state gives it; feedback: opening
-      and steps. A newer goal or a stop ends it.'
+      moves a TCP more than 0.2 m or 0.8 rad, or that of an arm holding still more than 0.05
+      m or 0.25 rad (unsafe_motion). Result: {stop_reason: reached | stalled | late | unsafe_motion
+      | ended, opening, steps}, opening as joint_state gives it; feedback: opening and steps.
+      A newer goal or a stop ends it.'
     transport: action
     direction: input
     endpoint: /right_gripper/grasp
