@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from kinex_sim.catalog.robots import list_robots, merge, setup
+from kinex_sim.catalog.robots import SHIPPED, list_robots, merge, setup
 from kinex_sim.core.commands import VELOCITY_TIMEOUT_S
 
 
@@ -82,7 +82,13 @@ def test_every_rig_exports_loaded_profiles_on_kinex_sim_endpoints(tmp_path, iden
     assert json.loads((root / "kinex.json").read_text())["python"] == {"provider": "ros-jazzy"}
     assert kinds(identifier.split("/")[0], configuration) | {"world": "world"} == {
         name: profile["type"] for name, profile in profiles.items()}
-    assert sorted(path.name for path in root.iterdir()) == ["devices", "kinex.json", "workspace.yaml"]
+    # Besides its profiles, the content its standard devices or its configuration ship, never both.
+    rig = PROJECT / "catalog/robots" / identifier
+    source = rig / "configurations" / configuration if configuration else rig
+    shipped = {name for name in SHIPPED if (source / name).is_dir()}
+    assert sorted(path.name for path in root.iterdir()) == sorted({"devices", "kinex.json", "workspace.yaml", *shipped})
+    if identifier == "robodojo/robodojo-arx-x5":  # its triangulation library is for its standard devices alone
+        assert (root / "lib/perception.py").is_file() == (configuration is None)
     for name, profile in profiles.items():
         assert profile["name"] == name and profile["loaded"] is True  # Kinex activates them when it starts
         assert profile["runtime"]["domain_id"] == 83
@@ -359,7 +365,7 @@ def test_rig_builders_write_configurations_as_patches_that_merge_back():
         rigs.patch({"fps": 30}, {"fps": None})
 
 
-def test_setup_ships_a_rigs_library_programs_and_skills_with_its_configurations_on_top(tmp_path):
+def test_setup_ships_the_content_of_the_standard_devices_or_of_the_configuration(tmp_path):
     """Kinex workspace content a rig ships, and a configuration's files over it; never over a workspace's own."""
     project = tmp_path / "project"
     (project / "src/kinex_sim").mkdir(parents=True)  # what project_root takes for a checkout
@@ -392,8 +398,10 @@ def test_setup_ships_a_rigs_library_programs_and_skills_with_its_configurations_
         "workspace.yaml": (source / "workspace.yaml").read_text(), "kinex.json": '{\n  "python": {\n    '
         '"provider": "ros-jazzy"\n  }\n}\n', "lib/grasp.py": "base", "lib/reach.py": "reach",
         "programs/reach.py": "reach", "skills/reach/SKILL.md": ""}
+    # A configuration ships its own content, not the standard devices'.
     retry = shipped(tmp_path / "retry", configuration="retry")
-    assert (retry["lib/grasp.py"], retry["programs/retry.py"], retry["lib/reach.py"]) == ("retrying", "retry", "reach")
+    assert {name: text for name, text in retry.items() if name.split("/")[0] in SHIPPED} == {
+        "lib/grasp.py": "retrying", "programs/retry.py": "retry"}
     (tmp_path / "own/.kinex/programs").mkdir(parents=True)
     with pytest.raises(ValueError, match="already contains programs"):
         setup("toy/reach", tmp_path / "own", project=project)

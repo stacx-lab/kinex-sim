@@ -40,7 +40,7 @@ run without it. They take Kinex Python from
 
 | Directory | Checks | Runs in |
 |---|---|---|
-| `tests/kinex/unit` | `custom_interfaces` is the same package here and in Kinex; Kinex's profile schema and readiness plan accept every rig | the default environment, next to a Kinex checkout |
+| `tests/kinex/unit` | `custom_interfaces` is the same package here and in Kinex; Kinex's profile schema and readiness plan accept every rig; RoboDojo's shipped `kinex.lib.perception` triangulates | the default environment, next to a Kinex checkout |
 | `tests/kinex/ros` | Kinex's ROS communication and device host on a kinex-sim overlay; `workspace.mjs`, an end-to-end program against a launched LIBERO run | a sourced simulator overlay |
 | `tests/kinex/native` | `test_<simulator>.py`: the exported rig's FK, mounts and camera frames, through Kinex's kinematics, against the simulator | that simulator's native environment |
 

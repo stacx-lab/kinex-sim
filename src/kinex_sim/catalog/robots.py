@@ -1,11 +1,13 @@
 """Export the Kinex workspace of a task and seed from the robot catalog, without importing ROS or simulators.
 
 Each robot is a complete workspace skeleton whose profiles carry its calibration; it may also ship Kinex
-workspace content (SHIPPED). Files shared by several robots are symlinks; export copies their content.
+workspace content (SHIPPED) for its standard devices. Files shared by several robots are symlinks; export copies
+their content.
 
 A simulator that declares configurations in its manifest, alternative device sets such as RoboDojo's RGB-D
 cameras, gives each of its rigs a `configurations/<name>/` directory: its optional `profiles.yaml` holds
-profile changes by device, and its SHIPPED directories add files over the rig's.
+profile changes by device, and its SHIPPED directories are the content that configuration ships, in place of the
+rig's.
 
 A simulator whose devices differ by task or seed, such as HandsOn's cameras, names a `workspace` hook in its
 manifest: "module:function" under its python_path, called with its runtime directory, the native task, the
@@ -102,8 +104,8 @@ def changes(root, config, task, seed, profiles=None):
 def setup(selection, directory=None, *, seed=None, project=None, domain_id=0, configuration=None):
     """The workspace a launch of the same task, seed and configuration serves, every device loaded (Kinex activates
     loaded devices when it starts): the task's robot in that
-    configuration, with its simulator's profile changes for that task and seed and the content it ships. The seed
-    defaults as a launch's does."""
+    configuration, with its simulator's profile changes for that task and seed and the content that configuration
+    ships. The seed defaults as a launch's does."""
     check_domain(domain_id)
     root, config, task = resolve(selection, project)
     check_configuration(config, configuration)
@@ -112,12 +114,11 @@ def setup(selection, directory=None, *, seed=None, project=None, domain_id=0, co
     if identifier not in list_robots(root):
         raise ValueError(f"task {task['id']} names an unknown robot {identifier!r}")
     rig = root / "catalog/robots" / identifier
-    # The rig's shipped content, then the configuration's over it.
-    sources = [source for source in (rig, configuration_directory(root, identifier, configuration)) if source]
+    # The content the standard devices ship, or the configuration's own.
+    source = configuration_directory(root, identifier, configuration) or rig
     profiles = catalog_profiles(root, identifier, configuration)
     apply(profiles, changes(root, config, task, seed, profiles), f"{config['name']}'s workspace hook")
-    exported = ["workspace.yaml", "devices",
-                *(name for name in SHIPPED if any((source / name).is_dir() for source in sources))]
+    exported = ["workspace.yaml", "devices", *(name for name in SHIPPED if (source / name).is_dir())]
     target = Path(directory or Path.cwd()).resolve() / ".kinex"
     present = [name for name in exported if (target / name).exists()]
     if present:
@@ -127,10 +128,9 @@ def setup(selection, directory=None, *, seed=None, project=None, domain_id=0, co
         staging = Path(temporary)
         shutil.copy(rig / "workspace.yaml", staging)
         shutil.copytree(rig / "devices", staging / "devices", ignore=IGNORED)
-        for source in sources:
-            for name in SHIPPED:
-                if (source / name).is_dir():
-                    shutil.copytree(source / name, staging / name, ignore=IGNORED, dirs_exist_ok=True)
+        for name in SHIPPED:
+            if (source / name).is_dir():
+                shutil.copytree(source / name, staging / name, ignore=IGNORED)
         for name, value in profiles.items():
             value["loaded"] = True
             value["runtime"] = {**value["runtime"], "domain_id": domain_id}
