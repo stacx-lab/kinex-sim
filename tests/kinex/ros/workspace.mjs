@@ -5,7 +5,7 @@ import { access, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-const { createKinexRuntime } = await import(process.env.KINEX_CORE ?? '../../../../kinex2.0/packages/core/dist/index.js')
+const { createKinexRuntime } = await import(process.env.KINEX_CORE ?? '../../../../kinex/packages/core/dist/index.js')
 const directory = path.resolve(process.argv[2])
 const runtime = createKinexRuntime({directory, enableRecording:true})
 const owned = []

@@ -82,12 +82,15 @@ class WorldRuntime:
 
     def start(self, operation, goal, complete, feedback):
         """Start a goal of one of the backend's actions (SimulatorBackend), given as its Goal's fields, in place of
-        the operation's active one: feedback(fields) with the Feedback it gives, complete(status, result fields)
-        once it ends. Owner thread."""
+        the operation's active one and of other actions' goals that command its groups: feedback(fields) with the
+        Feedback it gives, complete(status, result fields) once it ends. Owner thread."""
         self._assert_owner()
         self.end(operation, "replaced by a newer goal")
         self.goals[operation] = complete, feedback
         self.sim.start(operation, goal)
+        for group in self.sim.goals[operation]["commands"]:
+            for other in [other for other in self.goals if other != operation and group in self.sim.goals[other]["commands"]]:
+                self.end(other, "replaced by a newer goal", group)
         if self.ended:
             self.sim.end(operation, self.ended)
         self._follow([operation])

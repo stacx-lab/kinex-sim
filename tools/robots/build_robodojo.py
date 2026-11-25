@@ -14,28 +14,59 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "simulators/robodojo"), str(Path(__file__).parent)]
 
 import rigs  # noqa: E402
-from kinex_sim_robodojo import move  # noqa: E402
-from kinex_sim_robodojo.backend import RoboDojoSim, runtime  # noqa: E402
+from kinex_sim_robodojo import grip, move  # noqa: E402
+from kinex_sim_robodojo.backend import JSON, RoboDojoSim, runtime  # noqa: E402
 
 # RoboEnv's parallel-gripper geometry: the pad center ahead of link6, in the flange frame.
 TCP = (0.15007, -0.000002, -0.00144)
 ARM = "ARX X5 six-joint {side} arm"
-# The move configuration: what an arm's move goal does (kinex_sim_robodojo.move).
+# What the devices' goals do (kinex_sim_robodojo.move and grip), each a Json action's objects. A gear is named with
+# its step in cm and its tolerances in m and rad.
 GOALS = ", moved by flange goals through its own IK"
-MOVE = (f"Move the flange in straight lines through poses at the arm's own pace: multi_dof_trajectory with "
-        f"joint_names [flange] and one transform per point, in {{side}}_arm/base (metres, unit quaternion xyzw). A "
-        f"zero time_from_start moves at up to {move.SPEED[0]:g} m/s and {move.SPEED[1]:g} rad/s; a later one moves "
-        f"slower. It succeeds within {move.TOLERANCE[0]:g} m and {move.TOLERANCE[1]:g} rad of the last pose, or "
-        f"within component_goal_tolerance (joint_name flange; component 4 metres, 5 radians). It aborts where the "
-        f"arm is when the flange stalls, is still short {move.SETTLE_S:g} s (or goal_time_tolerance) after the "
-        f"motion should end, or has no IK solution. Result error_code: 0 reached, -4 stalled, -5 late, -1 "
-        f"otherwise; error_string says why and how far from the goal. A newer goal or a stop ends it.")
+GEARS = ", ".join(f"{name} {100 * step:g} cm within {reach:g} m and {turn:g} rad"
+                  for name, (step, reach, turn) in move.PROFILES.items())
+ENDS = "A newer goal or a stop ends it."
+# A step that moves an arm too far ends the goals it concerns (move.unsafe).
+UNSAFE = (f"a step moves a flange more than {move.MOVED[0]:g} m or {move.MOVED[1]:g} rad, or that of an arm holding "
+          f"still more than {move.HELD[0]:g} m or {move.HELD[1]:g} rad (unsafe_motion)")
+MOVE = ("Move the flange in a straight line to a pose: {{pose: [x, y, z, qx, qy, qz, qw] in {side}_arm/base, "
+        "profile}}. profile is the gear, the most a {period:g} s step moves the flange and how near the pose it "
+        f"has reached it: {GEARS}; standard by default. The goal aborts when the flange stalls, moves away from "
+        f"the pose on two steps running (diverging), when {UNSAFE}, when a step has no IK solution (unreachable) or "
+        f"{move.SETTLE} steps after the gear would have arrived (late). Before it is unreachable the flange goes, "
+        "once, for a pose the arm can reach within the gear's tolerance of the goal's, if there is one. Result: "
+        "{{stop_reason: reached | stalled | diverging | unsafe_motion | unreachable | late | ended, pose, "
+        "position_error_m, orientation_error_rad, steps, recovered: whether it went for such a pose}}; feedback: "
+        f"the errors and steps. {ENDS}")
+GRASP = (f"Close the fingers and keep squeezing: {{}}, no fields. The goal succeeds once the fingers have closed "
+         f"(reached: nothing is between them) or have stopped short (stalled, as on an object), and aborts if they "
+         f"are still moving after {grip.MAX_STEPS} steps (late) or {UNSAFE}. Result: {{stop_reason: reached | "
+         f"stalled | late | unsafe_motion | ended, opening, steps}}, opening as joint_state gives it; feedback: "
+         f"opening and steps. {ENDS}")
+RELEASE = (f"Open the fingers: {{opening}}, a grip joint position, fully open by default. The goal succeeds once "
+           f"the opening is reached and aborts when the fingers stall, are still moving after {grip.MAX_STEPS} "
+           f"steps (late) or a step is unsafe as for grasp. Result and feedback: as grasp's. {ENDS}")
 
 
-def arm(side, base, goals=False):
+def arm(side, base, period, goals=True):
+    """An arm, moved by goals, or in the basic configuration by joint targets."""
     profile = rigs.joint(f"{side}_arm", ARM.format(side=side) + (GOALS if goals else "") + ".",
                          [f"joint{i}" for i in range(1, 7)], [0.0] * 6, base, tip_pose=True, targets=not goals)
-    return rigs.action(profile, "move", move.TYPE, MOVE.format(side=side)) if goals else profile
+    return rigs.action(profile, "move", JSON, MOVE.format(side=side, period=period)) if goals else profile
+
+
+def gripper(side, goals=True):
+    """A gripper, commanded by its grasp and release goals, or in the basic configuration by grip targets."""
+    profile = rigs.gripper(
+        f"{side}_gripper",
+        f"ARX X5 {side} parallel two-finger gripper. A closed grip squeezes past the finger stop. The TCP is the "
+        "pad centre and approaches along +x.",
+        f"{side}_gripper",
+        rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
+        rigs.frame(f"{side}_gripper:base", TCP, (0, 0, 0, 1)), targets=not goals)
+    for name, text in (("grasp", GRASP), ("release", RELEASE)) if goals else ():
+        rigs.action(profile, name, JSON, text)
+    return profile
 
 
 def link(sim, side, name):
@@ -58,20 +89,14 @@ def main():
     x5 = runtime() / "Assets/Robots/x5"
     source = rigs.urdf_joints(x5 / "X5A.urdf")
     devices = {"world": rigs.world("World time and waits of a bimanual tabletop station.")}
-    files, depth, goals = {}, {}, {}
+    files, depth, basic = {}, {}, {}
     for side in ("left", "right"):
         robot = sim._actuators[side][0]
         lower, upper = map(float, robot.gripper_scale)
         flange = link(sim, side, "link6")
         base = rigs.pose_frame("world:base", link(sim, side, "base_link"))
-        devices[f"{side}_arm"], goals[f"{side}_arm"] = arm(side, base), arm(side, base, goals=True)
-        devices[f"{side}_gripper"] = rigs.gripper(
-            f"{side}_gripper",
-            f"ARX X5 {side} parallel two-finger gripper. A closed target squeezes past the finger stop. The TCP "
-            "is the pad centre and approaches along +x.",
-            f"{side}_gripper",
-            rigs.frame(f"{side}_arm:flange", (0, 0, 0), (0, 0, 0, 1)),
-            rigs.frame(f"{side}_gripper:base", TCP, (0, 0, 0, 1)))
+        devices[f"{side}_arm"], basic[f"{side}_arm"] = arm(side, base, sim.period), arm(side, base, sim.period, False)
+        devices[f"{side}_gripper"], basic[f"{side}_gripper"] = gripper(side), gripper(side, False)
         files[f"devices/{side}_arm/arm.urdf"] = rigs.source_arm(
             source, [f"joint{i}" for i in range(1, 7)], f"x5_{side}_arm",
             "RoboDojo ARX X5 arm from Assets/Robots/x5/X5A.urdf: base_link..link6; flange is "
@@ -95,7 +120,7 @@ def main():
              "head_camera", "left_camera", "right_camera"]
     rigs.write_rig(ROOT / "catalog/robots/robodojo/robodojo-arx-x5",
                    rigs.workspace("robodojo-arx-x5", "RoboDojo dual ARX X5", "arm", "ARX X5 (dual)"),
-                   {name: devices[name] for name in order}, files, {"depth": depth, "move": goals})
+                   {name: devices[name] for name in order}, files, {"depth": depth, "basic": basic})
     print("rig written", flush=True)
     np.set_printoptions(precision=4)
     sim.close()

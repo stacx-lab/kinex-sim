@@ -3,11 +3,14 @@
 Isaac Sim 5.1 needs Python 3.11, so the world node proxies this class through
 kinex_sim.core.worker. Every 0.04 s frame passes absolute arm joints and the
 native normalized gripper value to upstream's EvalEnv.take_action, which
-interpolates the arm over its ten 250 Hz substeps. In the move configuration
-the arms take goals instead (kinex_sim_robodojo.move): each step of one becomes
-joints through the cuRobo IK upstream's ee_pose action uses, checked as
-uni-robot-agent's RoboDojo adapter checks it. Resets load
-upstream's saved evaluation layouts. Ported from RoboEnv's RoboDojo adapter.
+interpolates the arm over its ten 250 Hz substeps. The devices take goals, as
+uni-robot-agent's tools do: an arm's move steps its flange to a pose
+(kinex_sim_robodojo.move), each step becoming joints through the cuRobo IK
+upstream's ee_pose action uses, checked as uni-robot-agent's RoboDojo adapter
+checks it, and a gripper's grasp and release run its fingers until they stop
+(kinex_sim_robodojo.grip). The basic configuration takes joint and grip targets
+on topics instead. Resets load upstream's saved evaluation layouts. Ported from
+RoboEnv's RoboDojo adapter.
 """
 import os
 import secrets
@@ -19,7 +22,7 @@ from kinex_sim.catalog import resolve
 from kinex_sim.core import Action, ActionLayout, CommandGroup
 from kinex_sim.core.devices import device_inventory, spectator_views
 from kinex_sim.project import project_root
-from . import move
+from . import grip, move
 from .assets import check_task
 
 CAMERAS = {"head_camera": "cam_head", "left_camera": "cam_left_wrist",
@@ -30,6 +33,8 @@ SPECTATORS = (("third_person", "head_camera"), ("left_wrist", "left_camera"),
 UNSTABLE_RETRIES = 3
 # An arm's goals are poses of its flange, link6: upstream's ee_link and its cuRobo tool frame.
 TIP = "flange"
+# The devices' goals are free-form: each action's profile description states its objects.
+JSON = "custom_interfaces/action/Json"
 # A pose solution's joint path from the measured joints is checked against cuRobo's self and table constraints at
 # this spacing, as uni-robot-agent's RoboDojo adapter checks it.
 PATH_SAMPLE_RAD = .025
@@ -192,10 +197,10 @@ class RoboDojoSim:
     width, height = 640, 480
 
     def __init__(self, *, max_steps=None, early_stop=False, configuration=None):
-        if configuration not in (None, "depth", "move"):
+        if configuration not in (None, "basic", "depth"):
             raise ValueError(f"RoboDojo has no configuration {configuration!r}")
         self.depth = configuration == "depth"  # RGB-D cameras
-        self.move = configuration == "move"  # the arms take move goals in place of joint targets
+        self.targets = configuration == "basic"  # joint and grip targets on topics, in place of goals
         self._captures = None  # each camera's annotator outputs at the current step; None until it is rendered
         self.requested_max_steps = max_steps
         self.max_steps = max_steps
@@ -208,7 +213,8 @@ class RoboDojoSim:
 
     @property
     def actions(self):
-        return tuple(Action(f"{side}_arm", "move", move.TYPE) for side in SIDES) if self.move else ()
+        return () if self.targets else tuple(Action(f"{side}_{part}", name, JSON) for side in SIDES for part, name in (
+            ("arm", "move"), ("gripper", "grasp"), ("gripper", "release")))
 
     @property
     def devices(self):
@@ -275,14 +281,14 @@ class RoboDojoSim:
         self.env.step_lim = self.max_steps
         self._index()
         self.steps, self.done, self.stop = 0, False, None
-        self.goals, self._moves = {}, {}  # each arm's move goal as the world reads it, and those that execute
+        self.goals, self._active = {}, {}  # each action's goal as the world reads it, and those that execute
         self._score()
         if self.spectators and not self._spectators:
             self._open_spectators()
 
     def _index(self):
         manager = self.env.robot_manager
-        names, groups, self._actuators, self._limits = [], [], {}, {}
+        names, groups, self._actuators, self._limits, self._spans, self._chains = [], [], {}, {}, {}, {}
         for side in SIDES:
             robot = manager.get_robot_by_arm_name(f"{side}_arm")
             if robot.type != "target":
@@ -294,12 +300,19 @@ class RoboDojoSim:
             # One frame's joint travel at the native velocity limit (upstream's 5 rad/s actuators), for the rig.
             step = float(np.min(values(key.data.joint_vel_limits[0])[arm])) * self.period
             self._limits[side] = (limits[:, 0], limits[:, 1], step)
+            # The flange in the arm's base at given joints, for poses the IK has not solved.
+            from .region import chain  # SciPy, which the native environment has
+            self._chains[side] = chain(runtime() / "Assets/Robots/x5/X5A.urdf", list(robot.arm_joints_name))
+            # The openings the fingers can reach: a closed command lies past the finger stop.
+            stops = values(key.data.joint_pos_limits[0])[robot.gripper_joint_indices[0]]
+            self._spans[f"{side}_gripper"] = np.clip(sorted(self._fraction(robot, stop) for stop in stops), 0., 1.)
             offset = len(names)
             names += list(robot.arm_joints_name) + [f"{side}_gripper"]
-            # Joint targets as upstream's arm_joint_state, or move goals through upstream's cuRobo IK.
+            # Goals command them, or in the basic configuration targets: upstream's arm_joint_state and ee value.
             groups.append(CommandGroup(f"{side}_arm", tuple(range(offset, offset + len(arm))), tuple(limits[:, 0]),
-                                       tuple(limits[:, 1]), tip=TIP, joint_targets=True, targets=not self.move))
-            groups.append(CommandGroup(f"{side}_gripper", (offset + len(arm),), (0.,), (1.,), scalar=True))
+                                       tuple(limits[:, 1]), tip=TIP, joint_targets=True, targets=self.targets))
+            groups.append(CommandGroup(f"{side}_gripper", (offset + len(arm),), (0.,), (1.,), scalar=True,
+                                       targets=self.targets))
         self.layout = ActionLayout(tuple(names), tuple(groups))
 
     @property
@@ -328,9 +341,11 @@ class RoboDojoSim:
         if self.done:
             raise RuntimeError("episode is done")
         action = np.array(action, dtype=float)
-        for operation, motion in self._moves.items():  # an arm with a goal takes the goal's step
-            offset = 7 * SIDES.index(operation.partition("_")[0])
-            action[offset:offset + 6] = motion.joints
+        for operation, active in self._active.items():  # a device with a goal takes the goal's step
+            group = next(group for group in self.layout.groups if group.name == operation.partition("/")[0])
+            action[list(group.indices)] = active.command
+        # While goals run, each step is checked for an arm it moved too far.
+        before = {f"{side}_arm": self.tip_pose(f"{side}_arm") for side in SIDES} if self._active else {}
         manager, native = self.env.robot_manager, {}
         for side, offset in zip(SIDES, (0, 7)):
             robot, key, arm, fingers = self._actuators[side]
@@ -362,53 +377,74 @@ class RoboDojoSim:
             elif found or self.steps < self.max_steps:
                 self.stop = ("failure", found or "a task constraint failed")
         self.done = bool(self.env.end_flag[0] or self.steps >= self.max_steps)
-        for operation in list(self._moves):
-            self._follow(operation)
+        poses = {arm: self.tip_pose(arm) for arm in before}
+        moving = {operation.partition("/")[0] for operation in self._active if operation.endswith("/move")}
+        unsafe = move.unsafe({arm: move.offset(before[arm], poses[arm]) for arm in before}, moving)
+        for operation in list(self._active):
+            # An arm that holds still and was moved too far ends every goal; one a goal moves ends its own.
+            group = operation.partition("/")[0]
+            self._follow(operation, poses, "; ".join(text for arm, text in unsafe.items() if arm == group or arm not in moving))
 
-    # Move goals -------------------------------------------------------------------------
+    # Goals ------------------------------------------------------------------------------
 
     def _joints(self, group):
         """An arm's measured joints."""
         _, key, arm, _ = self._actuators[group.removesuffix("_arm")]
         return values(key.data.joint_pos[0])[arm]
 
+    def _opening(self, group):
+        """A gripper's measured opening, as its grip joint states it."""
+        robot, key, _, fingers = self._actuators[group.removesuffix("_gripper")]
+        return self._fraction(robot, values(key.data.joint_pos[0])[fingers[0]])
+
     def start(self, operation, goal):
-        group = operation.partition("/")[0]
-        self._moves.pop(operation, None)
+        group, name = operation.split("/")
+        self._active.pop(operation, None)
+        arm = name == "move"
         try:
-            motion = move.motion(goal, TIP, f"{group}/base", self.tip_pose(group), self.time_s, self.period)
-        except ValueError as error:
-            self.goals[operation] = move.ended(move.INVALID_GOAL, str(error), {group: self._joints(group)})
+            active = move.motion(goal, self.tip_pose(group)) if arm else grip.grip(name, goal, self._spans[group])
+        except ValueError as error:  # it commands nothing: the device goes on as it was
+            self.goals[operation] = {"status": "aborted", "feedback": None, "commands": {},
+                                     "result": {"stop_reason": "invalid", "message": str(error)}}
             return
-        self._moves[operation], motion.joints = motion, self._joints(group)
+        if arm:
+            active.command = self._joints(group)
+        self._active[operation] = active
         self._follow(operation)
 
     def end(self, operation, reason):
-        motion = self._moves.pop(operation, None)
-        if motion is not None:
-            group = operation.partition("/")[0]
-            self.goals[operation] = move.ended(move.INVALID_GOAL, motion.report(reason, self.time_s),
-                                               {group: self._joints(group)})
+        active = self._active.pop(operation, None)
+        if active is not None:
+            self._end(operation, active, "ended", reason)
 
-    def _follow(self, operation):
-        """Judge a goal by its flange's measured pose and solve its next step, or end it: holding its last step if
-        it succeeded, else where the arm is."""
-        group, motion = operation.partition("/")[0], self._moves[operation]
-        outcome = motion.observe(self.tip_pose(group), self.time_s)
-        if outcome is None:
-            target = motion.reference()
+    def _end(self, operation, active, reason, text=None):
+        """Report a goal that has ended. An arm holds its goal's last step if it succeeded, else where it is; a
+        gripper keeps its goal's command, as a grip does."""
+        group, done = operation.partition("/")[0], active.succeeded(reason)
+        held = active.command if done or not group.endswith("_arm") else self._joints(group)
+        self.goals[operation] = {"status": "succeeded" if done else "aborted", "feedback": None,
+                                 "commands": {group: held}, "result": active.result(reason, text)}
+
+    def _follow(self, operation, poses=None, unsafe=""):
+        """Judge a goal by what it measures, its flange's pose or its gripper's opening, and command its next step,
+        an arm's through cuRobo's IK, or end it. poses are the flanges' measured poses, where a step has measured
+        them, and unsafe says which arms that step moved too far, which ends the goal."""
+        group, name = operation.split("/")
+        active, arm, text = self._active[operation], name == "move", None
+        reason = active.observe(self._opening(group) if not arm else poses[group] if poses else self.tip_pose(group))
+        if unsafe:
+            reason, text = "unsafe_motion", f"unsafe motion, {unsafe}"
+        if reason is None and arm:
             try:
-                motion.joints = self.joint_step(group, target)
+                active.command = self._next(group, active)
             except ValueError as error:
-                outcome = move.INVALID_GOAL, str(error)
-            else:
-                self.goals[operation] = {
-                    "status": None, "result": None, "commands": {group: motion.joints},
-                    "feedback": move.feedback(TIP, f"{group}/base", self.time_s, target, motion.pose)}
-                return
-        del self._moves[operation]
-        held = motion.joints if outcome[0] == move.SUCCESSFUL else self._joints(group)
-        self.goals[operation] = move.ended(outcome[0], motion.report(outcome[1], self.time_s), {group: held})
+                reason, text = "unreachable", str(error)
+        if reason is None:
+            self.goals[operation] = {"status": None, "result": None, "feedback": active.feedback(),
+                                     "commands": {group: active.command}}
+            return
+        del self._active[operation]
+        self._end(operation, active, reason, text)
 
     # Pose targets -----------------------------------------------------------------------
 
@@ -456,9 +492,38 @@ class RoboDojoSim:
                              "cuRobo's IK has no solution clear of the arm itself and the table")
         return q
 
-    def _candidates(self, planner, robot, target, current):
+    def _next(self, group, motion):
+        """The joints of a move's next step. When cuRobo's IK has none, the move goes on, once, to a pose near its
+        goal's that the arm can reach, if there is one: uni-robot-agent's goal recovery."""
+        try:
+            return self.joint_step(group, motion.reference())
+        except ValueError:
+            if motion.recovery is not None:
+                raise
+            motion.recovery = False
+            pose = self.reachable(group, motion.goal, motion.tolerance)
+            if pose is None:
+                raise
+            motion.recover(pose)
+            return self.joint_step(group, motion.reference())
+
+    def reachable(self, group, goal, tolerance):
+        """A flange pose within tolerance (m, rad) of goal that cuRobo's constraints allow the arm, or None
+        (kinex_sim_robodojo.region): among the IK's own solutions for goal, converged or not, then by search."""
+        side = group.removesuffix("_arm")
+        robot = self._actuators[side][0]
+        planner = self.env.robot_manager.ik_solver[robot.robot_name]
+        lower, upper, _ = self._limits[side]
+        joints = self._joints(group)
+        found = self._candidates(planner, robot, self._native_pose(side, np.asarray(goal, dtype=float)), joints, True)
+        from .region import search
+        return search(self._chains[side], [nearest_turn(q, joints, lower, upper) for q in found],
+                      lambda rows: self._constraints(planner, rows), joints, goal, (lower, upper), tolerance)
+
+    def _candidates(self, planner, robot, target, current, every=False):
         """cuRobo's successful IK solutions for an ee_pose target, built as upstream's
-        CuroboPlanner.solve_ik_to_joint builds its goal, from the joints current."""
+        CuroboPlanner.solve_ik_to_joint builds its goal, from the joints current; with every, also those of its
+        seeds that did not converge."""
         from utils.transformer import calculate_target_pose
         goal = calculate_target_pose(robot.entity_origin_pose, planner.robot_origin_pose, list(target))
         position, rotation = planner._trans_from_world_to_base(
@@ -471,23 +536,30 @@ class RoboDojoSim:
         joints = values(solution.position).reshape(-1, len(names))[:, [names.index(n) for n in
                                                                         planner.active_joints_name]]
         success = values(result.success).reshape(-1) > 0
-        return [q for q, ok in zip(joints, success) if ok]
+        return [q for q, ok in zip(joints, success) if ok or every and np.isfinite(q).all()]
 
     @staticmethod
-    def _path_free(planner, rows):
-        """Whether cuRobo's IK constraints (self collision, the table, joint limits) hold at every joint row, in
-        batches of the IK's 32 seeds so its rollout keeps its shape."""
+    def _constraints(planner, rows):
+        """cuRobo's IK constraints (self collision, the table, joint limits) at joint rows: whether each row
+        satisfies them, and each row's constraint costs, none positive when it does. In batches of the IK's 32
+        seeds so its rollout keeps its shape, as uni-robot-agent's adapter evaluates them."""
         import torch
-        solver = planner.ik_solver
+        solver, feasible, costs = planner.ik_solver, [], []
         for start in range(0, len(rows), 32):
             chunk = np.stack([planner._build_cspace_joint_values(q) for q in rows[start:start + 32]])
             padded = np.concatenate([chunk, np.repeat(chunk[-1:], 32 - len(chunk), axis=0)])
             action = torch.as_tensor(padded, device=planner.device_cfg.device, dtype=torch.float32)[:, None, :]
-            feasible = solver.metrics_rollout.compute_metrics_from_action(action).costs_and_constraints.get_feasible(
-                include_all_hybrid=False, sum_horizon=True)
-            if not (feasible if isinstance(feasible, bool) else bool(values(feasible).reshape(32, -1)[:len(chunk)].all())):
-                return False
-        return True
+            native = solver.metrics_rollout.compute_metrics_from_action(action).costs_and_constraints
+            ok = native.get_feasible(include_all_hybrid=False, sum_horizon=True)
+            valid = np.full(32, ok) if isinstance(ok, bool) else values(ok).reshape(32, -1).all(axis=1)
+            feasible.extend(valid[:len(chunk)])
+            terms = [values(term).reshape(32, -1).sum(axis=1) for term in native.constraints.values]
+            costs.extend((np.stack(terms, axis=1) if terms else np.zeros((32, 1)))[:len(chunk)])
+        return np.asarray(feasible, dtype=bool), np.asarray(costs, dtype=float)
+
+    def _path_free(self, planner, rows):
+        """Whether the constraints hold at every joint row."""
+        return bool(self._constraints(planner, rows)[0].all())
 
     def _score(self):
         self.success = bool(self.env.completed[0] and self.env.success[0])

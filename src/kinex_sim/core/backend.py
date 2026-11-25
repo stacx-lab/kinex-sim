@@ -120,9 +120,12 @@ class SimulatorBackend(Protocol):
 
     Optionally, actions lists the ROS actions the backend executes for its devices,
     and the backend, not the world, knows what each does. An operation is the
-    action's `<device>/<name>`, and a goal crosses as the fields of its messages:
+    action's `<device>/<name>`, and a goal crosses as the fields of its messages,
+    or for custom_interfaces/action/Json as the objects they carry, a result's
+    "message" being the action's own:
     start(operation, goal) begins a goal, given as its Goal's fields, in place of
     the operation's active one; end(operation, reason) ends the active one at once.
+    A goal also ends the other actions' goals that command its groups.
     Neither raises for the goal's sake: a goal the backend cannot take ends as it
     starts. The backend advances its goals in step, where the groups a goal
     commands take its commands in place of the action's, and reports them in goals:

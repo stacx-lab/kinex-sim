@@ -1,14 +1,14 @@
 """A backend's action goals in the world: their commands, their ends, and waits that end with them. No ROS.
 
-The pair toy's move steps an arm's tip 0.1 m a 0.1 s step from (0.5, -0.5) to the goal's last pose; a wall stops
-the tips at x = 1.2.
+The pair toy's move steps an arm's tip 0.1 m a 0.1 s step from (0.5, -0.5) to the goal's {x, y}, and its home
+back there; a wall stops the tips at x = 1.2.
 """
 import pytest
 
 from kinex_sim.runtime.world import WorldRuntime
 from tests.toy_backend import PairPoseToy
 
-REACHED = ("succeeded", {"error_code": 0, "error_string": "reached"})
+REACHED = ("succeeded", "reached")
 
 
 def world(**kwargs):
@@ -17,15 +17,16 @@ def world(**kwargs):
 
 
 def aborted(reason):
-    return "aborted", {"error_code": -1, "error_string": reason}
+    return "aborted", reason
 
 
-def start(runtime, arm, x, y):
-    """Start an arm's goal; its end and the x its feedback says each step commands."""
+def start(runtime, arm, x=None, y=None):
+    """Start an arm's move to (x, y), or without them its home: the goal's end, as its status and its result's
+    message, and the x its feedback says each step commands."""
     end, commanded = [], []
-    runtime.start(f"{arm}/move", {"multi_dof_trajectory": {"points": [{"transforms": [{"translation": {"x": x, "y": y}}]}]}},
-                  lambda *outcome: end.append(outcome),
-                  lambda fields: commanded.append(fields["multi_dof_desired"]["transforms"][0]["translation"]["x"]))
+    runtime.start(f"{arm}/home" if x is None else f"{arm}/move", {} if x is None else {"x": x, "y": y},
+                  lambda status, result: end.append((status, result["message"])),
+                  lambda fields: commanded.append(fields["x"]))
     return end, commanded
 
 
@@ -101,10 +102,15 @@ def test_a_newer_goal_a_stop_and_the_episodes_end_end_the_active_goal():
     second, _ = start(runtime, "left", .5, 0.)
     assert first == [aborted("replaced by a newer goal")]
     wait(runtime, seconds=[.1])
+    home, _ = start(runtime, "left")  # another action's goal for the same arm takes it too
+    assert second == [aborted("replaced by a newer goal")] and not home
+    second, _ = start(runtime, "left", .5, 0.)
+    assert home == [aborted("replaced by a newer goal")] and sim.position[:2] == pytest.approx([.5, -.4])
+    wait(runtime, seconds=[.1])
     runtime.hold("left")
-    assert second == [aborted("stopped")] and sim.position[:2] == pytest.approx([.5, -.4])
+    assert second == [aborted("stopped")] and sim.position[:2] == pytest.approx([.5, -.3])
     result, _ = wait(runtime, second)  # finished already: no step
-    assert result.done == (True,) and runtime.steps == 1
+    assert result.done == (True,) and runtime.steps == 2
     last, _ = start(runtime, "right", 1., -.5)
     result, _ = wait(runtime, last)
     assert result.done == (True,) and runtime.steps == 3  # the end finished the goal the wait was for

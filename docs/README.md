@@ -153,10 +153,10 @@ device; two arms may keep the same native names. An arm the simulator commands b
 pose of its tip link, as HandsOn's arms and LIBERO's under `--config osc` are, takes instead a
 `trajectory_msgs/msg/MultiDOFJointTrajectory` of tip poses in `<arm>/base` on
 `<arm>/pose_target`, timed alike, and reports the measured tip on `<arm>/pose_state`
-(`sensor_msgs/msg/MultiDOFJointState`). RoboDojo's arms take joint targets and report the measured tip
-on `<arm>/pose_state`; with `--config move` they serve instead `<arm>/move`, a
-`control_msgs/action/FollowJointTrajectory` whose goals of tip poses the arm reaches at its own pace
-(see [Move configuration](robodojo.md#move-configuration)). Grippers accept a
+(`sensor_msgs/msg/MultiDOFJointState`). RoboDojo's arms and grippers take goals instead, on Json
+actions of its own: `<arm>/move` steps the tip to a pose in a gear, and `<gripper>/grasp` and
+`<gripper>/release` run the fingers until they stop (see [Goals](robodojo.md#goals)); its
+`--config basic` takes the joint and grip targets of the others. Grippers accept a
 `std_msgs/msg/Float64` position on `<gripper>/target`, in each simulator's native
 command units (LIBERO's finger metres; the normalized 0..1 opening of ABC, RoboTwin
 and RoboDojo; RoboCasa's integrated -1..1 command; BEHAVIOR's smooth -1..1 R1Pro command).

@@ -15,7 +15,7 @@ kinex-sim launch robodojo/stack-bowls --execution-mode stepped --timeout 1800
 kinex-sim setup robodojo/stack-bowls --directory ../my-robodojo-workspace
 kinex-sim setup robodojo/stack-bowls --config depth --directory ../my-robodojo-depth-workspace
 kinex-sim launch robodojo/stack-bowls --config depth --execution-mode stepped --timeout 1800
-kinex-sim launch robodojo/stack-bowls --config move --execution-mode stepped --timeout 1800
+kinex-sim launch robodojo/stack-bowls --config basic --execution-mode stepped --timeout 1800
 ```
 
 `robodojo` selects `pack_objects_into_box`. The twelve `*_random` variants are not
@@ -65,18 +65,19 @@ changed files replaced, bumps the pin without copying.
 | Device | Interfaces |
 |---|---|
 | `world` | `world/now`, `world/wait_all`, `world/wait_any`, `world/stop`, `/clock`, `world/spectator/*` while recording |
-| `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/joint_target`, `<arm>/pose_state`, `<arm>/stop`; `<arm>/move` in place of `<arm>/joint_target` with `--config move` |
-| `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/target`, `<gripper>/stop` |
+| `left_arm`, `right_arm` | `<arm>/joint_state`, `<arm>/pose_state`, `<arm>/move`, `<arm>/stop`; `<arm>/joint_target` in place of `<arm>/move` with `--config basic` |
+| `left_gripper`, `right_gripper` | `<gripper>/joint_state`, `<gripper>/grasp`, `<gripper>/release`, `<gripper>/stop`; `<gripper>/target` in place of the two goals with `--config basic` |
 | `head_camera`, `left_camera`, `right_camera` | `<camera>/image`, `<camera>/camera_info`; `<camera>/depth` with `--config depth` |
 
 Both arms keep upstream's joint names `joint1..joint6` (radians; native limits
 ±10 rad for joints 1–5 and ±3.14 for joint 6); the device disambiguates them.
-Arm targets are upstream's `<side>_arm_joint_state` action entries. Gripper
-targets are upstream's normalized `<side>_ee_joint_state` value from 0 (closed) to
-1 (open), mapped by `gripper_scale` to finger targets `-0.01 + 0.054 v` metres;
-`joint_state` reports the same normalization of the measured primary finger
-(about 0.185 when the fingers touch). Each arm `stop` holds the measured position; a
-gripper `stop` keeps its applied grip target, so a held object stays squeezed.
+Goals command the devices (below); the basic configuration's targets are upstream's
+`<side>_arm_joint_state` action entries and its normalized `<side>_ee_joint_state`
+value. A gripper's position runs from 0 (closed) to 1 (open), mapped by `gripper_scale`
+to finger targets `-0.01 + 0.054 v` metres; `joint_state` reports the same
+normalization of the measured primary finger (about 0.185 when the fingers touch).
+Each arm `stop` holds the measured position; a gripper `stop` keeps its commanded
+grip, so a held object stays squeezed.
 
 Cameras are RGB, as upstream's evaluation renders them, or RGB-D in the depth
 configuration below. They are the head camera (Gemini 345Lg model, fx ≈ 288.13 px) and
@@ -90,18 +91,26 @@ ahead of `link6`) and the measured camera mounts.
 The flange is `link6`, upstream's `ee_link` and cuRobo's tool frame, and `pose_state` reports its
 measured pose in `<arm>/base`.
 
-### Move configuration
+### Goals
 
-`--config move` gives each arm one command, `<arm>/move`, in place of `joint_target`. It is a
-`control_msgs/action/FollowJointTrajectory`: a goal's `multi_dof_trajectory` gives the `flange` poses,
-in `<arm>/base`, that the arm passes in turn at its own pace, so a caller chooses no times. It is the
-stepped, closed-loop counterpart of uni-robot-agent's `move` tool, and nothing plans a path around
-objects. The action is this backend's own (`kinex_sim_robodojo.move`): it advances each goal inside its
-step, and the world only carries the goal, its feedback and its result (see
-[Actions](adding-a-simulator.md#actions)):
+Each device takes goals, the stepped, closed-loop counterparts of uni-robot-agent's `move`, `grasp` and
+`release` tools. They are `custom_interfaces/action/Json` actions of this backend's own
+(`kinex_sim_robodojo.move` and `grip`): a goal, its feedback and its result are JSON objects, the backend
+advances each goal inside its step, and the world only carries them (see
+[Actions](adding-a-simulator.md#actions)). A goal ends other goals of its device, and a stop ends it.
+Nothing plans a path around objects.
 
-1. Each 0.04 s frame commands a pose at most one step from the measured one, 4 cm and 0.13 rad at the
-   device pace of 1 m/s and 3.3 rad/s, so a blocked flange is never driven far past where it is.
+`<arm>/move` takes `{pose, profile}`: the `flange` pose to reach, `[x, y, z, qx, qy, qz, qw]` in
+`<arm>/base`, and a gear, uni-robot-agent's motion profile.
+
+| `profile` | Most a 0.04 s frame moves the flange | Reached within |
+|---|---|---|
+| `standard` (default) | 4 cm, 0.13 rad | 0.03 m, 0.1 rad |
+| `approach` | 4 cm, 0.13 rad | 0.02 m, 0.05 rad |
+| `precision` | 1 cm, 0.033 rad | 0.005 m, 0.05 rad |
+
+1. Each frame commands a pose at most the gear's step from the measured one, on the straight line to the
+   goal, so a blocked flange is never driven far past where it is.
 2. cuRobo's `InverseKinematics`, the solver upstream's `ee_pose` action uses (32 seeds, self and table
    collision, 1 mm and 0.02 rad), solves that pose from the measured joints (`RoboDojoSim.joint_step`).
    Of its solutions, the one nearest the measured joints is taken that lies within the joint limits, a
@@ -110,15 +119,34 @@ step, and the world only carries the goal, its feedback and its result (see
    uni-robot-agent's RoboDojo adapter, with the nearest solution in place of cuRobo's first. A joint
    asked for more than a frame's 0.2 rad (the X5 actuators' 5 rad/s `velocity_limit_sim`) saturates, and
    the next frame goes on from where the arm is.
-3. A point's `time_from_start` is its nominal time: zero goes at the device pace, a later time
-   proportionally slower.
-4. The goal succeeds once the flange is within `component_goal_tolerance` of the last pose (`TRANSLATION`
-   in metres, `ROTATION` in radians; 0.005 m and 0.05 rad when omitted).
-5. It is aborted, the arm holding its measured joints, when the flange stalls (`error_code` -4: over four
-   frames it gains less than a tenth of the tolerance), when it is not there `goal_time_tolerance` (1 s
-   when zero) after its nominal end (-5), or when a frame has no IK solution (-1). `error_string` says
-   why and how far from the goal it ended. A cancel, a newer goal or a stop
-   ends it the same way (-1, with that reason).
+3. The goal succeeds once the flange is within the gear's tolerance of the pose (`stop_reason` `reached`),
+   the arm holding its last step.
+4. It is aborted, the arm holding its measured joints, when the flange stalls (over four frames it gains
+   less than a tenth of the tolerance), when it moves away from the pose on two frames running
+   (`diverging`: its distance in metres plus a tenth of its radians grows by more than 0.01 each time),
+   when a frame has no IK solution (`unreachable`), or 25 frames after the gear's steps would have
+   arrived (`late`). A cancel, a newer goal or a stop ends it the same way (`ended`). The result's
+   `message` says why and how far from the pose it ended; the result also gives the measured `pose`,
+   `position_error_m`, `orientation_error_rad`, `steps` and `recovered`.
+5. Before a goal is unreachable it is recovered, once, as uni-robot-agent recovers a move
+   (`kinex_sim_robodojo.region`): the flange goes on to a pose the arm can reach within 80% of the
+   gear's tolerance of the goal's, and still arrives when it is within the tolerance of the goal's own
+   pose. That pose is the flange of one of the IK's own solutions for the goal, converged or not, that
+   cuRobo's constraints allow; failing one, of the joints nearest the measured ones that a search
+   finds, by the arm's kinematics from `X5A.urdf` and within 10 s of wall time. No world time passes
+   meanwhile.
+
+A frame that moves a flange too far ends goals as `unsafe_motion`: more than 0.2 m or 0.8 rad for an arm
+its goal moves, which ends that goal; more than 0.05 m or 0.25 rad for an arm that holds still, which
+ends every goal that runs, a gripper's too.
+
+`<gripper>/grasp` takes `{}` and closes: it commands the closed value, which lies past the finger stop
+to squeeze, and keeps it. `<gripper>/release` takes `{opening}`, a grip joint position, fully open by
+default. A goal ends once the opening is within 0.02 of its target, about 2 mm of pad gap (`reached`:
+for a grasp, nothing is between the fingers), once the fingers gain less than 0.005 on it over eight
+frames (`stalled`: for a grasp, they have stopped on an object), or after 24 frames (`late`). A grasp
+succeeds reached or stalled, a release only reached. The result gives `stop_reason`, the measured
+`opening` and `steps`. The arms hold while a gripper goal runs: nothing moves them.
 
 A goal advances no time. Send both arms their goals, then give the goals' ids to `world/wait_all`: it ends
 on the frame the last of them finishes, so the wait costs no more budget than the motion, and its `timeout`
@@ -130,6 +158,12 @@ unchanged. To solve them, kinex-sim builds upstream's cuRobo planner for the arm
 evaluation does by default (`need_planner`). RoboEnv's adapter, whose arms took joints only, skipped it.
 `robodojo-native` carries cuRobo's `[cu12]` extra (`cuda-core`), as upstream's install does, because the
 planner compiles its kernels through it.
+
+### Basic configuration
+
+`--config basic` commands the devices on topics instead, with upstream's own action entries: each arm
+takes `<arm>/joint_target` and each gripper `<gripper>/target`, and no device serves a goal. The rig's
+`configurations/basic/profiles.yaml` holds these profile changes.
 
 ### Depth configuration
 

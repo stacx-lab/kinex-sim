@@ -1,0 +1,72 @@
+left_arm:
+  operations:
+    move: null
+    joint_target:
+      description: Position trajectory naming every joint once, without velocities, accelerations
+        or effort, with strictly increasing time_from_start ending within 120 s. It starts
+        on receipt, or at a nonzero header stamp not in the past, runs linearly from the current
+        target and replaces the active command. One that is malformed or leaves the joint
+        limits is refused, which the world's next wait reply reports.
+      transport: topic
+      direction: input
+      endpoint: /left_arm/joint_target
+      type: trajectory_msgs/msg/JointTrajectory
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+  description: ARX X5 six-joint left arm.
+left_gripper:
+  operations:
+    grasp: null
+    release: null
+    target:
+      description: Grip joint position (data), a normalized opening, between closed and open.
+        It persists until replaced or stopped; one out of range is refused, which the world's
+        next wait reply reports.
+      transport: topic
+      direction: input
+      endpoint: /left_gripper/target
+      type: std_msgs/msg/Float64
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+right_arm:
+  operations:
+    move: null
+    joint_target:
+      description: Position trajectory naming every joint once, without velocities, accelerations
+        or effort, with strictly increasing time_from_start ending within 120 s. It starts
+        on receipt, or at a nonzero header stamp not in the past, runs linearly from the current
+        target and replaces the active command. One that is malformed or leaves the joint
+        limits is refused, which the world's next wait reply reports.
+      transport: topic
+      direction: input
+      endpoint: /right_arm/joint_target
+      type: trajectory_msgs/msg/JointTrajectory
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+  description: ARX X5 six-joint right arm.
+right_gripper:
+  operations:
+    grasp: null
+    release: null
+    target:
+      description: Grip joint position (data), a normalized opening, between closed and open.
+        It persists until replaced or stopped; one out of range is refused, which the world's
+        next wait reply reports.
+      transport: topic
+      direction: input
+      endpoint: /right_gripper/target
+      type: std_msgs/msg/Float64
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10

@@ -134,14 +134,14 @@ class PoseToy(ToyBackend):
 
 
 class PairPoseToy(PoseToy):
-    """Two planar arms, left and right, as joint groups that take joint targets and, by an action of this backend's
-    own, goals: move steps an arm's tip 0.1 m a step to the last pose of a goal's multi_dof_trajectory. A step
-    leaving an arm's 1.5 m reach ends the goal, and the tips cannot pass a wall at x = 1.2, where a goal stalls."""
+    """Two planar arms, left and right, as joint groups that take joint targets and, by Json actions of this
+    backend's own, goals: move steps an arm's tip 0.1 m a step to a goal's {x, y}, and home to where it started. A
+    step leaving an arm's 1.5 m reach ends the goal, and the tips cannot pass a wall at x = 1.2, where a goal stalls."""
     layout = ActionLayout(("x", "y", "x", "y"), tuple(
         CommandGroup(name, indices, (-2., -2.), (2., 2.), tip="tip", joint_targets=True)
         for name, indices in (("left", (0, 1)), ("right", (2, 3)))))
     devices = device_inventory(layout, {})
-    actions = tuple(Action(arm, "move", "control_msgs/action/FollowJointTrajectory") for arm in ("left", "right"))
+    actions = tuple(Action(arm, name, "custom_interfaces/action/Json") for arm in ("left", "right") for name in ("move", "home"))
     JOINTS = {"left": slice(0, 2), "right": slice(2, 4)}
 
     def reset(self, task, seed, randomize):
@@ -156,12 +156,11 @@ class PairPoseToy(PoseToy):
         return np.r_[self.position[self.JOINTS[group]], 0., 0., 0., 0., 1.]
 
     def start(self, operation, goal):
-        points = goal["multi_dof_trajectory"]["points"]
-        if not points:
+        goal = {"x": .5, "y": -.5} if operation.endswith("/home") else goal
+        if not {"x", "y"} <= set(goal):
             self.targets.pop(operation, None)
             return self.finish(operation, "aborted", "a goal needs a tip pose")
-        to = points[-1]["transforms"][0]["translation"]
-        self.targets[operation] = np.array([to["x"], to["y"]])
+        self.targets[operation] = np.array([goal["x"], goal["y"]])
         self.follow(operation)
 
     def end(self, operation, reason):
@@ -171,7 +170,7 @@ class PairPoseToy(PoseToy):
     def finish(self, operation, status, text):
         arm = operation.partition("/")[0]
         self.goals[operation] = {"status": status, "feedback": None, "commands": {arm: self.position[self.JOINTS[arm]]},
-                                 "result": {"error_code": 0 if status == "succeeded" else -1, "error_string": text}}
+                                 "result": {"message": text, "x": float(self.position[self.JOINTS[arm]][0])}}
 
     def follow(self, operation, moved=True):
         """The goal's next step, or its end: there, stalled, or out of reach."""
@@ -184,9 +183,8 @@ class PairPoseToy(PoseToy):
         if end:
             del self.targets[operation]
             return self.finish(operation, *end)
-        self.goals[operation] = {"status": None, "result": None, "commands": {arm: command}, "feedback": {
-            "multi_dof_joint_names": ["tip"], "multi_dof_desired": {"transforms": [{"translation": {
-                "x": float(command[0]), "y": float(command[1])}}]}}}
+        self.goals[operation] = {"status": None, "result": None, "commands": {arm: command},
+                                 "feedback": {"x": float(command[0]), "y": float(command[1])}}
 
     def step(self, action):
         assert threading.get_ident() == self.owner

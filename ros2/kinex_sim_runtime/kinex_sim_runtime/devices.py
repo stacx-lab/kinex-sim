@@ -29,6 +29,8 @@ FRAME_QOS = QoSProfile(depth=1, durability=DurabilityPolicy.VOLATILE,
                        reliability=ReliabilityPolicy.RELIABLE)
 # Wall time after which a subscribed camera of a resting world sends its frame again.
 KEEPALIVE_S = .2
+# The free-form action: its goal, result and feedback carry JSON objects.
+JSON_ACTION = 'custom_interfaces/action/Json'
 
 
 class Actuator:
@@ -128,10 +130,12 @@ class Actuator:
 class Goals:
     """A backend's action as a ROS action server, `<device>/<name>` of the type it names. A goal starts in the world
     before the server accepts it, so the world has every goal a client holds; its messages cross to the backend as
-    their fields."""
+    their fields, and those of the free-form Json action as the objects they carry: a result's message apart, as
+    the action's own."""
 
     def __init__(self, action, node):
         self.node, self.operation, self.type = node, f'{action.device}/{action.name}', get_action(action.type)
+        self.json = action.type == JSON_ACTION
         self.server = ActionServer(node, self.type, self.operation, self.execute, goal_callback=self.accept,
                                    handle_accepted_callback=self.accepted, cancel_callback=self.cancel,
                                    callback_group=ReentrantCallbackGroup())
@@ -140,12 +144,18 @@ class Goals:
         goal = SimpleNamespace(done=Future(executor=self.node.executor), handle=None, sample=None)
 
         def feedback(fields):
-            goal.sample = conv.message(self.type.Feedback, fields)
+            goal.sample = (self.type.Feedback(feedback=json.dumps(fields)) if self.json else
+                           conv.message(self.type.Feedback, fields))
             if goal.handle is not None:
                 goal.handle.publish_feedback(goal.sample)
         # Ends the goal while it is still this one.
         goal.end = lambda reason: goal.done.done() or self.node.world.end(self.operation, reason)
-        fields = message_to_ordereddict(request)
+        try:
+            fields = json.loads(request.request) if self.json else message_to_ordereddict(request)
+        except ValueError:
+            return GoalResponse.REJECT
+        if not isinstance(fields, dict):
+            return GoalResponse.REJECT
         try:
             await self.node.request(lambda: self.node.world.start(
                 self.operation, fields, lambda *end: goal.done.set_result(end), feedback))
@@ -167,7 +177,11 @@ class Goals:
     async def execute(self, handle):
         status, result = await self.node.goals[bytes(handle.goal_id.uuid)].done
         (handle.succeed if status == 'succeeded' else handle.canceled if handle.is_cancel_requested else handle.abort)()
-        return conv.message(self.type.Result, result)
+        if not self.json:
+            return conv.message(self.type.Result, result)
+        result = dict(result)
+        return self.type.Result(success=status == 'succeeded', message=result.pop('message', ''),
+                                response=json.dumps(result))
 
     def cancel(self, handle):
         self.node.world.submit(lambda: self.node.goals[bytes(handle.goal_id.uuid)].end('canceled'))

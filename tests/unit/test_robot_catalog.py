@@ -27,9 +27,12 @@ OPERATIONS = {
 # A joint device commanded by the pose of its one tip link serves pose_target in place of joint_target.
 POSE = {"joint_state": "sensor_msgs/msg/JointState", "pose_state": "sensor_msgs/msg/MultiDOFJointState",
         "pose_target": "trajectory_msgs/msg/MultiDOFJointTrajectory", "stop": "std_srvs/srv/Trigger"}
-# One that reports its tip's pose serves pose_state besides; in a move configuration, move in place of joint_target.
+# One that reports its tip's pose serves pose_state besides. Devices commanded by their backend's goals serve
+# Json actions in place of target topics: an arm its move, a gripper its grasp and release.
 TIP = {**OPERATIONS["joint"], "pose_state": POSE["pose_state"]}
-MOVE = {**POSE, "pose_target": None, "move": "control_msgs/action/FollowJointTrajectory"}
+JSON = "custom_interfaces/action/Json"
+MOVE = {**POSE, "pose_target": None, "move": JSON}
+GRIP = {**OPERATIONS["gripper"], "target": None, "grasp": JSON, "release": JSON}
 # The world node also serves the geometry of a camera rendered through a lens.
 GEOMETRY = {op: "custom_interfaces/srv/Json" for op in ("geometry", "unproject", "project")}
 WORLD = {"now": ("/world/now", "custom_interfaces/srv/Now"),
@@ -87,10 +90,14 @@ def test_every_rig_exports_loaded_profiles_on_kinex_sim_endpoints(tmp_path, iden
         operations = OPERATIONS.get(profile["type"])
         if "pose_state" in profile["operations"]:
             assert profile["type"] == "joint" and len(profile["model"]["tip_links"]) == 1
-            assert ("move" in profile["operations"]) == (configuration == "move")
             operations = next(kind for key, kind in (("move", MOVE), ("pose_target", POSE), ("pose_state", TIP))
                               if key in profile["operations"])
-            operations = {op: kind for op, kind in operations.items() if kind}
+        if "grasp" in profile["operations"]:
+            operations = GRIP
+        if identifier.startswith("robodojo/"):  # goals command its devices, but for the basic configuration's topics
+            assert (not {"move", "grasp"} & set(profile["operations"])) == (
+                configuration == "basic" or profile["type"] not in ("joint", "gripper"))
+        operations = operations and {op: kind for op, kind in operations.items() if kind}
         lens = profile["type"] in ("rgb", "rgbd") and profile["color"]["distortion"]["model"] != "none"
         if lens:
             assert profile["color"]["distortion"]["model"] == "opencv_brown_conrady" and profile["color"]["fov"]

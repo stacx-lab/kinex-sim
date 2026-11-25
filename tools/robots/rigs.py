@@ -131,26 +131,28 @@ def joint(name, description, joints, home, base, *, tip="flange", model="arm.urd
                   frames={"base": base})
 
 
-# Kinex's grip contract: a stop keeps the applied target, since the measured opening would release a held object.
-GRIP_STOP = ("Keep the active grip target, so a held object stays gripped; before the first command, hold the "
-             "measured opening. An open target releases.")
+# Kinex's grip contract: a stop keeps the commanded grip, since the measured opening would release a held object.
+GRIP_STOP = ("Keep the commanded grip, so a held object stays gripped; before the first command, hold the measured "
+             "opening.")
 
 
 def gripper(name, description, joint, base, tcp, *, quantity="a normalized opening", note="", state=None,
-            opened=1.0, closed=0.0):
+            opened=1.0, closed=0.0, targets=True):
     """A gripper whose grip joint carries quantity, between the profile's open and closed. note: a sentence on
-    how the grip follows a target; state: joint_state's description when the grip joint is not a measured opening."""
+    how the grip follows a target; state: joint_state's description when the grip joint is not a measured opening.
+    Without targets it takes no target on a topic: its actions command it."""
     ops = {
         "joint_state": operation(
             state or f"Measured grip joint position, {quantity}, stamped at acquisition.",
             "topic", "output", f"/{name}/joint_state", "sensor_msgs/msg/JointState",
             qos(durability="transient_local")),
-        "target": operation(
+    }
+    if targets:
+        ops["target"] = operation(
             f"Grip joint position (data), {quantity}, between closed and open. {note + ' ' if note else ''}"
             f"It persists until replaced or stopped; one out of range {REFUSED}",
-            "topic", "input", f"/{name}/target", "std_msgs/msg/Float64"),
-        "stop": operation(GRIP_STOP, "service", "input", f"/{name}/stop", "std_srvs/srv/Trigger"),
-    }
+            "topic", "input", f"/{name}/target", "std_msgs/msg/Float64")
+    ops["stop"] = operation(GRIP_STOP, "service", "input", f"/{name}/stop", "std_srvs/srv/Trigger")
     return device(name, "gripper", description, ops, observation="joint_state",
                   stop={"behavior": "hold", "affected_devices": [name]},
                   frames={"base": base, "tcp": tcp},

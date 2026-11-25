@@ -204,9 +204,12 @@ the backend defines and executes. The world knows no action by name: it serves e
 lists, carries its goals, feedback and results, and lets waits name its goals.
 
 - **Declare.** `actions` lists an `Action(device, name, type)` per operation; the world serves it as
-  `<device>/<name>`, of any installed action type.
+  `<device>/<name>`, of any installed action type. `custom_interfaces/action/Json` is the free-form one:
+  its goal, feedback and result cross as the JSON objects they carry, a result's `message` as the
+  action's own, and the operation's profile description states their fields.
 - **Start and end.** `start(operation, goal)` takes a goal as the fields of the type's `Goal`, in place
-  of the operation's active one. `end(operation, reason)` ends the active one at once: a cancel, a
+  of the operation's active one and of other actions' goals that command the same groups.
+  `end(operation, reason)` ends the active one at once: a cancel, a
   stop, a newer command or the episode's end. Neither raises for the goal's
   sake; a goal the backend cannot take ends as it starts, with the reason in its result.
 - **Advance.** Goals advance in `step`, one `period` each as everything does, and a goal's commands

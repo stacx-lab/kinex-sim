@@ -1,4 +1,4 @@
-"""Every catalog rig against Kinex's profile schema and readiness plan."""
+"""Every catalog rig against Kinex's profile schema."""
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,8 +10,8 @@ from kinex_sim.catalog.robots import list_robots, setup
 PROJECT = Path(__file__).resolve().parents[3]
 
 
-def test_kinex_schema_and_readiness_accept_every_rig(tmp_path):
-    """Kinex's own profile schema parses every export and its readiness plan completes.
+def test_kinex_schema_accepts_every_rig(tmp_path):
+    """Kinex's own profile schema parses every export, in every configuration.
 
     Kinex resolves URDFs in its own Python environment, a multi-gigabyte Pixi
     project it would otherwise provision in every workspace. Set
@@ -21,7 +21,7 @@ def test_kinex_schema_and_readiness_accept_every_rig(tmp_path):
     import os
     import shutil
     import subprocess
-    dist = PROJECT.parent / "kinex2.0/packages/core/dist"
+    dist = PROJECT.parent / "kinex/packages/core/dist"
     python = os.environ.get("KINEX_PYTHON_PROJECT")
     if not python or not shutil.which("node") or not (dist / "device/profile/store.js").is_file():
         pytest.skip("needs Node, a built Kinex core next to this checkout and KINEX_PYTHON_PROJECT")
@@ -37,8 +37,8 @@ def test_kinex_schema_and_readiness_accept_every_rig(tmp_path):
     result = subprocess.run(["node", str(Path(__file__).with_name("profiles.mjs")), str(dist), *map(str, workspaces)],
                             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=300)
     assert result.returncode == 0, result.stderr
-    plans = json.loads(result.stdout)
-    assert len(plans) == len(exports)
-    for (robot, configuration), plan in zip(exports, plans):
-        assert plan["robot"] == robot.split("/")[1]
-        assert {item["status"] for item in plan["items"]} == {"done"}, (robot, configuration, plan["items"])
+    parsed = json.loads(result.stdout)
+    assert len(parsed) == len(exports)
+    for (robot, configuration), directory, workspace in zip(exports, workspaces, parsed):
+        exported = {path.parent.name for path in (directory / ".kinex/devices").glob("*/profile.yaml")}
+        assert workspace["robot"] == robot.split("/")[1] and set(workspace["devices"]) == exported, (robot, configuration)

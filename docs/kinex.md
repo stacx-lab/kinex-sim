@@ -25,8 +25,8 @@ simulator instead of relaying it. What Kinex adds runs in Kinex:
 
 The world's `now` is `custom_interfaces/srv/Now`, its `wait_all` and `wait_any` are
 `custom_interfaces/srv/Wait`, and a lensed camera's `geometry`,
-`unproject` and `project` are `custom_interfaces/srv/Json`. An arm's `move` is the standard
-`control_msgs/action/FollowJointTrajectory`. kinex-sim and Kinex each build an
+`unproject` and `project` are `custom_interfaces/srv/Json`. A device's goals, such as RoboDojo's `move`,
+`grasp` and `release`, are `custom_interfaces/action/Json`. kinex-sim and Kinex each build an
 identical copy of the package, from `ros2/custom_interfaces` here and from Kinex's own assets
 there, so the types are the same on the wire and neither project needs the other to build or
 to call them. The camera
@@ -36,7 +36,7 @@ operations take and return the JSON of Kinex's camera geometry operations.
 
 Every check that needs Kinex is in `tests/kinex`, apart from kinex-sim's own tests, which
 run without it. They take Kinex Python from
-`KINEX_PYTHON=../kinex2.0/packages/core/assets/python` and are skipped without it.
+`KINEX_PYTHON=../kinex/packages/core/assets/python` and are skipped without it.
 
 | Directory | Checks | Runs in |
 |---|---|---|
@@ -45,7 +45,7 @@ run without it. They take Kinex Python from
 | `tests/kinex/native` | `test_<simulator>.py`: the exported rig's FK, mounts and camera frames, through Kinex's kinematics, against the simulator | that simulator's native environment |
 
 ```bash
-export KINEX_PYTHON=$PWD/../kinex2.0/packages/core/assets/python
+export KINEX_PYTHON=$PWD/../kinex/packages/core/assets/python
 pixi run --frozen python -m pytest -q tests/kinex/unit
 pixi run --frozen -e abc bash -c \
     'source .workspaces/abc/install/local_setup.bash && python -m pytest -q tests/kinex/ros'

@@ -3,13 +3,14 @@
 <package format="3">
   <name>custom_interfaces</name>
   <version>0.2.0</version>
-  <description>The world Wait service and the free-form Json service that devices declare.</description>
+  <description>The world Now and Wait services and the free-form Json service and action that devices declare.</description>
   <maintainer email="haitongma8@gmail.com">haitongma</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
+  <depend>action_msgs</depend>
   <depend>unique_identifier_msgs</depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 

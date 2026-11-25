@@ -32,10 +32,10 @@ def execute(graph, client, message, feedback=None):
 
 
 def ended(graph, handle):
-    """A finished goal's (status, error code, error string)."""
+    """A finished Json goal's (status, success, message)."""
     reply = handle.get_result_async()
     graph.until(reply.done)
-    return reply.result().status, reply.result().result.error_code, reply.result().result.error_string
+    return reply.result().status, reply.result().result.success, reply.result().result.message
 
 
 class Graph:

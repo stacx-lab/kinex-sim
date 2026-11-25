@@ -15,21 +15,6 @@ operations:
       reliability: reliable
       durability: transient_local
     timeout_s: 10
-  joint_target:
-    description: Position trajectory naming every joint once, without velocities, accelerations
-      or effort, with strictly increasing time_from_start ending within 120 s. It starts on
-      receipt, or at a nonzero header stamp not in the past, runs linearly from the current
-      target and replaces the active command. One that is malformed or leaves the joint limits
-      is refused, which the world's next wait reply reports.
-    transport: topic
-    direction: input
-    endpoint: /left_arm/joint_target
-    type: trajectory_msgs/msg/JointTrajectory
-    qos:
-      depth: 1
-      reliability: reliable
-      durability: volatile
-    timeout_s: 10
   pose_state:
     description: Measured flange pose in left_arm/base, stamped with joint_state.
     transport: topic
@@ -52,12 +37,35 @@ operations:
       reliability: reliable
       durability: volatile
     timeout_s: 10
+  move:
+    description: 'Move the flange in a straight line to a pose: {pose: [x, y, z, qx, qy, qz,
+      qw] in left_arm/base, profile}. profile is the gear, the most a 0.04 s step moves the
+      flange and how near the pose it has reached it: standard 4 cm within 0.03 m and 0.1
+      rad, approach 4 cm within 0.02 m and 0.05 rad, precision 1 cm within 0.005 m and 0.05
+      rad; standard by default. The goal aborts when the flange stalls, moves away from the
+      pose on two steps running (diverging), when a step moves a flange more than 0.2 m or
+      0.8 rad, or that of an arm holding still more than 0.05 m or 0.25 rad (unsafe_motion),
+      when a step has no IK solution (unreachable) or 25 steps after the gear would have arrived
+      (late). Before it is unreachable the flange goes, once, for a pose the arm can reach
+      within the gear''s tolerance of the goal''s, if there is one. Result: {stop_reason:
+      reached | stalled | diverging | unsafe_motion | unreachable | late | ended, pose, position_error_m,
+      orientation_error_rad, steps, recovered: whether it went for such a pose}; feedback:
+      the errors and steps. A newer goal or a stop ends it.'
+    transport: action
+    direction: input
+    endpoint: /left_arm/move
+    type: custom_interfaces/action/Json
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: volatile
+    timeout_s: 10
 loaded: true
 meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: ARX X5 six-joint left arm.
+description: ARX X5 six-joint left arm, moved by flange goals through its own IK.
 source: introspected
 calibrated_at: null
 method: introspection

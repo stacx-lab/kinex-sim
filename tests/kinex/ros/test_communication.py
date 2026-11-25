@@ -31,13 +31,9 @@ def arms():
     catalog = {}
     for arm in ('left', 'right'):
         catalog[f'{arm}.move'] = {'transport': 'action', 'direction': 'input', 'endpoint': f'/{arm}/move',
-                                  'type': 'control_msgs/action/FollowJointTrajectory'}
+                                  'type': 'custom_interfaces/action/Json'}
         catalog[f'{arm}.stop'] = {**SERVICE, 'endpoint': f'/{arm}/stop', 'type': 'std_srvs/srv/Trigger'}
     return catalog
-
-
-def goal(x, y):
-    return {'multi_dof_trajectory': {'joint_names': ['tip'], 'points': [{'transforms': [{'translation': {'x': x, 'y': y}}]}]}}
 
 
 def run(graph, catalog, program):
@@ -112,23 +108,23 @@ def test_goals_run_in_parallel_and_the_world_waits_for_them(tmp_path):
 
         async def time():
             return (await world.now()).time_s
-        near, far = left(goal(.7, -.5)), right(**goal(1., -.5))  # 0.2 s and 0.5 s away
+        near, far = left({'x': .7, 'y': -.5}), right(x=1., y=-.5)  # 0.2 s and 0.5 s away
         assert near.status == 'sending' and await world.wait_all([0]) == [True] and await time() == 0.
         assert await world.wait_any([near, far, 5]) == [True, False, False] and await time() == pytest.approx(.2)
-        assert (near.status, near.result.error_code, far.status) == ('succeeded', 0, 'executing')
+        assert (near.status, near.result, far.status) == ('succeeded', {'x': pytest.approx(.7)}, 'executing')
         assert await world.wait_all([near, far]) == [True, True] and await time() == pytest.approx(.5)
-        assert (await far).error_string == 'reached'
+        assert await far == {'x': pytest.approx(1.)}  # a Json action's result is its object
         # The latest feedback the device sent; its last may arrive after its result.
-        assert far.feedback.multi_dof_desired.transforms[0].translation.x == pytest.approx(.95, abs=.06)
+        assert far.feedback['x'] == pytest.approx(.95, abs=.06)
         assert await world.wait_all([.5]) == [True] and await time() == pytest.approx(1.)  # a plain wait
-        slow = left(goal(1.1, -.5))  # 0.4 s away
+        slow = left(x=1.1, y=-.5)  # 0.4 s away
         assert await world.wait_all([slow, .1], timeout=.2) == [False, True]  # the timeout cancels what is left
         assert slow.status == 'canceled' and await time() == pytest.approx(1.2)
-        blocked = right(goal(1.5, -.5))  # the wall stops it
+        blocked = right(x=1.5, y=-.5)  # the wall stops it
         assert await world.wait_all([blocked]) == [True]  # over, however it ended
         with pytest.raises(RPCError, match='right.move was aborted: stalled'):
             await blocked
-        assert (blocked.status, blocked.result.error_string) == ('aborted', 'stalled')
+        assert (blocked.status, blocked.result) == ('aborted', {'x': pytest.approx(1.2)})
         refused = left({})  # a goal the backend cannot take ends as it starts
         assert await world.wait_all([refused]) == [True] and refused.status == 'aborted'
         with pytest.raises(RPCError, match='a goal needs a tip pose'):
@@ -193,9 +189,9 @@ def test_where_time_passes_by_itself_the_same_waits_only_block(tmp_path):
         before = await world.now()
         assert before.time_s > start.time_s and before[1:] == (None, None)  # it runs unwatched, without a budget
         assert await world.wait_all([.3]) == [True] and (await world.now()).time_s >= before.time_s + .3
-        near = left(goal(.7, -.5))  # 0.2 s away
-        assert await world.wait_all([near]) == [True] and (await near).error_string == 'reached'
-        far = left(goal(1.1, -.5))  # 0.4 s away
+        near = left(x=.7, y=-.5)  # 0.2 s away
+        assert await world.wait_all([near]) == [True] and await near == {'x': pytest.approx(.7)}
+        far = left(x=1.1, y=-.5)  # 0.4 s away
         assert await world.wait_any([far], timeout=.2) == [False] and far.status == 'canceled'
         ticks = []
         async for now in world.rate(5):

@@ -30,8 +30,8 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Keep the active grip target, so a held object stays gripped; before the first
-      command, hold the measured opening. An open target releases.
+    description: Keep the commanded grip, so a held object stays gripped; before the first
+      command, hold the measured opening.
     transport: service
     direction: input
     endpoint: /right_gripper/stop
