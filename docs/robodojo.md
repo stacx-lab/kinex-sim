@@ -88,6 +88,14 @@ The rig `robodojo/robodojo-arx-x5` holds the X5 chains from `X5A.urdf`, mounts
 at (∓0.3, −0.45, 0.765) with a 90° yaw, RoboEnv's TCP (the pad center, 0.15 m
 ahead of `link6`) and the measured camera mounts.
 
+With its standard devices, not in the `basic` or `depth` configuration, the rig ships
+`kinex.lib.perception` (`lib/perception.py`, `.kinex/lib/perception.py` in an exported workspace),
+uni-robot-agent's `locate(method=triangulate)` for these cameras:
+`triangulate(views, frame)` takes the pixels of one point in two or more views, each `(camera, [u, v])`
+or `(camera, [u, v], image or stamp)`. Each ray comes from the camera's profile geometry and its tf pose
+at that stamp, so a wrist camera serves from any arm pose. The point is valid when the rays are at least
+1° apart, it lies in front of every camera, and it reprojects within 3 px of every pixel.
+
 The flange is `link6`, upstream's `ee_link` and cuRobo's tool frame, and `pose_state` reports its
 measured pose in `<arm>/base`. Move goals control the TCP, `<gripper>/tcp`, as uni-robot-agent's
 `move` controls its grasp site.

@@ -156,9 +156,10 @@ the profiles on the selected ROS domain into `.kinex/` (`workspace.yaml`, `devic
 nothing, and it refuses an existing workspace. Export a workspace
 for each task, seed and configuration whose devices differ, and launch with the same ones.
 
-A rig may also ship Kinex workspace content beside its profiles: a `lib/` function library
-(`kinex.lib.<module>`), `programs/` and `skills/`. Setup copies these into `.kinex/`, and it
-refuses a workspace that already has any of them. No rig ships any yet.
+A rig may also ship Kinex workspace content for its standard devices beside its profiles: a
+`lib/` function library (`kinex.lib.<module>`), `programs/` and `skills/`. Setup copies these
+into `.kinex/`, and it refuses a workspace that already has any of them. RoboDojo's rig ships
+`lib/perception.py` (see [RoboDojo](robodojo.md)).
 
 A simulator that serves alternative device sets declares each one in its manifest, as
 `[configurations.NAME]` with a `description` and the device kinds it changes (`devices`).
@@ -167,7 +168,8 @@ RoboDojo's `depth` makes its cameras RGB-D. Every rig of that simulator holds
 
 - an optional `profiles.yaml`, the configuration's profile changes by device, as JSON merge
   patches that the rig builder writes;
-- optional `lib/`, `programs/` and `skills/`, whose files are added over the rig's.
+- optional `lib/`, `programs/` and `skills/`, the content the configuration ships in place of
+  the rig's.
 
 The backend is created with `configuration=NAME`. The catalog tests export every rig in every
 configuration its simulator declares and check the device kinds against the manifest.
