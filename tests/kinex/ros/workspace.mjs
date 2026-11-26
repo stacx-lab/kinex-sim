@@ -15,7 +15,7 @@ const latencies = []
 async function exec(body, {error=false, timeout_s=120}={}) {
   const started = performance.now()
   const result = await call('exec', {python:`import asyncio
-from kinex import device, finish, lib, runtime, seconds, world
+from kinex import device, finish, lib, seconds, world
 from kinex.errors import OperationError
 async def measured(name, operation, time_s):
     topic = device(name).topic(operation)
@@ -49,9 +49,9 @@ try {
   }
   const started = await runtime.recording.start({specs:{gripper:{rate:20},camera_agentview:{rate:10}},sessionID:host.sessionID})
   assert.deepEqual(started.refusals,{})
-  const first = await exec(`assert runtime.describe('gripper.target')['message'] == {'data': 'double'}
+  const first = await exec(`assert device('gripper').topic('target').describe()['interface']['message'] == {'data': 'double'}
 from kinex.communication import scope
-assert set(runtime.describe('world.wait')['request']) == {'seconds'}
+assert set(device('world').service('wait').describe()['interface']['request']) == {'seconds'}
 assert all(not name.endswith(('/task/status','/task/instruction')) for name,_ in scope().bridge.node.get_topic_names_and_types())
 state = await device('arm').topic('joint_state').next(timeout_s=5)
 await lib.frames.lookup_transform('world:base','gripper:tcp',state.header.stamp)
