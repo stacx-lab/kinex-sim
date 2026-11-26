@@ -6,9 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   now:
-    description: 'World time, time_s, and the time budget in seconds of world time:
-      used_s spent of max_s allowed. Without a budget both are NaN; without a limit
-      max_s is inf.'
+    description: 'World time, time_s, and the time budget in seconds of world time: used_s spent of max_s allowed. Without a budget both are NaN; without a limit max_s is inf.'
     transport: service
     direction: input
     endpoint: /world/now
@@ -19,12 +17,7 @@ operations:
       durability: volatile
     timeout_s: 10
   wait:
-    description: 'Wait seconds of world time: the reply gives time_s, the world time
-      reached. A world that executes goals ends the wait when one ends, and names
-      it in ended. One wait at a time: a second is rejected. A command a device refused
-      since the previous reply ends the wait at once with success false; message names
-      it and why. Once the episode has ended, a wait with seconds left fails and message
-      says why.'
+    description: 'Wait seconds of world time: the reply gives time_s, the world time reached. A world that executes goals ends the wait when one ends, and names it in ended. One wait at a time: a second is rejected. A command a device refused since the previous reply ends the wait at once with success false; message names it and why. Once the episode has ended, a wait with seconds left fails and message says why.'
     transport: service
     direction: input
     endpoint: /world/wait

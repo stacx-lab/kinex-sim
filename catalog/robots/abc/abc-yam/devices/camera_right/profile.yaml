@@ -16,8 +16,7 @@ operations:
       durability: volatile
     timeout_s: 10
   depth:
-    description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
-      0 marks missing samples.
+    description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
     transport: topic
     direction: output
     endpoint: /camera_right/depth

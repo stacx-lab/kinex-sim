@@ -16,11 +16,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   joint_target:
-    description: Position trajectory naming every joint once, without velocities, accelerations
-      or effort, with strictly increasing time_from_start ending within 120 s. It starts on
-      receipt, or at a nonzero header stamp not in the past, runs linearly from the current
-      target and replaces the active command. One that is malformed or leaves the joint limits
-      is refused, which the world's next wait reply reports.
+    description: Position trajectory naming every joint once, without velocities, accelerations or effort, with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs linearly from the current target and replaces the active command. One that is malformed or leaves the joint limits is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /arm/joint_target

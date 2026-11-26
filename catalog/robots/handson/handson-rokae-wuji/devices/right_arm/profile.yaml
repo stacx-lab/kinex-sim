@@ -16,12 +16,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   pose_target:
-    description: 'Trajectory of palm poses in right_arm/base: joint_names [palm] and one transform
-      per point (metres, unit quaternion xyzw), with strictly increasing time_from_start ending
-      within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs
-      from the current target and replaces the active command. The arm''s own IK tracks it
-      and may stop short of a pose. A malformed one is refused, which the world''s next wait
-      reply reports.'
+    description: 'Trajectory of palm poses in right_arm/base: joint_names [palm] and one transform per point (metres, unit quaternion xyzw), with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs from the current target and replaces the active command. The arm''s own IK tracks it and may stop short of a pose. A malformed one is refused, which the world''s next wait reply reports.'
     transport: topic
     direction: input
     endpoint: /right_arm/pose_target

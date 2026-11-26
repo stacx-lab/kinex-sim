@@ -16,8 +16,7 @@ operations:
       durability: volatile
     timeout_s: 10
   depth:
-    description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
-      0 marks missing samples.
+    description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
     transport: topic
     direction: output
     endpoint: /camera_right/depth
@@ -43,8 +42,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: rgbd
-description: RGB-D camera on the torso lift, behind and above the robot's right side, looking
-  forward and down past the arm.
+description: RGB-D camera on the torso lift, behind and above the robot's right side, looking forward and down past the arm.
 source: introspected
 calibrated_at: null
 method: introspection

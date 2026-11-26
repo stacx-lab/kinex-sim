@@ -17,9 +17,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Grip joint position (data), a normalized opening, between closed and open.
-      It persists until replaced or stopped; one out of range is refused, which the world's
-      next wait reply reports.
+    description: Grip joint position (data), a normalized opening, between closed and open. It persists until replaced or stopped; one out of range is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /left_gripper/target
@@ -30,8 +28,7 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Keep the commanded grip, so a held object stays gripped; before the first
-      command, hold the measured opening.
+    description: Keep the commanded grip, so a held object stays gripped; before the first command, hold the measured opening.
     transport: service
     direction: input
     endpoint: /left_gripper/stop
@@ -46,8 +43,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: YAM left parallel two-finger gripper. The inner pad gap runs from about 0.8 mm
-  closed to 95.8 mm open.
+description: YAM left parallel two-finger gripper. The inner pad gap runs from about 0.8 mm closed to 95.8 mm open.
 source: introspected
 calibrated_at: null
 method: introspection

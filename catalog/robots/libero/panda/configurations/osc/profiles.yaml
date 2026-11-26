@@ -4,12 +4,7 @@ arm:
     stop:
       description: Stop motion and hold the measured flange pose.
     pose_target:
-      description: 'Trajectory of flange poses in arm/base: joint_names [flange] and one transform
-        per point (metres, unit quaternion xyzw), with strictly increasing time_from_start
-        ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the
-        past, runs from the current target and replaces the active command. An operational-space
-        controller tracks it, by at most 5 cm and 0.5 rad per axis every 0.05 s, and may stop
-        short of a pose. A malformed one is refused, which the world''s next wait reply reports.'
+      description: 'Trajectory of flange poses in arm/base: joint_names [flange] and one transform per point (metres, unit quaternion xyzw), with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs from the current target and replaces the active command. An operational-space controller tracks it, by at most 5 cm and 0.5 rad per axis every 0.05 s, and may stop short of a pose. A malformed one is refused, which the world''s next wait reply reports.'
       transport: topic
       direction: input
       endpoint: /arm/pose_target

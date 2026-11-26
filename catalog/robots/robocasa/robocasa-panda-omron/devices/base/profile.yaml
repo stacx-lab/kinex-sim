@@ -6,10 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   velocity:
-    description: Body velocity in base/base axes, in the units and bounds of the profile's
-      velocity; other axes stay zero. The body follows the latest twist and stops 0.5 s of
-      world time after the last, so re-send to keep moving. One out of bounds is refused,
-      which the world's next wait reply reports.
+    description: Body velocity in base/base axes, in the units and bounds of the profile's velocity; other axes stay zero. The body follows the latest twist and stops 0.5 s of world time after the last, so re-send to keep moving. One out of bounds is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /base/velocity
@@ -20,8 +17,7 @@ operations:
       durability: volatile
     timeout_s: 10
   odometry:
-    description: Measured body twist in base/base (m/s, rad/s) and planar pose in base/odom,
-      the body frame where it started; never a global pose.
+    description: Measured body twist in base/base (m/s, rad/s) and planar pose in base/odom, the body frame where it started; never a global pose.
     transport: topic
     direction: output
     endpoint: /base/odometry
@@ -47,8 +43,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: locomotion
-description: Omron holonomic mobile base. Full-scale velocity is 1 m/s and 1.5 rad/s. Its
-  base frame is the chassis origin, 21 cm ahead of the yaw axis.
+description: Omron holonomic mobile base. Full-scale velocity is 1 m/s and 1.5 rad/s. Its base frame is the chassis origin, 21 cm ahead of the yaw axis.
 source: introspected
 calibrated_at: null
 method: introspection

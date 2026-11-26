@@ -17,9 +17,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Grip joint position (data), a normalized command, between closed and open.
-      The applied command moves 0.2 toward it every 0.05 s. It persists until replaced or
-      stopped; one out of range is refused, which the world's next wait reply reports.
+    description: Grip joint position (data), a normalized command, between closed and open. The applied command moves 0.2 toward it every 0.05 s. It persists until replaced or stopped; one out of range is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /gripper/target
@@ -30,8 +28,7 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Keep the commanded grip, so a held object stays gripped; before the first
-      command, hold the measured opening.
+    description: Keep the commanded grip, so a held object stays gripped; before the first command, hold the measured opening.
     transport: service
     direction: input
     endpoint: /gripper/stop
@@ -46,9 +43,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: Panda parallel two-finger gripper. Fingers close along the base x axis. The grip
-  joint is the applied command, not a measured opening, so fingers stalled on an object do
-  not show in it.
+description: Panda parallel two-finger gripper. Fingers close along the base x axis. The grip joint is the applied command, not a measured opening, so fingers stalled on an object do not show in it.
 source: introspected
 calibrated_at: null
 method: introspection

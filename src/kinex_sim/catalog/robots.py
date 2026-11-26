@@ -24,7 +24,7 @@ import tempfile
 
 import yaml
 
-from kinex_sim.catalog import check_configuration, resolve
+from kinex_sim.catalog import check_configuration, resolve, yaml_text
 from kinex_sim.project import project_root
 from kinex_sim.runs.domains import check_domain
 
@@ -134,7 +134,7 @@ def setup(selection, directory=None, *, seed=None, project=None, domain_id=0, co
         for name, value in profiles.items():
             value["loaded"] = True
             value["runtime"] = {**value["runtime"], "domain_id": domain_id}
-            (staging / "devices" / name / "profile.yaml").write_text(yaml.safe_dump(value, sort_keys=False))
+            (staging / "devices" / name / "profile.yaml").write_text(yaml_text(value))
         target.mkdir(exist_ok=True)
         for name in exported:
             (staging / name).rename(target / name)

@@ -2,8 +2,7 @@ left_camera:
   layout: null
   operations:
     depth:
-      description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
-        0 marks missing samples.
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
       transport: topic
       direction: output
       endpoint: /left_camera/depth
@@ -33,8 +32,7 @@ right_camera:
   layout: null
   operations:
     depth:
-      description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
-        0 marks missing samples.
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
       transport: topic
       direction: output
       endpoint: /right_camera/depth
@@ -64,8 +62,7 @@ head_camera:
   layout: null
   operations:
     depth:
-      description: 16UC1 depth registered to image, in millimetres, with the image's stamp;
-        0 marks missing samples.
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
       transport: topic
       direction: output
       endpoint: /head_camera/depth
