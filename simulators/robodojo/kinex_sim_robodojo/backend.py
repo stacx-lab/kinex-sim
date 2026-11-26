@@ -196,6 +196,8 @@ def config(task, early_stop, env_cfg_type="arx_x5", depth=False):
 class RoboDojoSim:
     default_task = "pack_objects_into_box"
     width, height = 640, 480
+    # cuRobo IK seeds: upstream's 32, then 128 when none of their solutions can be taken, uni-robot-agent's budgets.
+    seeds = (32, 128)
 
     def __init__(self, *, max_steps=None, early_stop=False, configuration=None):
         if configuration not in (None, "basic", "depth"):
@@ -211,6 +213,7 @@ class RoboDojoSim:
         self.env = None
         self.task = None
         self.spectators, self._spectators = (), {}
+        self._wide = {}  # each arm's 128-seed IK, made when first needed
 
     @property
     def actions(self):
@@ -482,21 +485,23 @@ class RoboDojoSim:
         return np.r_[world[:3, 3], t3d.quaternions.mat2quat(world[:3, :3])]
 
     def joint_step(self, group, pose):
-        """The joints for the next step of a goal: cuRobo's IK solves the flange pose from the measured joints, and
-        its solution nearest them must lie within the joint limits and JUMP_RAD of them, along a joint path clear
-        of cuRobo's self and table constraints. A ValueError says why there is none."""
+        """The joints for the next step of a goal: cuRobo's IK solves the flange pose from the measured joints, with
+        each of seeds in turn until one gives a solution a step can take: its solution nearest them must lie within
+        the joint limits and JUMP_RAD of them, along a joint path clear of cuRobo's self and table constraints. A
+        ValueError says why there is none."""
         side = group.removesuffix("_arm")
         robot = self._actuators[side][0]
         planner = self.env.robot_manager.ik_solver[robot.robot_name]
         lower, upper, _ = self._limits[side]
         joints = self._joints(group)
         target = self._native_pose(side, np.asarray(pose, dtype=float))
-        q, why = choose(self._candidates(planner, robot, target, joints), joints, lower, upper, JUMP_RAD,
-                        lambda rows: self._path_free(planner, rows), list(robot.arm_joints_name))
-        if q is None:
-            raise ValueError(f"the nearest IK solution {why}" if why else
-                             "cuRobo's IK has no solution clear of the arm itself and the table")
-        return q
+        for seeds in self.seeds:
+            q, why = choose(self._candidates(planner, robot, target, joints, seeds=seeds), joints, lower, upper,
+                            JUMP_RAD, lambda rows: self._path_free(planner, rows), list(robot.arm_joints_name))
+            if q is not None:
+                return q
+        raise ValueError(f"the nearest IK solution {why}" if why else
+                         "cuRobo's IK has no solution clear of the arm itself and the table")
 
     def _next(self, group, motion):
         """The joints of a move's next step, the flange's for its TCP's pose. When cuRobo's IK has none, the move
@@ -527,8 +532,22 @@ class RoboDojoSim:
         return search(self._chains[side], [nearest_turn(q, joints, lower, upper) for q in found],
                       lambda rows: self._constraints(planner, rows), joints, goal, (lower, upper), tolerance)
 
-    def _candidates(self, planner, robot, target, current, every=False):
-        """cuRobo's successful IK solutions for an ee_pose target, built as upstream's
+    def _solver(self, planner, robot, seeds):
+        """cuRobo's IK with seeds seeds: upstream's own for 32, else one made once per arm with upstream's IK
+        settings, as uni-robot-agent's adapter makes its 128-seed IK."""
+        if seeds == 32:
+            return planner.ik_solver
+        if robot.robot_name not in self._wide:
+            from curobo.inverse_kinematics import InverseKinematics, InverseKinematicsCfg
+            self._wide[robot.robot_name] = InverseKinematics(InverseKinematicsCfg.create(
+                robot=planner.robot_cfg, scene_model=planner.scene_model, device_cfg=planner.device_cfg,
+                num_seeds=seeds, seed_solver_num_seeds=seeds, position_tolerance=.001, orientation_tolerance=.02,
+                self_collision_check=True, use_cuda_graph=planner.use_cuda_graph, max_batch_size=1, multi_env=False,
+                max_goalset=1))
+        return self._wide[robot.robot_name]
+
+    def _candidates(self, planner, robot, target, current, every=False, seeds=32):
+        """cuRobo's successful IK solutions for an ee_pose target with seeds seeds, built as upstream's
         CuroboPlanner.solve_ik_to_joint builds its goal, from the joints current; with every, also those of its
         seeds that did not converge."""
         from utils.transformer import calculate_target_pose
@@ -536,8 +555,9 @@ class RoboDojoSim:
         position, rotation = planner._trans_from_world_to_base(
             np.asarray(planner.robot_origin_pose, dtype=np.float32), np.asarray(goal, dtype=np.float32))
         position = position + np.asarray(planner.frame_bias, dtype=position.dtype)
-        result = planner.ik_solver.solve_pose(goal_tool_poses=planner._build_goal_pose(position, rotation),
-                                              current_state=planner._build_joint_state(current), return_seeds=32)
+        result = self._solver(planner, robot, seeds).solve_pose(
+            goal_tool_poses=planner._build_goal_pose(position, rotation),
+            current_state=planner._build_joint_state(current), return_seeds=seeds)
         solution = result.js_solution
         names = list(solution.joint_names)
         joints = values(solution.position).reshape(-1, len(names))[:, [names.index(n) for n in
@@ -680,6 +700,9 @@ class RoboDojoSim:
         global _APP
         # Render products share the native graph; they end with the environment.
         self._spectators = {}
+        for solver in self._wide.values():
+            solver.destroy()
+        self._wide = {}
         if self.env is not None:
             self.env.close()
             self.env = None

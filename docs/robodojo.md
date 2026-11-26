@@ -128,7 +128,8 @@ takes, 1–24 and 24 by default.
    it is.
 2. cuRobo's `InverseKinematics`, the solver upstream's `ee_pose` action uses (32 seeds, self and table
    collision, 1 mm and 0.02 rad), solves the flange of that pose from the measured joints
-   (`RoboDojoSim.joint_step`).
+   (`RoboDojoSim.joint_step`); when none of its solutions can be taken, one with 128 seeds and the same
+   settings solves it again, as uni-robot-agent's adapter does.
    Of its solutions, the one nearest the measured joints is taken that lies within the joint limits, a
    whole turn nearer where they allow, asks no joint for more than 1 rad, and has a joint path, sampled
    every 0.025 rad, that passes cuRobo's self and table constraints. These checks follow
