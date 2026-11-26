@@ -205,8 +205,9 @@ frame holds the commanded targets and calls upstream's `EvalEnv.take_action` wit
 the joint action dictionary, which interpolates the arms and fingers within the
 frame, as RoboEnv does. Success is native completion and success. The reward is
 upstream's episode score (`EvalEnv.run_eval`): 1 for a success; a failed graded task
-keeps upstream's 0..100 score, as a reward in [0, 1); other failures score 0. The horizon is the native
-`step_lim` unless a maximum is given. `--early-stop` ends the episode where `EvalEnv`
+keeps upstream's 0..100 score, as a reward in [0, 1); other failures score 0. A stepped run's step
+limit is the native `step_lim`, the catalog's `max_steps`; a realtime run has none, and `EvalEnv`
+counts against no limit. `--early-stop` ends the episode where `EvalEnv`
 does: at its completion, or when a task constraint fails (a `query` or `trigger_query`
 that held on more steps than its task allows, such as `push_T`'s lifted T), with that
 constraint as the cause. Without it a failed constraint keeps success false and the

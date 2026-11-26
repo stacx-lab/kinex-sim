@@ -113,8 +113,8 @@ zero; under `--config osc` they are upstream's five idle OSC actions.
 
 Episodes are scored as upstream's evaluation scores them:
 
-- **Step limit:** an episode ends after upstream's evaluation horizon of 600 steps
-  (`libero/configs/eval/default.yaml`); the world node's `max_steps` parameter overrides it.
+- **Step limit:** a stepped episode ends after upstream's evaluation horizon of 600 steps
+  (`libero/configs/eval/default.yaml`), every task's catalog `max_steps`; a realtime run has none.
 - **Success:** each step's success is `env.step`'s own `done`, the BDDL goal on the
   kinematics the step leaves, as upstream reads it; reward is the same sparse value.
 - **Judging:** `kinex-sim judge RUN_ID` reports them. `--early-stop` ends the episode at

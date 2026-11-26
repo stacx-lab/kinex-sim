@@ -59,7 +59,7 @@ Nothing has been reported to BEHAVIOR-1K yet. Section 9 lists the reports worth 
 | 3.5 | Native worker segmentation fault | unknown |
 | 4.1 | Wait replies did not say that or why the episode ended | kinex-sim |
 | 4.2 | A tilted base looks upright in odometry and TF | open |
-| 4.3 | A client cannot read the episode's step limit | open |
+| 4.3 | A client could not read the episode's step limit | kinex-sim |
 | 4.4 | Device texts do not say how cutting, toggling and removal work | property |
 | 5.1 | Any part of any slicer cuts; slicers cut again on their halves | departs (`0005`); upstream |
 | 5.2 | A vacuum standing flat removes nothing | departs (`0006`); upstream |
@@ -171,9 +171,9 @@ kinex-sim: every wait reply at or after the end states it, for example `the epis
 
 The base's odometry is planar (x, y and yaw of `base_link` relative to the episode start), and nothing puts `base/odom` on TF. A base tilted against furniture (2.1) reads as upright, and the cameras' own tilt is the only sign. Open (rule 1): publishing the full attitude on the odometry and on TF, and stating a large tilt in wait replies, was proposed and not merged. Measured for that proposal: a base propped at 30.9° recovers to 0.01° by driving back out the way it came, so refusing base motion on a tilt would trap it.
 
-### 4.3 A client cannot read the episode's step limit
+### 4.3 A client could not read the episode's step limit
 
-The limit is 1.5 times the mean human demonstration length (`task.jsonl`). The world device gives elapsed time only, and the limit appears nowhere a client can read before the episode ends. It cannot be computed from `docs/challenge/task_data.json` either: 1.5 times its `duration` matches the real limit for none of the 100 activities, is within 1% for 53 and off by more than 10% for 30 (`tidying_living_room` 14220 against 18848 steps; `cook_brussels_sprouts` 30915 against 23492). The world node's `max_steps` launch argument sets another limit. Open (rule 1).
+The limit is 1.5 times the mean human demonstration length (`task.jsonl`), plus the step on which upstream's `Timeout` truncates. It cannot be computed from `docs/challenge/task_data.json`: 1.5 times its `duration` matches the real limit for none of the 100 activities, is within 1% for 53 and off by more than 10% for 30 (`tidying_living_room` 14220 against 18848 steps; `cook_brussels_sprouts` 30915 against 23492). The task catalog now states each activity's limit as `max_steps`, which `kinex-sim tasks list --json` lists before a launch and `kinex-sim describe` states for a run; a stepped world's `world/now` gives it as `max_s`. Fixed in kinex-sim.
 
 ### 4.4 Device texts do not say how cutting, toggling and removal work
 

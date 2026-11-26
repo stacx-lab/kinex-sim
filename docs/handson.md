@@ -74,9 +74,10 @@ Control runs at 30 Hz: four 1/120 s PhysX substeps per step, eight 1/240 s for
 `t37_scrub_bottle`. Each step also records the evaluator's per-substep PhysX ground-truth
 trace, which its settle gate and contact checkers read. A step costs hundreds of milliseconds
 of wall time (0.4–0.9 s on a shared L40S), so a realtime run lags the clock; prefer
-`stepped`. The horizon is upstream's evaluation budget (`budgets.json`, three times the 75th
-percentile of demonstration length; the `eval_flex` tasks keep their native durations), from
-222 steps (`t19`) to 7200 (`eval_flex01`).
+`stepped`. A stepped run's step limit, the catalog's `max_steps`, is upstream's
+evaluation budget (`budgets.json`, three times the 75th percentile of demonstration length;
+the `eval_flex` tasks keep their native durations), from 222 steps (`t19`) to 7200
+(`eval_flex01`); a realtime run has none.
 
 Success is upstream's `succeed` at each step. The evaluator ends a trial at its first
 outcome (`evaluation/rollout.py`), and so does a run launched with `--early-stop`: at a

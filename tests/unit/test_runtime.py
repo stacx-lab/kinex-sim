@@ -401,3 +401,28 @@ def test_a_measure_that_fails_is_the_records_error(tmp_path, monkeypatch, capsys
     assert outcome['reason'] == 'stopped' and 'progress' not in outcome
     assert outcome['error'] == "measures: RuntimeError: cannot measure a negative position"
     assert "Traceback" in capsys.readouterr().err and runtime.sim.closed
+
+
+def test_a_held_world_takes_no_step_until_released():
+    """A synchronous recording holds the world until the recorder has every spectator frame sampled so far."""
+    hold = [True]
+    runtime, published = world(held=lambda: hold[0])
+    pending = wait(runtime, .1)
+    runtime.drain()
+    assert not runtime.tick() and not pending.done() and runtime.time_s == 0.
+    hold[0] = False
+    assert runtime.tick() and pending.result().success and runtime.steps == 1
+
+
+@pytest.mark.parametrize("task,stopped,finals", [("toy", False, 1), ("toy", True, 1), ("fails", False, 0)])
+def test_the_final_state_is_published_when_the_episode_ends_or_stops(task, stopped, finals):
+    """A recording's final frame: once at the episode's end, or when the world stops an open episode; never after a
+    failed step, whose backend may be broken."""
+    calls = []
+    runtime, _ = world(task=task, max_steps=None if stopped else 2, final=lambda: calls.append(runtime.steps))
+    wait(runtime, .2 if stopped else 1.)
+    finish(runtime)
+    runtime.close()
+    assert len(calls) == finals
+    if finals:
+        assert calls == [2]

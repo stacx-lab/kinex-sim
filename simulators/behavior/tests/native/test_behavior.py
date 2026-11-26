@@ -122,7 +122,8 @@ def test_the_episode_starts_as_the_evaluator_starts_it(tmp_path):
     np.testing.assert_allclose(start["robot"][:2], start["sampled"][:2], atol=1e-4)
     assert abs(start["robot"][2] - start["sampled"][2]) < .01
     assert abs(np.dot(start["robot"][3:], start["sampled"][3:])) > 1 - 1e-6  # the same rotation, up to sign
-    assert start["max_steps"] == start["timeout"] + 1
+    # The catalog's step limit is the evaluator's Timeout plus the step on which it truncates.
+    assert start["max_steps"] == start["timeout"] + 1 == start["native_timeout"] + 1
 
 
 def test_particles_out_of_the_loaded_rooms_are_removed_at_every_load_and_recorded():
@@ -145,7 +146,7 @@ def test_catalog_task_loads_steps_and_records(task):
     try:
         sim.configure_spectators()
         sim.reset(task, 0)
-        assert not sim.done and sim.max_steps > 0 and sim.description == {"instruction": task}
+        assert not sim.done and sim.max_steps is None and sim.description == {"instruction": task}
         sim.step(sim.state()[0])
         assert sim.steps == 1 and np.isfinite(sim.state()[0]).all() and sim.reward in (0., 1.)
         assert 0. <= sim.native("measures")["q_score"] <= 1.

@@ -110,7 +110,7 @@ class RoboCasaSim:
             raise ValueError(f'RoboCasa has no configuration {configuration!r}')
         self.configuration = configuration
         self.cameras, self.width, self.height = tuple(cameras), width, height
-        self.requested_max_steps = self.max_steps = max_steps
+        self.max_steps = max_steps
         self.early_stop = early_stop
         self.env = self._depth = self._spectator = None
         self.spectators = ()
@@ -145,7 +145,7 @@ class RoboCasaSim:
         scene = {'split': split, 'layout_id': layout_id, 'style_id': style_id}
         check_task(project_root() / '.runtime/robocasa', spec['native_task'])
         candidate = RoboCasaSim(cameras=self.cameras, width=self.width, height=self.height,
-                                max_steps=self.requested_max_steps,
+                                max_steps=self.max_steps,
                                 early_stop=self.early_stop, configuration=self.configuration)
         candidate.spectators = self.spectators
         # Kitchen generation also draws from process RNGs; a failed reset keeps the
@@ -166,7 +166,6 @@ class RoboCasaSim:
     def _initialize(self, spec, seed, scene):
         import robocasa  # noqa: F401  (registers the kitchen environments)
         import robosuite
-        from robocasa.utils.dataset_registry import ATOMIC_TASK_DATASETS, COMPOSITE_TASK_DATASETS
 
         self.task, self.seed = spec['native_task'], seed
         random.seed(seed)
@@ -193,11 +192,10 @@ class RoboCasaSim:
         self._grip_rate = 0.
         self._origin = self.data.xpos[self._base].copy(), self.data.xmat[self._base].reshape(3, 3).copy()
         self.steps, self.done, self.success, self.reward = 0, False, False, 0.
-        horizon = {**ATOMIC_TASK_DATASETS, **COMPOSITE_TASK_DATASETS}.get(self.task, {}).get('horizon')
-        self.max_steps = self.requested_max_steps or horizon
         meta = self.env.get_ep_meta()
         # The kitchen the seed picked, or the one the ids pinned.
         self.scene = {'split': scene['split'], 'layout_id': meta['layout_id'], 'style_id': meta['style_id']}
+        self.initialization = dict(self.scene)
         # The language instruction upstream's episode metadata gives its policy.
         self.description = {'instruction': meta['lang']}
         if self.spectators:

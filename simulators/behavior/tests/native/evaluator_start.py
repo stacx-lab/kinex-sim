@@ -17,6 +17,8 @@ boot()
 import omnigibson as og  # noqa: E402
 import omnigibson.eval.utils.eval_utils as eval_utils  # noqa: E402
 from omnigibson.tasks.behavior_task import get_presampled_robot_poses  # noqa: E402
+from omnigibson.eval.utils.eval_utils import EVAL_TIMEOUT_MULTIPLIER  # noqa: E402
+from omnigibson.eval.utils.score_utils import load_human_stats  # noqa: E402
 
 events, teleports, seed_everything, environment = [], [], eval_utils.seed_everything, og.Environment
 eval_utils.seed_everything = lambda seed, *args, **kwargs: (events.append(["seed", seed]),
@@ -45,7 +47,8 @@ def build(*args, **kwargs):
 
 
 og.Environment = build
-sim = R1ProSim()
+from kinex_sim.catalog import resolve  # noqa: E402
+sim = R1ProSim(max_steps=resolve("behavior", task="turning_on_radio")[2]["max_steps"])
 sim.reset("turning_on_radio", 0)
 robot, scene = sim.episode.robot, sim.episode.env.scene
 position, orientation = robot.get_position_orientation(frame="scene")
@@ -53,6 +56,8 @@ pose = get_presampled_robot_poses(scene.get_task_metadata(key="robot_poses"), ro
 with open(sys.argv[1], "w") as stream:
     json.dump({"events": events, "teleports": teleports, "robot": th.cat([position, orientation]).tolist(),
                "sampled": th.cat([th.as_tensor(pose["position"]), th.as_tensor(pose["orientation"])]).tolist(),
-               "max_steps": sim.max_steps, "timeout": sim.episode.max_steps}, stream)
+               "max_steps": sim.max_steps, "timeout": sim.episode.max_steps,
+               "native_timeout": int(load_human_stats("turning_on_radio")["length"] * EVAL_TIMEOUT_MULTIPLIER)},
+              stream)
     stream.flush()
 sim.close()  # OmniGibson's shutdown ends the process

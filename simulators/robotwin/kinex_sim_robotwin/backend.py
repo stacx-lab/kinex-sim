@@ -126,7 +126,6 @@ class RoboTwinSim:
     def __init__(self, *, cameras=CAMERAS, max_steps=None, early_stop=False):
         self.cameras = tuple(cameras)
         # env is the native upstream task instance; task is its catalog name.
-        self.requested_max_steps = max_steps
         self.max_steps = max_steps
         self.early_stop = early_stop
         self.env = None
@@ -146,7 +145,7 @@ class RoboTwinSim:
         """Episode seed of upstream's evaluation: its seed-th evaluated scene, which the seed fully determines."""
         spec = resolve("robotwin", task=task)[2]
         check_task(runtime(), spec["native_task"])
-        candidate = RoboTwinSim(cameras=self.cameras, max_steps=self.requested_max_steps,
+        candidate = RoboTwinSim(cameras=self.cameras, max_steps=self.max_steps,
                                 early_stop=self.early_stop)
         candidate.spectators = self.spectators
         # Native scene generation seeds process RNGs; a failed reset keeps the live
@@ -201,7 +200,7 @@ class RoboTwinSim:
             self._camera(camera)
         self._index()
         self.steps, self.done = 0, False
-        self.max_steps = self.requested_max_steps or int(self.env.step_lim)
+        self.initialization = {"native_seed": int(native)}
         # Upstream's evaluation first checks success within the first action, not at reset.
         self.success = False
         self.reward = float(self.success)

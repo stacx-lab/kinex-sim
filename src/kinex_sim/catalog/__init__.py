@@ -42,6 +42,10 @@ def tasks(project=None, name=None):
         for task in tomllib.loads((directory / config["task_catalog"]).read_text())["tasks"]:
             if task["id"] in result or not task["id"].startswith(item + "/"):
                 raise ValueError(f"Invalid or duplicate task ID: {task['id']}")
+            # The step limit of a stepped episode, upstream's evaluation horizon; absent where upstream has none.
+            limit = task.get("max_steps")
+            if limit is not None and (type(limit) is not int or limit <= 0):
+                raise ValueError(f"{task['id']}: max_steps must be a positive integer")
             result[task["id"]] = dict(task, simulator=item)
     return result
 

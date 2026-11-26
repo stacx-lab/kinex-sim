@@ -1,5 +1,6 @@
 # Task IDs mapped to names from the pinned ABC task catalog; every task runs on the
 # abc/abc-yam rig (arm mounts unified at z=0.76 by patches/abc/0003).
+# No max_steps: upstream's environment has no step limit (abc_sim.make_env without max_episode_steps).
 
 [[tasks]]
 id = "abc/throw-plastic-bottles-in-bin"

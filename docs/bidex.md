@@ -85,9 +85,10 @@ into the tray. Leave the milk. Pick up the lemon from the shelf and put it into 
 instead." This is the one deliberate departure from the evaluator's protocol.
 
 **Timing.** Control runs at 25 Hz: twenty 2 ms MuJoCo substeps per step. A step costs about
-10 ms of wall time, and a reset about 3.5 s. The horizon is the evaluator's: the task's
-`max_steps`, otherwise 1.2 × the 90th percentile of its demonstration lengths. The task's
-`max_seconds` also ends the episode.
+10 ms of wall time, and a reset about 3.5 s. A stepped run's step limit, the
+catalog's `max_steps`, is the evaluator's horizon: the task's `max_steps`, otherwise 1.2 × the
+90th percentile of its demonstration lengths. The task's `max_seconds`, never shorter, also
+ends a stepped episode; a realtime run has no limit.
 
 **Success and score.** Success is the evaluator's final-frame verdict: every subtask has
 latched, every `must_hold` subtask still holds, and no `latch_violation` guard was violated.

@@ -52,7 +52,7 @@ class R1ProSim:
         from .r1pro import R1Pro
 
         self.r1pro = R1Pro()
-        self.requested_max_steps = self.max_steps = max_steps
+        self.max_steps = max_steps
         self.early_stop = early_stop
         self.episode = self.task = None
         self.spectators, self._spectators, self._frames = (), {}, {}
@@ -85,13 +85,13 @@ class R1ProSim:
         if self.episode is None:
             boot()
             self.task = native
-            self.episode = Episode(native, self.r1pro, self.requested_max_steps)
-            self.layout = self.r1pro.layout(self.episode.robot)
             # Upstream's Timeout checks the step count before counting the step, so the evaluator's episode
-            # truncates on the step after its limit.
-            self.max_steps = self.requested_max_steps or self.episode.max_steps + 1
+            # truncates on the step after its limit: a step limit of N is a Timeout of N - 1.
+            self.episode = Episode(native, self.r1pro, self.max_steps - 1 if self.max_steps else None)
+            self.layout = self.r1pro.layout(self.episode.robot)
         self.done = True
         self.episode.load(seed)
+        self.initialization = {"instance": self.episode.instance}
         # The evaluator's TaskMetric takes the goal options' satisfaction here, once the instance has loaded and
         # before the policy acts: its partial credit counts only literals the episode newly satisfies.
         self.initial_goal_options = self.episode.env.task.get_goal_option_satisfaction(0)
@@ -124,7 +124,7 @@ class R1ProSim:
         self.success = self.episode.step(np.asarray(action, dtype=np.float32))  # the evaluator's action vector
         self.steps, self._frames = self.steps + 1, {}
         self.reward = float(self.success)
-        self.done = self.steps >= self.max_steps or (self.early_stop and self.success)
+        self.done = bool(self.max_steps and self.steps >= self.max_steps) or (self.early_stop and self.success)
         if self._spectators:
             self._place(self._spectators)  # where the next step renders them
 

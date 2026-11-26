@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from kinex_sim.catalog import tasks
+from kinex_sim.catalog import resolve, tasks
 from kinex_sim_libero.backend import LiberoSim
 from kinex_sim_libero.assets import configure, task_files
 
@@ -17,8 +17,10 @@ def test_catalog_task_loads_and_steps(task):
     try:
         sim.reset(task, seed=17, randomize=False)
         assert sim.description['instruction']
-        # Upstream's evaluation horizon, libero/configs/eval/default.yaml.
-        assert sim.steps == 0 and sim.time_s == 0 and sim.period == .05 and sim.max_steps == 600
+        # Without a launch's step limit the episode has none; the catalog's is upstream's evaluation horizon,
+        # libero/configs/eval/default.yaml.
+        assert sim.steps == 0 and sim.time_s == 0 and sim.period == .05 and sim.max_steps is None
+        assert resolve('libero', task=task)[2]['max_steps'] == 600
         sim.step(sim.state()[0])
         assert sim.steps == 1 and sim.time_s == pytest.approx(.05)
         assert np.isfinite(sim.state()[0]).all()

@@ -31,9 +31,13 @@ class WorldRuntime:
     owner thread between steps, so callback threads never touch native state.
     early_stop: the backend was created to end the episode where its simulator's evaluator does, such as at a
     success or a task failure; otherwise only its step limit ends it.
+    held: while it returns true, the world takes no step, as a synchronous recording holds it until the recorder
+    has every spectator frame sampled so far. final: publishes the state the episode ends in, once it has ended or
+    the world stops, as a recording's final frame does.
     """
-    def __init__(self, sim, mode, publish, early_stop=False, **pacer_options):
+    def __init__(self, sim, mode, publish, early_stop=False, held=None, final=None, **pacer_options):
         self.sim, self.publish, self.early_stop = sim, publish, early_stop
+        self.held, self.final = held, final
         self.ended = None  # once the episode has ended, why, as wait replies state it
         self._owner = threading.get_ident()
         self._requests = queue.SimpleQueue()
@@ -191,7 +195,7 @@ class WorldRuntime:
     def tick(self):
         self._assert_owner()
         self.waits.settle(self.time_s, self.steps, self.ended)  # a goal ended between steps may end its wait
-        if self.ended or not self.pacer.ready(self.waits.pending):
+        if self.ended or not self.pacer.ready(self.waits.pending) or (self.held is not None and self.held()):
             return False
         action = self.commands.action(self.time_s + self.sim.period)
         poses = self.commands.poses()  # pose groups' tip targets for the same step
@@ -236,6 +240,8 @@ class WorldRuntime:
         self.ended = f"the episode ended because {why}"
         for operation in list(self.goals):
             self.end(operation, self.ended)
+        if self.final is not None and reason != "error":
+            self.final()  # the state the episode ended in, before its record
         self._record_terminal(reason, error=error, cause=cause)
 
     def _outcome(self, reason):
@@ -270,7 +276,11 @@ class WorldRuntime:
         print("episode terminal: " + json.dumps(result), flush=True)
 
     def idle_s(self):
-        return 0.05 if self.ended else self.pacer.wait_s(self.waits.pending)
+        if self.ended:
+            return 0.05
+        if self.held is not None and self.waits.pending and self.held():
+            return 0.002  # the recorder's acknowledgement arrives on the executor
+        return self.pacer.wait_s(self.waits.pending)
 
     def close(self, error=None):
         """Stop: interrupt the pending wait, fail queued requests and record the open episode as stopped (with the
@@ -286,6 +296,8 @@ class WorldRuntime:
                 break
             future.set_exception(RuntimeError("runtime stopped"))
         try:
+            if self.final is not None and error is None and self.ended is None:
+                self.final()  # the state the stopped episode is left in
             self._record_terminal("stopped", error=error)
         finally:
             self.commands.close()

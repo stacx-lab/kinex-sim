@@ -121,7 +121,11 @@ world's own time is due on its step; a wait of no seconds is immediate, an obser
 negative or NaN seconds fail. Waits are sequential: a wait requested while another is pending is
 rejected, and `world/stop` (`std_srvs/srv/Trigger`) cancels the pending one. A run
 is one episode, of the task, seed and scene options it was launched with. There is no reset: to
-start over, stop the run and launch another. An episode ends at its step limit, if it
+start over, stop the run and launch another. A stepped run's step limit is its task's
+`max_steps` in the simulator's task catalog (`simulators/<sim>/tasks.toml`), upstream's
+evaluation horizon, which `kinex-sim tasks list --json` lists before any launch; a task whose
+upstream has none, such as ABC's, has no limit. A realtime run has no step limit: world time
+passes whether or not anyone spends it. An episode ends at its step limit, if it
 has one, or when a simulator step fails. Launched with `--early-stop`, it also ends where
 its simulator's own evaluator ends one: at a success for every simulator, and at a task
 failure the evaluator reports for ABC's `ball_tray_balancing`, RoboDojo and HandsOn (see
@@ -194,10 +198,20 @@ simulation-time FPS and 960×720. They use separate render targets and never res
 observation cameras. World publishes each view at
 `world/spectator/<view>/{image_raw,camera_info}` with reliable, depth-one,
 transient-local QoS: initial frames are available to matching late subscribers,
-and slow consumers do not accumulate an unbounded queue. Frames can be dropped;
-this is a live inspection stream, not lossless recording. Sampling includes the
+and slow consumers do not accumulate an unbounded queue. Sampling includes the
 initial state and follows native control boundaries, skipping missed sample
-deadlines. Paused stepped worlds produce no repeated frames.
+deadlines. Paused stepped worlds produce no repeated frames. Every recording ends with
+the state its episode ends in: when the episode ends, or when the run stops an open
+episode, the world samples its spectators once more unless its latest sample already
+shows that state (not after a failed step, whose backend may be broken).
+
+A stepped recording is synchronous: the recorder acknowledges, on
+`world/spectator/acknowledged`, the latest stamp it holds for every view, and the world
+takes no step while its latest sample is unacknowledged, so no frame is dropped; the
+encoder queue waits instead of dropping too. Stepping only waits wall time, never world
+time. A recorder that acknowledges nothing for 60 s stops the world with an error, which
+fails the run. A realtime recording cannot hold the world, whose pacing is the wall
+clock: its frames can be dropped, as a live inspection stream's are.
 
 ```bash
 kinex-sim launch abc/pouring --execution-mode stepped --detach --record ./recordings/pouring
@@ -235,10 +249,9 @@ Ctrl-C in foreground mode or `kinex-sim stop RUN_ID` stops the producer, drains 
 recorder and finalizes files. Encoder workers drain concurrently under one shutdown
 deadline. Recording metadata is written only when it changes. A recorder failure
 fails the run and stops the simulation. Forced termination may leave partial output.
-`recording.json` records completion, errors, received frames, encoder-queue drops
-and each view's file (`segments`); check it before treating a recording as complete.
-The bounded live ROS pipeline can drop frames before the recorder sees them, so
-recording is not a lossless capture guarantee.
+`recording.json` records completion, errors, whether it was synchronous (`sync`),
+received frames, encoder-queue drops and each view's file (`segments`); check it before
+treating a recording as complete. `kinex-sim describe` states a run's recording settings.
 
 ## Sources, caches and extension
 

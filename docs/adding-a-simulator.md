@@ -185,7 +185,9 @@ Implement `SimulatorBackend` (`src/kinex_sim/core/backend.py`). Its docstring is
   reads it, plus any further text it gives under its own name (RoboDojo's `detailed_instruction`).
   The world node logs it and `kinex-sim describe` reads it back
   ([Task description](devices.md#task-description)); the backend neither prints nor writes it.
-- **Ending.** `done` at the step limit; `success` and `reward` every step.
+- **Ending.** `done` at the step limit it was created with, if any; `success` and `reward` every step.
+- **Initialization.** Optionally `initialization`: what reset resolved from the task, seed and scene,
+  such as a layout or a native seed, which `kinex-sim describe` states.
   - Created with `early_stop`, the backend ends where upstream's evaluator ends an episode, and names
     that end in `stop`.
   - `measures()` adds the backend's own fields to the episode record, such as a native seed or a
@@ -239,8 +241,12 @@ upstream's evaluation script, not only its environment, and match each item:
      upstream calls it.
 2. **Score.** Report upstream's per-episode score as the reward. For example, RoboDojo scores a
    success 1 and grades only failures.
-3. **Step limit.** Use the evaluator's horizon, with the off-by-one included. BEHAVIOR's `Timeout`
-   ends on the step after its limit.
+3. **Step limit.** Record the evaluator's horizon as each task's `max_steps` in the catalog, with
+   the off-by-one included: BEHAVIOR's `Timeout` ends on the step after its limit, so its
+   `max_steps` is the Timeout plus one. A stepped launch gives the backend that limit; the backend
+   takes `max_steps` as given and never falls back to its own, so without one (realtime) no limit,
+   upstream's own time limits included, ends the episode. A native test checks the catalog against
+   the horizon upstream computes.
 4. **Early termination.** `--early-stop` ends where the evaluator ends: at its success, and at the
    task failures it reports.
 5. **Episode selection.** Seed k is the episode upstream's evaluation runs as its k-th:

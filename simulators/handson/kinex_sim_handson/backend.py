@@ -18,6 +18,7 @@ task's camera profile, with the head camera's calibrated lens, and the episode's
 offsets (kinex_sim_handson.cameras).
 """
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -119,7 +120,7 @@ class HandsOnSim:
     camera_rate_hz = 2.
 
     def __init__(self, *, max_steps=None, early_stop=False):
-        self.requested_max_steps = self.max_steps = max_steps
+        self.max_steps = max_steps
         self.early_stop = early_stop
         self.cameras = tuple(CAMERAS)
         self.env = self.task = self.stop = self.native_seed = self._tracker = self._frames = self._temporary = None
@@ -215,10 +216,9 @@ class HandsOnSim:
         if self._adapter.spec.force_scoring:  # t10 scores support, lift and hold; force is diagnostic
             from handson.evaluation.carton import install
             self._tracker = install(env, out / "CARTON_RAW_FORCE_000")
-        budgets = json.loads(Path(native.__file__).with_name("budgets.json").read_text())
         self.period = float(env._control_dt)
-        self.max_steps = self.requested_max_steps or int(budgets[self.task]["steps"])
-        env._time_limit = self.max_steps * self.period
+        env._time_limit = self.max_steps * self.period if self.max_steps else math.inf
+        self.initialization = {"native_seed": int(self.native_seed)}
         env.hz = 0  # the world paces wall time; upstream would sleep to 30 Hz
         self._index()
         # Arm pose targets are palm poses in the arm base (link0), which Isaac places in the world here.
@@ -274,8 +274,8 @@ class HandsOnSim:
         if self.early_stop:
             returned = dict(terminated=terminated, truncated=truncated, info=info)
             self.stop = native_stop(returned, self._adapter.terminal_reason(returned, env=self.env),
-                                    self.steps >= self.max_steps)
-        self.done = self.steps >= self.max_steps or self.stop is not None
+                                    bool(self.max_steps) and self.steps >= self.max_steps)
+        self.done = bool(self.max_steps and self.steps >= self.max_steps) or self.stop is not None
 
     def measures(self):
         return {"native_seed": self.native_seed}

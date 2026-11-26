@@ -128,6 +128,30 @@ def test_describe_prints_the_task_description_of_the_live_run_on_a_domain(tmp_pa
         "## Description\n\nNest all bowls.\n\n## Scoring\n\n- 100: stacked.\n")
     assert main(["describe", "--domain-id", "42", "--project", str(tmp_path), "--json"]) == 0
     assert json.loads(capsys.readouterr().out) == description
+    # A run's description adds the episode its world initialized; describe adds its run, task and revision.
+    episode = {"execution_mode": "stepped", "period_s": .04, "max_steps": 1875, "early_stop": False,
+               "configuration": None, "scene": {}, "initialization": {"layout_id": 7, "layouts": 8},
+               "recording": {"rate_hz": 10., "width": 960, "height": 720, "views": ["third_person"],
+                             "sync": True}}
+    folder = tmp_path / ".cache/kinex-sim/runs/full"
+    folder.mkdir(parents=True)
+    (folder / "graph.log").write_text("[sim_node-1] [INFO] [1.0] [world]: task description: "
+                                      + json.dumps(dict(description, episode=episode)) + "\n")
+    (tmp_path / "simulators/robodojo").mkdir(parents=True)
+    (tmp_path / "simulators/robodojo/simulator.toml").write_text('name = "robodojo"\nsource_revision = "abc123"\n')
+    write_json(folder / "run.json", {"schema": SCHEMA, "uid": os.getuid(), "id": "full", "state": "ready",
+                                     "owner": identity(os.getpid()), "domain_id": 46, "log": str(folder / "graph.log"),
+                                     "simulator": "robodojo", "task": "robodojo/stack-bowls"})
+    assert main(["describe", "--domain-id", "46", "--project", str(tmp_path), "--json"]) == 0
+    stated = json.loads(capsys.readouterr().out)
+    assert stated == dict(description, episode=dict(episode, run="full", simulator="robodojo",
+                                                    task_id="robodojo/stack-bowls", source_revision="abc123"))
+    from kinex_sim.runtime.description import instructions
+    assert instructions(stated) == {name: description[name] for name in ("instruction", "detailed_instruction")}
+    assert main(["describe", "--domain-id", "46", "--project", str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert '\nEpisode:\n  execution_mode: "stepped"\n' in output and '  max_steps: 1875\n' in output
+    assert '  initialization: {"layout_id": 7, "layouts": 8}\n' in output
     assert main(["describe", "--domain-id", "43", "--project", str(tmp_path)]) == 1
     assert "has not started its episode yet" in capsys.readouterr().err
     assert main(["describe", "--domain-id", "45", "--project", str(tmp_path)]) == 1
@@ -196,3 +220,29 @@ def test_preparation_cannot_modify_a_running_environment(tmp_path):
         with pytest.raises(ValueError, match="preparation to finish"):
             with workspace_lock(tmp_path, "fake", shared=True):
                 pytest.fail("launch entered during preparation")
+
+
+def test_a_catalog_step_limit_is_a_positive_integer(tmp_path):
+    (tmp_path / "src/kinex_sim").mkdir(parents=True)
+    (tmp_path / "pixi.toml").touch()
+    (tmp_path / "simulators/toy").mkdir(parents=True)
+    (tmp_path / "simulators/toy/simulator.toml").write_text('name = "toy"\ntask_catalog = "tasks.toml"\n')
+    catalog = tmp_path / "simulators/toy/tasks.toml"
+    catalog.write_text('tasks = [{ id = "toy/a", native_task = "a", max_steps = 30 }, { id = "toy/b", native_task = "b" }]\n')
+    assert {k: v.get("max_steps") for k, v in tasks(tmp_path).items()} == {"toy/a": 30, "toy/b": None}
+    for bad in ("0", "1.5", '"30"'):
+        catalog.write_text(f'tasks = [{{ id = "toy/a", native_task = "a", max_steps = {bad} }}]\n')
+        with pytest.raises(ValueError, match="max_steps must be a positive integer"):
+            tasks(tmp_path)
+
+
+@pytest.mark.parametrize("mode,limit", [("stepped", "max_steps:=900"), ("realtime", None), (None, None)])
+def test_a_stepped_launch_takes_the_catalog_step_limit(mode, limit):
+    """A stepped run ends at its task's catalog max_steps; a realtime run has no step limit."""
+    from kinex_sim.runs.api import launch_arguments
+    _, config, task = resolve("robocasa/close-blender-lid")
+    arguments = launch_arguments(config, task, {"execution_mode": mode}, recording=True)
+    assert [a for a in arguments if a.startswith("max_steps:=")] == ([limit] if limit else [])
+    # A task without an upstream horizon has no step limit even in a stepped run.
+    _, config, task = resolve("abc")
+    assert not [a for a in launch_arguments(config, task, {"execution_mode": "stepped"}) if a.startswith("max_steps")]

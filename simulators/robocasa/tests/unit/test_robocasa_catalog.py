@@ -14,8 +14,8 @@ SLUG = re.compile(r'(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])')
 def test_catalog_holds_robocasa365_and_leaves_the_scene_to_the_launch():
     entries = list(tasks(name='robocasa').values())
     assert len(entries) == 365
-    # Kitchens and object instances are scene options, not task fields.
-    assert all(set(t) == {'id', 'robot', 'native_task', 'simulator'} for t in entries)
+    # Kitchens and object instances are scene options, not task fields; the step limit is the task's.
+    assert all(set(t) - {'max_steps'} == {'id', 'robot', 'native_task', 'simulator'} for t in entries)
     assert {t['robot'] for t in entries} == {'robocasa/robocasa-panda-omron'}
     for task in entries:
         assert task['id'] == 'robocasa/' + SLUG.sub('-', task['native_task']).lower()
@@ -86,3 +86,28 @@ def test_seeded_prepare_adopts_verified_archives_and_overlays_the_upstream_tree(
     assert (tree / 'textures').is_symlink() and (runtime / 'robocasa/macros_private.py').exists()
     assets.prepare(runtime, 'Other', store)  # one preparation serves every task
     assets.check_task(runtime, 'Other')
+
+
+def test_catalog_step_limits_are_the_registry_horizons():
+    """Each task's max_steps is its dataset horizon in the pinned registry (robocasa/utils/dataset_registry.py, which
+    get_task_horizon returns); a task the registry gives none takes the longest of those horizons."""
+    import ast
+    from kinex_sim.catalog import simulator
+    root, _, config = simulator('robocasa')
+    registry = root / config['source'] / 'robocasa/utils/dataset_registry.py'
+    if not registry.is_file():
+        pytest.skip('the RoboCasa source is not exported')
+    horizons = {}
+    for node in ast.parse(registry.read_text()).body:
+        if isinstance(node, ast.Assign) and getattr(node.targets[0], 'id', '') in (
+                'ATOMIC_TASK_DATASETS', 'COMPOSITE_TASK_DATASETS'):
+            for task in node.value.keywords:
+                for field in task.value.keywords:
+                    if field.arg == 'horizon':
+                        horizons[task.arg] = ast.literal_eval(field.value)
+    entries = tasks(name='robocasa').values()
+    longest = max(horizons.values())
+    assert {t['id']: t['max_steps'] for t in entries} == {
+        t['id']: horizons.get(t['native_task'], longest) for t in entries}
+    assert resolve('robocasa/prepare-veggie-dip')[2]['max_steps'] == longest == 7200
+    assert resolve('robocasa/close-blender-lid')[2]['max_steps'] == 900

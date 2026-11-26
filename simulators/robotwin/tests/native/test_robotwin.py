@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import yaml
 
-from kinex_sim.catalog import tasks
+from kinex_sim.catalog import resolve, tasks
 from kinex_sim.catalog.robots import setup
 from kinex_sim_robotwin.backend import RoboTwinSim
 
@@ -103,7 +103,9 @@ def test_catalog_task_loads_and_steps(task):
     sim = RoboTwinSim(cameras=())
     try:
         sim.reset(task, SEEDS[task])
-        assert sim.max_steps == int(sim.env.step_lim) and not sim.done and sim.description["instruction"]
+        # The catalog's step limit is upstream's evaluation step_lim; without a launch's the episode has none.
+        assert resolve("robotwin", task=task)[2]["max_steps"] == int(sim.env.step_lim) and sim.max_steps is None
+        assert not sim.done and sim.description["instruction"]
         sim.step(sim.state()[0])
         assert sim.steps == 1 and np.isfinite(sim.state()[0]).all()
         assert sim.reward == float(sim.success)

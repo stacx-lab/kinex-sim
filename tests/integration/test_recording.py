@@ -135,3 +135,36 @@ def test_realtime_recording_includes_initial_frame(runs, tmp_path):
         assert view['segments'][0]['first_stamp_ns'] == 0
         assert view['segments'][0]['last_stamp_ns'] > 0
         assert int(video_info(output / f'{name}.mp4')['nb_read_frames']) > 1
+
+
+def test_a_stepped_recording_keeps_every_frame_and_ends_with_the_final_state(runs, tmp_path):
+    """--record in a stepped run: the world steps once the recorder holds every spectator frame sampled so far, and
+    the recording ends with the state the stopped episode is left in, off the sampling grid."""
+    output = tmp_path / 'synchronous'
+    record = start(runs, '--record', output, '--record-views', 'third_person')
+    description = json.loads(invoke('describe', '--domain-id', record['domain_id'], '--json').stdout)
+    assert description['episode']['recording']['sync'] is True
+    controller = '''import rclpy
+from rclpy.node import Node
+from kinex_sim.clients import WorldClockClient
+rclpy.init()
+n=Node('recording_test')
+r=WorldClockClient(n).wait(1.34,timeout_s=60)
+assert r.success
+print(r.time_s)
+n.destroy_node()
+rclpy.shutdown()
+'''
+    reached = float(invoke('exec', record['id'], '--', 'python', '-c', controller).stdout.split()[-1])
+    stopped = json.loads(invoke('stop', record['id'], '--json').stdout)
+    assert stopped['recording_state'] == 'complete'
+    result = metadata(output)
+    assert result['sync'] and result['views']['third_person']['dropped'] == 0
+    stamps = [json.loads(line)['stamp_ns'] for line in (output / 'third_person.frames.jsonl').read_text().splitlines()]
+    # Every sample the world's 10 Hz schedule took over its control steps, none skipped, then the final state.
+    from kinex_sim.core.devices import SampleSchedule
+    period, schedule = description['episode']['period_s'], SampleSchedule(10.)
+    steps = round(reached / period)
+    grid = [round(step * period * 1e9) for step in range(steps + 1) if schedule.due(step * period)]
+    final = round(steps * period * 1e9)
+    assert stamps == grid + ([] if grid[-1] == final else [final])

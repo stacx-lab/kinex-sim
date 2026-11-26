@@ -5,6 +5,7 @@ scene with the evaluator's rooms and transition rules, a horizon of 1.5 average 
 demonstrations, and public test instances restored and settled as the evaluator loads them.
 """
 import json
+import math
 import os
 from pathlib import Path
 
@@ -107,12 +108,11 @@ def boot():
 class Episode:
     """One activity's environment; Isaac hosts one per process."""
 
-    def __init__(self, task, r1pro, max_steps=None):
+    def __init__(self, task, r1pro, timeout=None):
         import omnigibson as og
         from omnigibson.eval.utils.eval_utils import (
-            DEFAULT_EVAL_SEED, EVAL_TIMEOUT_MULTIPLIER, TASK_NAMES_TO_ROOMS, generate_basic_environment_config,
+            DEFAULT_EVAL_SEED, TASK_NAMES_TO_ROOMS, generate_basic_environment_config,
             seed_everything)
-        from omnigibson.eval.utils.score_utils import load_human_stats
         from omnigibson.macros import gm
 
         metadata = Path(gm.DATA_PATH) / "2026-challenge-task-instances/metadata"
@@ -125,8 +125,10 @@ class Episode:
         cfg["robots"] = [robot]
         # load() places the robot at the instance's presampled pose, and env.reset places it there again once
         # the scene has settled, as the evaluator's does (the task's use_presampled_robot_pose).
-        self.max_steps = max_steps or int(load_human_stats(task)["length"] * EVAL_TIMEOUT_MULTIPLIER)
-        cfg["task"]["termination_config"]["max_steps"] = self.max_steps
+        # The evaluator's Timeout, int(1.5 x the human episode length): the step limit less one (the catalog's
+        # max_steps). Without a limit no Timeout ends the episode.
+        self.max_steps = timeout
+        cfg["task"]["termination_config"]["max_steps"] = timeout if timeout else math.inf  # Timeout compares it
         self.task = task
         # The evaluator seeds once, before it builds the environment (omnigibson/eval/eval.py).
         seed_everything(DEFAULT_EVAL_SEED)
@@ -153,7 +155,7 @@ class Episode:
         from omnigibson.utils.bddl_utils import is_system_bddl_inst
         from omnigibson.utils.python_utils import recursively_convert_to_torch
 
-        instance = TEST_INSTANCE_IDS[seed % NUM_PUBLIC_TEST_INSTANCES]
+        instance = self.instance = int(TEST_INSTANCE_IDS[seed % NUM_PUBLIC_TEST_INSTANCES])
         env, robot, task, scene = self.env, self.robot, self.env.task, self.env.scene
         # The instance restores only the base pose; joints, controllers and grasps start clean.
         robot.reset()
