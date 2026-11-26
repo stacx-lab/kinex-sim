@@ -1,10 +1,12 @@
-"""Pinned RoboCasa acceptance on representative tasks: upstream splits and seeds, kitchen ids, controls and rendering."""
+"""Pinned RoboCasa acceptance on representative tasks: upstream splits and seeds, kitchen ids, rollout parity with
+upstream's composite controller, the basic configuration's joint controls, and rendering."""
 import random
 
 import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 
-from kinex_sim_robocasa.backend import RoboCasaSim
+from kinex_sim_robocasa.backend import ROBOT, RoboCasaSim
 
 
 TARGET_KITCHENS = [(i, i) for i in range(1, 11)]
@@ -140,8 +142,8 @@ def test_kitchen_ids_override_the_split_and_failed_resets_keep_the_episode(monke
         sim.close()
 
 
-def test_native_controls_follow_the_device_semantics():
-    sim = RoboCasaSim(cameras=())
+def test_basic_joint_controls_follow_the_device_semantics():
+    sim = RoboCasaSim(cameras=(), configuration='basic')
     try:
         sim.reset(sim.default_task, 0)
         home = sim.state()[0]
@@ -186,12 +188,13 @@ def test_native_controls_follow_the_device_semantics():
         sim.close()
 
 
-def test_rgbd_rendering_is_registered_and_never_advances_the_world():
+def test_basic_rgbd_rendering_is_registered_and_never_advances_the_world():
     from robosuite.utils.camera_utils import get_real_depth_map
-    sim = RoboCasaSim()
+    sim = RoboCasaSim(configuration='basic')
     sim.configure_spectators(320, 240)
     try:
         sim.reset(sim.default_task, 0)
+        assert {device.kind for device in sim.devices if device.name.startswith('camera_')} == {'rgbd'}
         qpos, steps = sim.data.qpos.copy(), sim.steps
         for camera in sim.cameras:
             rgb, depth = sim.render(camera), sim.render_depth(camera)
@@ -208,3 +211,151 @@ def test_rgbd_rendering_is_registered_and_never_advances_the_world():
             sim.render('robot0_agentview_center')
     finally:
         sim.close()
+
+
+def world(env, kind, name):
+    """A body's or site's world pose, from MuJoCo, as a 4x4 transform."""
+    element = getattr(env.sim.data._data, kind)(name)
+    result = np.eye(4)
+    result[:3, :3], result[:3, 3] = element.xmat.reshape(3, 3), element.xpos
+    return result
+
+
+def pose(matrix):
+    return np.r_[matrix[:3, 3], Rotation.from_matrix(matrix[:3, :3]).as_quat()]
+
+
+def upstream(task, seed):
+    """An independent upstream kitchen, built as the backend builds it, with create_env's composite controller."""
+    import robocasa  # noqa: F401
+    import robosuite
+    from robosuite.controllers import load_composite_controller_config
+    random.seed(seed)
+    np.random.seed(seed)
+    env = robosuite.make(
+        task, robots=ROBOT, controller_configs=load_composite_controller_config(controller=None, robot=ROBOT),
+        has_renderer=False, has_offscreen_renderer=True, use_camera_obs=False, camera_names=[],
+        camera_widths=256, camera_heights=256, camera_depths=False, ignore_done=True, translucent_robot=False,
+        seed=seed)
+    env.reset()
+    env.sim.forward()
+    return env
+
+
+def test_default_targets_step_as_upstream_composite_controller_steps_a_policy():
+    """By default a policy's deltas, mapped onto flange pose and torso targets as the page documents, step as
+    upstream steps those deltas: in its arm mode from the grip site measured in the arm base, and while the base
+    drives in its base mode from the previous target; clipped deltas included. The targets come from MuJoCo and
+    the mapping, not from the backend's frames.
+
+    Upstream takes the same goals, and the robot follows them alike. MuJoCo solves every contact together, so
+    rounding moves the rest of the kitchen as it moves upstream's own: a 1e-14 change of upstream's torso input
+    moves a distractor settling in this kitchen's cabinet by 4e-6 in one step."""
+    task, seed = 'PickPlaceCounterToCabinet', 3
+    sim, native = RoboCasaSim(cameras=()), None
+    try:
+        sim.reset(task, seed)
+        native = upstream(task, seed)
+        model = sim.model
+        robot = [j for j in range(model.njnt) if model.joint(j).name.startswith(('mobilebase0', 'robot0', 'gripper0'))]
+        qpos, qvel = model.jnt_qposadr[robot], model.jnt_dofadr[robot]
+        np.testing.assert_array_equal(sim.data.qpos, native.sim.data._data.qpos)
+        np.testing.assert_array_equal(sim.data.qvel, native.sim.data._data.qvel)
+        osc, torso = (native.robots[0].part_controllers[part] for part in ('right', 'torso'))
+        ours = sim.robot.part_controllers
+        grip = np.linalg.inv(world(native, 'body', 'robot0_right_hand')) @ world(native, 'site', osc.ref_name)
+        rng, site = np.random.default_rng(0), None
+        for k in range(24):
+            delta = rng.uniform(-.4, .4, 6) if k != 5 else np.r_[1.5, -.2, .3, .4, 1.2, -.3]  # k=5 saturates
+            lift = .5 if k < 8 else -.3  # up, then down, within the torso's travel
+            base = np.zeros(3) if k < 12 else np.r_[-.4, rng.uniform(-.2, .2), rng.uniform(-.3, .3)]
+            closing = 1. if k % 10 < 5 else -1.
+            scaled = np.clip(delta, -1, 1) * [.05, .05, .05, .5, .5, .5]
+            if not base.any():  # arm mode: from the grip site measured in the arm base
+                site = np.linalg.inv(world(native, 'body', 'robot0_link0')) @ world(native, 'site', osc.ref_name)
+            moved = np.eye(4)
+            moved[:3, :3] = Rotation.from_rotvec(scaled[3:]).as_matrix() @ site[:3, :3]
+            moved[:3, 3] = site[:3, 3] + scaled[:3]
+            site = moved
+            action = sim.state()[0]
+            action[7], action[8], action[9:] = closing, action[8] + .05 * lift, base
+            sim.step(action, {'arm': pose(site @ np.linalg.inv(grip))})
+            native.step(np.r_[delta, closing, base, lift, 1. if base.any() else -1.])
+            native.sim.forward()
+            np.testing.assert_allclose(ours['right'].goal_pos, osc.goal_pos, atol=1e-9, rtol=0)
+            np.testing.assert_allclose(ours['right'].goal_ori, osc.goal_ori, atol=1e-9, rtol=0)
+            np.testing.assert_allclose(ours['torso'].goal_qpos, torso.goal_qpos, atol=1e-9, rtol=0)
+            np.testing.assert_allclose(sim.data.qpos[qpos], native.sim.data._data.qpos[qpos], atol=1e-7, rtol=0)
+            np.testing.assert_allclose(sim.data.qvel[qvel], native.sim.data._data.qvel[qvel], atol=1e-6, rtol=0)
+            assert sim.success == bool(native._check_success()) and sim.reward == float(sim.success)
+    finally:
+        sim.close()
+        if native is not None:
+            native.close()
+
+
+def test_default_arm_tracks_flange_poses_and_its_cameras_are_rgb():
+    sim = RoboCasaSim()
+    try:
+        sim.reset(sim.default_task, 0)
+        assert [group.tip for group in sim.layout.groups] == ['flange', None, None, None]
+        assert {device.name: device.kind for device in sim.devices} == {
+            'arm': 'joint', 'gripper': 'gripper', 'torso': 'joint', 'base': 'locomotion',
+            'camera_left': 'rgb', 'camera_right': 'rgb', 'camera_wrist': 'rgb'}
+        assert sim.render('robot0_eye_in_hand').shape == (256, 256, 3)
+        with pytest.raises(KeyError):
+            sim.render_depth('robot0_eye_in_hand')
+        osc = sim.robot.part_controllers['right']
+        arm_base = world(sim.env, 'body', 'robot0_link0')
+        flange = np.linalg.inv(arm_base) @ world(sim.env, 'body', 'robot0_right_hand')
+        np.testing.assert_allclose(sim.tip_pose('arm'), pose(flange), atol=1e-12)
+        # The state's base channels are odometry; a held base commands zero velocity.
+        action = np.r_[sim.state()[0][:9], 0., 0., 0.]
+        # Uncommanded, the arm idles as upstream's does, on zero deltas.
+        start = sim.tip_pose('arm')
+        for _ in range(20):
+            sim.step(action)
+        assert np.linalg.norm(sim.tip_pose('arm')[:3] - start[:3]) < .002
+
+        def error(target):
+            measured = sim.tip_pose('arm')
+            turned = (Rotation.from_quat(measured[3:]).inv() * Rotation.from_quat(target[3:])).magnitude()
+            return np.linalg.norm(measured[:3] - target[:3]), np.degrees(turned)
+        # 6 cm forward, turned 15 degrees about the flange's z axis: OSC's goal leads the grip site by at most 5 cm
+        # per axis, from where its reference saw the site one 2 ms substep earlier, and the hand gets there.
+        # (Further up, this kitchen's wall cabinet stops the arm.)
+        start = sim.tip_pose('arm')
+        rotation = Rotation.from_quat(start[3:]) * Rotation.from_euler('z', 15, degrees=True)
+        target = np.r_[start[:3] + [.06, 0, 0], rotation.as_quat()]
+        leads = []
+        for _ in range(80):
+            site = np.linalg.inv(world(sim.env, 'body', 'robot0_link0')) @ world(sim.env, 'site', osc.ref_name)
+            sim.step(action, {'arm': target})
+            leads.append(osc.goal_pos - site[:3, 3])
+        assert np.abs(leads).max() < .051 and leads[0][0] == pytest.approx(.05, abs=.001)
+        assert error(target)[0] < .002 and error(target)[1] < .5
+        # Driving the base switches to upstream's base mode, whose goal stays put in the moving arm base.
+        settled = sim.tip_pose('arm')
+        action[9:] = (-.5, 0., 0.)
+        for _ in range(10):
+            sim.step(action, {'arm': target})
+            assert np.linalg.norm(sim.tip_pose('arm')[:3] - settled[:3]) < .005
+        assert sim.state()[0][9] < -.08
+        action[9:] = 0.
+        for _ in range(20):
+            sim.step(action, {'arm': target})
+        assert error(target)[0] < .002 and error(target)[1] < .5
+        # The torso's goal leads the measured lift by at most 5 cm, upstream's delta clip; the lift gets there and
+        # the hand returns to its target in the risen arm base.
+        action[8] = .3
+        lift = sim.robot.part_controllers['torso']
+        for _ in range(60):
+            measured = sim.state()[0][8]
+            sim.step(action, {'arm': target})
+            assert lift.goal_qpos[0] - measured <= .05 + 1e-12
+        assert abs(sim.state()[0][8] - .3) < .005
+        assert error(target)[0] < .002 and error(target)[1] < .5
+    finally:
+        sim.close()
+    with pytest.raises(ValueError, match="RoboCasa has no configuration 'depth'"):
+        RoboCasaSim(configuration='depth')

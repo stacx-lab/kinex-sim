@@ -35,6 +35,22 @@ def test_manifest_scene_options_are_the_backend_reset_keywords():
     assert simulator('robocasa')[2]['scene_options'] == [arg.arg for arg in reset.args.kwonlyargs]
 
 
+def test_manifest_configurations_are_the_backend_configurations():
+    """RGB cameras and the flange-pose arm by default, as upstream's evaluation runs; basic makes the cameras RGB-D
+    and gives the arm joint targets."""
+    import ast
+    from pathlib import Path
+    from kinex_sim.catalog import simulator
+    manifest = simulator('robocasa')[2]
+    source = Path(assets.__file__).with_name('backend.py').read_text()
+    declared, = (node.value for node in ast.parse(source).body if isinstance(node, ast.Assign)
+                 and isinstance(node.targets[0], ast.Name) and node.targets[0].id == 'CONFIGURATIONS')
+    assert [None, *manifest['configurations']] == list(ast.literal_eval(declared)) == [None, 'basic']
+    cameras = {name: kind for name, kind in manifest['devices'].items() if name.startswith('camera_')}
+    assert set(cameras.values()) == {'rgb'}
+    assert manifest['configurations']['basic']['devices'] == dict.fromkeys(cameras, 'rgbd')
+
+
 def test_seeded_prepare_adopts_verified_archives_and_overlays_the_upstream_tree(tmp_path,
                                                                                 monkeypatch):
     seed = tmp_path / 'seed/robocasa'

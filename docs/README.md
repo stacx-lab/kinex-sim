@@ -37,7 +37,8 @@ or a simulator's default-task alias. It takes `--execution-mode`, `--seed`, `--c
 `--record-type`. It requires preparation; launch never downloads assets.
 A simulator that serves alternative device sets names them in its manifest's
 `configurations`, and `--config NAME` selects one, such as RoboDojo's `depth` (RGB-D
-cameras). Without it the simulator serves its standard devices. Launch refuses a name the
+cameras) or RoboCasa's `basic` (joint targets and RGB-D cameras). Without it the simulator serves
+its standard devices. Launch refuses a name the
 simulator does not declare. `setup` takes the same flag, so export a workspace in the
 configuration you launch.
 A simulator that selects scenes in its own terms names them in its manifest's
@@ -151,7 +152,7 @@ Arms accept `trajectory_msgs/msg/JointTrajectory` on `<arm>/joint_target`:
 position-only points over every arm joint, strictly increasing times ending within
 120 seconds, and a start that is now or later. Joint names are unique within a
 device; two arms may keep the same native names. An arm the simulator commands by the
-pose of its tip link, as HandsOn's arms and LIBERO's under `--config osc` are, takes instead a
+pose of its tip link, as HandsOn's arms, RoboCasa's and LIBERO's under `--config osc` are, takes instead a
 `trajectory_msgs/msg/MultiDOFJointTrajectory` of tip poses in `<arm>/base` on
 `<arm>/pose_target`, timed alike, and reports the measured tip on `<arm>/pose_state`
 (`sensor_msgs/msg/MultiDOFJointState`). RoboDojo's arms and grippers take goals instead, on Json
@@ -307,6 +308,7 @@ kinex-sim demo libero --execution-mode realtime
 kinex-sim demo robotwin
 kinex-sim demo robodojo
 kinex-sim demo robocasa
+kinex-sim demo robocasa --config basic
 kinex-sim demo behavior --timeout 1800
 kinex-sim demo handson --timeout 1800
 kinex-sim demo bidex

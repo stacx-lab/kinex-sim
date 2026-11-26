@@ -28,6 +28,13 @@ base = "locomotion"
 torso = "joint"
 arm = "joint"
 gripper = "gripper"
-camera_left = "rgbd"
-camera_right = "rgbd"
-camera_wrist = "rgbd"
+camera_left = "rgb"
+camera_right = "rgb"
+camera_wrist = "rgb"
+
+# Alternative device sets: setup, launch and demo select one with --config NAME (default: [devices] above).
+# devices overrides kinds in [devices]; each rig holds configurations/NAME/ with its profile changes
+# (profiles.yaml); the backend takes configuration=NAME.
+[configurations.basic]
+description = "RGB-D cameras, and absolute joint targets for the arm and torso, which robosuite's JOINT_POSITION controller executes in place of upstream's OSC_POSE and delta torso"
+devices = { camera_left = "rgbd", camera_right = "rgbd", camera_wrist = "rgbd" }  # the arm stays a joint device

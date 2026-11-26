@@ -28,7 +28,7 @@ What a simulator does behind a device belongs on its page here, not in the profi
 |---|---|
 | `world` | `now` (`/world/now`, Now), `wait` (`/world/wait`, Wait), `stop` (`/world/stop`) |
 | `joint` (arm, torso) | `joint_state` (`/<arm>/joint_state`, JointState), `joint_target` (`/<arm>/joint_target`, JointTrajectory), `stop` |
-| `joint` commanded by its tip pose (HandsOn's arms, LIBERO's arm with `--config osc`) | `joint_state`, `pose_target` (`/<arm>/pose_target`, MultiDOFJointTrajectory in `<arm>/base`), `pose_state` (`/<arm>/pose_state`, MultiDOFJointState), `stop` |
+| `joint` commanded by its tip pose (HandsOn's arms, RoboCasa's arm, LIBERO's arm with `--config osc`) | `joint_state`, `pose_target` (`/<arm>/pose_target`, MultiDOFJointTrajectory in `<arm>/base`), `pose_state` (`/<arm>/pose_state`, MultiDOFJointState), `stop` |
 | `joint` commanded by its backend's action (RoboDojo's arms) | `joint_state`, `pose_state`, `move` (`/<arm>/move`, a Json action), `stop`; the action is the simulator's own ([Goals](robodojo.md#goals)): a newer goal replaces the active one, and a stop ends it |
 | `joint` that reports its tip (RoboDojo's arms with `--config basic`) | `joint_state`, `joint_target`, `pose_state`, `stop` |
 | `gripper` | `joint_state`, `target` (`/<gripper>/target`, Float64 position), `stop` |
@@ -117,7 +117,7 @@ with the simulator.
 | `abc/abc-yam` | `left_arm`, `right_arm` (YAM, `<side>_joint1..6`), normalized grippers, RGB-D `camera_top`, `camera_left`, `camera_right` | 33 |
 | `robotwin/robotwin-aloha-agilex` | `left_arm` (`fl_joint1..6`), `right_arm` (`fr_joint1..6`), normalized grippers, RGB-D `head_camera`, `left_camera`, `right_camera` | 50 |
 | `robodojo/robodojo-arx-x5` | `left_arm`, `right_arm` (ARX X5, both `joint1..6`; `flange` move goals, or joint targets with `--config basic`), normalized grippers with grasp and release goals, RGB (RGB-D with `--config depth`) `head_camera`, `left_camera`, `right_camera` | 42 |
-| `robocasa/robocasa-panda-omron` | `base` (Omron, locomotion), `torso` (lift), `arm` (Panda, `robot0_joint1..7`), integrated-command `gripper`, RGB-D `camera_left`, `camera_right`, `camera_wrist` | 365 |
+| `robocasa/robocasa-panda-omron` | `base` (Omron, locomotion), `torso` (lift), `arm` (Panda, `robot0_joint1..7`; `flange` pose targets, or joint targets with `--config basic`), integrated-command `gripper`, RGB (RGB-D with `--config basic`) `camera_left`, `camera_right`, `camera_wrist` | 365 |
 | `behavior/behavior-r1pro` | `base` (holonomic, locomotion), `torso` (`torso_joint1..4`), `left_arm`, `right_arm` (`<side>_arm_joint1..7`), smooth grippers, RGB-D `head_camera` (720²), `left_camera`, `right_camera` (480²) | 100 |
 | `handson/handson-rokae-wuji` | `right_arm`, `left_arm` (ROKAE AR5, `joint1..7_<side>`, tip `palm`), `right_hand`, `left_hand` (Wuji, `<side>_finger1..5_joint1..4`), RGB `head_camera` (854×480), `left_camera`, `right_camera` (848×480, on the palms) | 66 |
 | `bidex/bidex-fr3v2-sharpa-tabletop`, `bidex/bidex-fr3v2-sharpa-dexjoco` | `right_arm`, `left_arm` (Franka FR3v2, `<side>_fr3v2_joint1..7`), `right_hand`, `left_hand` (Sharpa Wave, 22 joints), RGB-D `head_camera`, `left_camera`, `right_camera` (480×360, on the flanges); the two differ in the base pose | 152, 40 |
@@ -163,7 +163,8 @@ into `.kinex/`, and it refuses a workspace that already has any of them. RoboDoj
 
 A simulator that serves alternative device sets declares each one in its manifest, as
 `[configurations.NAME]` with a `description` and the device kinds it changes (`devices`).
-RoboDojo's `depth` makes its cameras RGB-D. Every rig of that simulator holds
+RoboDojo's `depth` makes its cameras RGB-D, and RoboCasa's `basic` gives its arm joint targets and its
+cameras depth. Every rig of that simulator holds
 `configurations/NAME/`:
 
 - an optional `profiles.yaml`, the configuration's profile changes by device, as JSON merge

@@ -1,4 +1,6 @@
-"""Measure the RoboCasa PandaOmron rig from MuJoCo and write catalog/robots/robocasa/robocasa-panda-omron.
+"""Measure the RoboCasa PandaOmron rig from MuJoCo and write catalog/robots/robocasa/robocasa-panda-omron: its
+standard devices, an arm commanded by flange poses and RGB cameras, and the basic configuration's joint-target arm
+and RGB-D cameras.
 
 Run in the RoboCasa environment after `kinex-sim prepare robocasa`:
     pixi run --frozen -e robocasa python tools/robots/build_robocasa.py
@@ -51,6 +53,14 @@ def main():
         return rigs.transform(data.cam_xpos[cid], data.cam_xmat[cid].reshape(3, 3) @ OPTICAL)
 
     low, high = robot.part_controllers["base"].control_limits
+    # Upstream's OSC_POSE clips each step's change of its goal to these per axis.
+    clip = robot.part_controllers["right"].output_max
+    osc = (f"An operational-space controller tracks it, by at most {clip[:3].max() * 100:g} cm and "
+           f"{clip[3:].max():g} rad per axis every {sim.period:g} s, and may stop short of a pose.")
+
+    def arm(description, **pose_targets):
+        return rigs.joint("arm", description, list(robot.robot_joints), robot.init_qpos,
+                          rigs.pose_frame("torso:top", rigs.relative(top, pose["robot0_link0"])), **pose_targets)
     devices = {
         "world": rigs.world("World time and waits of a household kitchen."),
         "base": rigs.locomotion(
@@ -65,11 +75,7 @@ def main():
             "Prismatic lift of the Omron base.",
             ["mobilebase0_joint_torso_height"], robot.init_torso_qpos,
             rigs.frame("base:base", (0, 0, 0), (0, 0, 0, 1)), tip="top", model="torso.urdf"),
-        "arm": rigs.joint(
-            "arm",
-            "Franka Panda seven-joint arm.",
-            list(robot.robot_joints), robot.init_qpos,
-            rigs.pose_frame("torso:top", rigs.relative(top, pose["robot0_link0"]))),
+        "arm": arm("Franka Panda seven-joint arm, commanded by the pose of its flange.", pose=osc),
         "gripper": rigs.gripper(
             "gripper",
             "Panda parallel two-finger gripper. Fingers close along the base x axis. The grip joint is the "
@@ -81,17 +87,18 @@ def main():
             state="The applied grip command, not a measured opening, stamped at acquisition.",
             opened=-1.0, closed=1.0),
     }
+    # The basic configuration: joint targets for the arm, and RGB-D cameras.
+    basic = {"arm": arm("Franka Panda seven-joint arm.")}
     for name, camera, parent, frame in (
             ("camera_left", "robot0_agentview_left", "torso:top", top),
             ("camera_right", "robot0_agentview_right", "torso:top", top),
             ("camera_wrist", "robot0_eye_in_hand", "arm:flange", flange)):
         side = name.split("_")[1]
-        devices[name] = rigs.camera(
-            name,
-            (f"RGB-D camera on the torso lift, behind and above the robot's {side} side, looking forward and "
-             "down past the arm." if side != "wrist" else "RGB-D camera on the hand, looking along the fingers."),
-            sim.intrinsics(camera),
-            rigs.pose_frame(parent, rigs.relative(frame, optical(camera))), (near, far))
+        view = (f"camera on the torso lift, behind and above the robot's {side} side, looking forward and down "
+                "past the arm." if side != "wrist" else "camera on the hand, looking along the fingers.")
+        mount = rigs.pose_frame(parent, rigs.relative(frame, optical(camera)))
+        devices[name] = rigs.camera(name, f"RGB {view}", sim.intrinsics(camera), mount)
+        basic[name] = rigs.camera(name, f"RGB-D {view}", sim.intrinsics(camera), mount, (near, far))
     files = {
         "devices/torso/torso.urdf": rigs.mujoco_chain(
             model, ["mobilebase0_fixed_support", "mobilebase0_support"], "omron_torso",
@@ -110,7 +117,7 @@ def main():
     rigs.write_rig(ROOT / "catalog/robots/robocasa/robocasa-panda-omron",
                    rigs.workspace("robocasa-panda-omron", "RoboCasa Panda Omron", "mobile",
                                   "Franka Panda on an Omron mobile base"),
-                   {name: devices[name] for name in order}, files)
+                   {name: devices[name] for name in order}, files, {"basic": basic})
     sim.close()
 
 

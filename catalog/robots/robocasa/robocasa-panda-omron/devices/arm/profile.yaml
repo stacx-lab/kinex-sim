@@ -15,19 +15,30 @@ operations:
       reliability: reliable
       durability: transient_local
     timeout_s: 10
-  joint_target:
-    description: Position trajectory naming every joint once, without velocities, accelerations or effort, with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs linearly from the current target and replaces the active command. One that is malformed or leaves the joint limits is refused, which the world's next wait reply reports.
+  pose_target:
+    description: 'Trajectory of flange poses in arm/base: joint_names [flange] and one transform per point (metres, unit quaternion xyzw), with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs from the current target and replaces the active command. An operational-space controller tracks it, by at most 5 cm and 0.5 rad per axis every 0.05 s, and may stop short of a pose. A malformed one is refused, which the world''s next wait reply reports.'
     transport: topic
     direction: input
-    endpoint: /arm/joint_target
-    type: trajectory_msgs/msg/JointTrajectory
+    endpoint: /arm/pose_target
+    type: trajectory_msgs/msg/MultiDOFJointTrajectory
     qos:
       depth: 1
       reliability: reliable
       durability: volatile
     timeout_s: 10
+  pose_state:
+    description: Measured flange pose in arm/base, stamped with joint_state.
+    transport: topic
+    direction: output
+    endpoint: /arm/pose_state
+    type: sensor_msgs/msg/MultiDOFJointState
+    qos:
+      depth: 1
+      reliability: reliable
+      durability: transient_local
+    timeout_s: 10
   stop:
-    description: Stop motion and hold the measured posture.
+    description: Stop motion and hold the measured flange pose.
     transport: service
     direction: input
     endpoint: /arm/stop
@@ -42,7 +53,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: Franka Panda seven-joint arm.
+description: Franka Panda seven-joint arm, commanded by the pose of its flange.
 source: introspected
 calibrated_at: null
 method: introspection

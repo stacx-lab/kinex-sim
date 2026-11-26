@@ -15,17 +15,6 @@ operations:
       reliability: reliable
       durability: volatile
     timeout_s: 10
-  depth:
-    description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
-    transport: topic
-    direction: output
-    endpoint: /camera_left/depth
-    type: sensor_msgs/msg/Image
-    qos:
-      depth: 1
-      reliability: reliable
-      durability: volatile
-    timeout_s: 10
   camera_info:
     description: CameraInfo mirroring the profile's color geometry.
     transport: topic
@@ -41,8 +30,9 @@ loaded: true
 meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
-type: rgbd
-description: RGB-D camera on the torso lift, behind and above the robot's left side, looking forward and down past the arm.
+type: rgb
+layout: mono
+description: RGB camera on the torso lift, behind and above the robot's left side, looking forward and down past the arm.
 source: introspected
 calibrated_at: null
 method: introspection
@@ -59,20 +49,6 @@ color:
     skew: 0
   distortion:
     model: none
-depth:
-  width: 256
-  height: 256
-  fps: null
-  quantity: z
-  scale_m_per_unit: 0.001
-  invalid_value: 0
-  valid_range_m:
-    min: 0.028899
-    max: 65.535
-  reliable_range_m:
-    min: 0.028899
-    max: 65.535
-  registration: color
 frames:
   base:
     translation_m:

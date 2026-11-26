@@ -1,8 +1,9 @@
-"""The exported mobile rig's chain base -> torso:top -> arm:flange agrees with MuJoCo."""
+"""The exported mobile rig's chain base -> torso:top -> arm:flange agrees with MuJoCo, and so does the flange pose
+the arm reports by default."""
 import numpy as np
 
 from kinex_sim_robocasa.backend import RoboCasaSim
-from tests.kinex.geometry import Rig, compose, requires_kinex, rt
+from tests.kinex.geometry import Rig, compose, requires_kinex, rt, xyzq
 
 pytestmark = requires_kinex
 
@@ -14,7 +15,7 @@ def assert_pose(expected, measured):
 
 def test_catalog_chain_cameras_and_fingers_match_measurements(tmp_path):
     rig = Rig("robocasa", tmp_path)
-    sim = RoboCasaSim()
+    sim = RoboCasaSim(configuration="basic")  # joint targets move the chain through its joints
     try:
         sim.reset(sim.default_task, 0)
         model, data = sim.model, sim.data
@@ -47,5 +48,21 @@ def test_catalog_chain_cameras_and_fingers_match_measurements(tmp_path):
             target[8] = rng.uniform(.05, .3)
             for _ in range(5):
                 sim.step(target)
+    finally:
+        sim.close()
+
+
+def test_reported_flange_pose_is_the_rig_arm_fk(tmp_path):
+    rig = Rig("robocasa", tmp_path)
+    sim = RoboCasaSim(cameras=())
+    try:
+        sim.reset(sim.default_task, 0)
+        start = sim.tip_pose("arm")
+        hold = np.r_[sim.state()[0][:9], 0., 0., 0.]
+        for offset in ((0., 0., 0.), (.04, -.03, 0.)):
+            for _ in range(10):
+                sim.step(hold, {"arm": np.r_[start[:3] + offset, start[3:]]})
+            measured = sim.tip_pose("arm")
+            assert_pose(rig.link("arm", sim.state()[0][:7]), xyzq(list(measured)))
     finally:
         sim.close()

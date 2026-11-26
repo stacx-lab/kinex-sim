@@ -1,4 +1,5 @@
-"""Official RoboCasa kitchens with the PandaOmron's native part controllers; no ROS dependencies."""
+"""Official RoboCasa kitchens with the PandaOmron's native composite controller: upstream's own OSC_POSE arm and
+delta torso, or in the basic configuration joint-position arm and torso on absolute targets; no ROS dependencies."""
 import os
 import random
 
@@ -6,6 +7,7 @@ os.environ.setdefault('MUJOCO_GL', 'egl')
 
 import mujoco as mj  # noqa: E402
 import numpy as np  # noqa: E402
+from scipy.spatial.transform import Rotation  # noqa: E402
 
 from kinex_sim.catalog import resolve
 from kinex_sim.core import ActionLayout, CommandGroup
@@ -18,6 +20,10 @@ ROBOT = 'PandaOmron'
 CAMERAS = {'robot0_agentview_left': 'camera_left', 'robot0_agentview_right': 'camera_right',
            'robot0_eye_in_hand': 'camera_wrist'}
 SPECTATORS = (('third_person', 'robot0_agentview_left'), ('wrist', 'robot0_eye_in_hand'))
+# The arm's device base, which is also OSC's reference frame (its robot0_right_center site), and its flange.
+ARM_BASE, FLANGE = 'robot0_link0', 'robot0_right_hand'
+# Upstream's composite controller by default; basic replaces the arm's with absolute joint positions.
+CONFIGURATIONS = (None, 'basic')
 # Upstream's create_env(split=...) presets (robocasa/utils/env_utils.py:86-104), passed to the kitchen unchanged so
 # that the seed selects the kitchen, objects and the rest exactly as upstream does. No split passes nothing, as
 # create_env(split=None) does: every kitchen and object.
@@ -56,18 +62,42 @@ def excluded(task, env, layout_id, style_id):
     return f'{task} excludes ' + (' and '.join(reasons) or 'every kitchen these scene options allow')
 
 
-def controller_config():
-    """JOINT_POSITION arm and torso; native base velocity and gripper.
+def controller_config(configuration=None):
+    """Upstream's composite controller as its create_env loads it (default_pandaomron.json): OSC_POSE arm and
+    JOINT_POSITION torso on delta input, native base velocity and gripper. The basic configuration replaces the
+    arm's with JOINT_POSITION.
 
     Both joint parts start with native delta input, so the zero actions with which a
-    kitchen settles during reset hold the initial posture; reset then makes them absolute.
+    kitchen settles during reset hold the initial posture; in basic, reset then makes them absolute.
     """
     from robosuite.controllers import load_composite_controller_config, load_part_controller_config
-    config = load_composite_controller_config(robot=ROBOT)
-    parts = config['body_parts']
-    parts['right'] = {**load_part_controller_config(default_controller='JOINT_POSITION'),
-                      'gripper': parts['right']['gripper']}
+    config = load_composite_controller_config(controller=None, robot=ROBOT)
+    if configuration == 'basic':
+        parts = config['body_parts']
+        parts['right'] = {**load_part_controller_config(default_controller='JOINT_POSITION'),
+                          'gripper': parts['right']['gripper']}
     return config
+
+
+def matrix(pose):
+    """[x, y, z, qx, qy, qz, qw] as a float64 4x4 transform."""
+    result = np.eye(4)
+    result[:3, :3], result[:3, 3] = Rotation.from_quat(pose[3:]).as_matrix(), pose[:3]
+    return result
+
+
+def placement(element):
+    """A MuJoCo body's or site's world pose as a float64 4x4 transform."""
+    result = np.eye(4)
+    result[:3, :3], result[:3, 3] = element.xmat.reshape(3, 3), element.xpos
+    return result
+
+
+def normalized(controller, change):
+    """The input a part controller's scale_action maps to change; its clip stays upstream's per-step limit."""
+    low, high, out_low, out_high = (controller.input_min, controller.input_max,
+                                    controller.output_min, controller.output_max)
+    return (change - (out_high + out_low) / 2) * (high - low) / (out_high - out_low) + (high + low) / 2
 
 
 class RoboCasaSim:
@@ -75,7 +105,10 @@ class RoboCasaSim:
     period = 1 / 20
 
     def __init__(self, *, cameras=tuple(CAMERAS), width=256, height=256,
-                 max_steps=None, early_stop=False):
+                 max_steps=None, early_stop=False, configuration=None):
+        if configuration not in CONFIGURATIONS:
+            raise ValueError(f'RoboCasa has no configuration {configuration!r}')
+        self.configuration = configuration
         self.cameras, self.width, self.height = tuple(cameras), width, height
         self.requested_max_steps = self.max_steps = max_steps
         self.early_stop = early_stop
@@ -97,7 +130,8 @@ class RoboCasaSim:
     @property
     def devices(self):
         cameras = {CAMERAS[camera]: camera for camera in self.cameras}
-        return device_inventory(self.layout, cameras, depth=tuple(cameras))
+        # RGB, as upstream's evaluation observes; basic adds depth registered to each image.
+        return device_inventory(self.layout, cameras, depth=tuple(cameras) if self.configuration == 'basic' else ())
 
     def configure_spectators(self, width=960, height=720, views=None):
         self.spectators = spectator_views(SPECTATORS, width, height, views)
@@ -112,7 +146,7 @@ class RoboCasaSim:
         check_task(project_root() / '.runtime/robocasa', spec['native_task'])
         candidate = RoboCasaSim(cameras=self.cameras, width=self.width, height=self.height,
                                 max_steps=self.requested_max_steps,
-                                early_stop=self.early_stop)
+                                early_stop=self.early_stop, configuration=self.configuration)
         candidate.spectators = self.spectators
         # Kitchen generation also draws from process RNGs; a failed reset keeps the
         # live episode's future randomness.
@@ -138,7 +172,7 @@ class RoboCasaSim:
         random.seed(seed)
         np.random.seed(seed)
         self.env = robosuite.make(
-            self.task, robots=ROBOT, controller_configs=controller_config(), has_renderer=False,
+            self.task, robots=ROBOT, controller_configs=controller_config(self.configuration), has_renderer=False,
             has_offscreen_renderer=True, use_camera_obs=False, camera_names=list(self.cameras),
             camera_widths=self.width, camera_heights=self.height, camera_depths=False,
             ignore_done=True, translucent_robot=False, seed=seed, **kitchen_arguments(**scene))
@@ -149,19 +183,13 @@ class RoboCasaSim:
         self.env.reset()
         # Measurements and frames describe the current state, not the last substep's start.
         self.env.sim.forward()
-        # The kitchen has settled under native zero-delta holds; goals are absolute from now on.
-        for part in ('right', 'torso'):
-            self.robot.part_controllers[part].input_type = 'absolute'
         for camera in (*self.cameras, *(v.source for v in self.spectators)):
             if mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_CAMERA, camera) < 0:
                 raise ValueError(f'unknown camera: {camera}')
         self._index()
-        # Seed the integrated gripper command from the fingers, so stop holds them.
-        gripper = self.robot.part_controllers['right_gripper']
-        fingers = self.data.qpos[gripper.qpos_index]
-        self.robot.gripper['right'].current_action = np.clip(
-            2 * (fingers - gripper.actuator_min) / (gripper.actuator_max - gripper.actuator_min) - 1,
-            -1, 1)
+        # By default every controller stays as upstream's reset leaves it.
+        if self.configuration == 'basic':
+            self._basic()
         self._grip_rate = 0.
         self._origin = self.data.xpos[self._base].copy(), self.data.xmat[self._base].reshape(3, 3).copy()
         self.steps, self.done, self.success, self.reward = 0, False, False, 0.
@@ -172,6 +200,23 @@ class RoboCasaSim:
         self.scene = {'split': scene['split'], 'layout_id': meta['layout_id'], 'style_id': meta['style_id']}
         # The language instruction upstream's episode metadata gives its policy.
         self.description = {'instruction': meta['lang']}
+        if self.spectators:
+            from kinex_sim.core.mujoco_rendering import SpectatorRenderer
+            context = self.env.sim._render_context_offscreen
+            self._spectator = SpectatorRenderer(self.model, self.data, self.spectators,
+                                               restore_context=context.gl_ctx, options=context.vopt)
+            self._spectator.capture()
+
+    def _basic(self):
+        """The basic configuration's start, once the kitchen has settled under native zero-delta holds: absolute
+        joint goals from now on, the integrated gripper command seeded from the fingers so stop holds them, and a
+        depth renderer."""
+        for part in ('right', 'torso'):
+            self.robot.part_controllers[part].input_type = 'absolute'
+        gripper = self.robot.part_controllers['right_gripper']
+        fingers = self.data.qpos[gripper.qpos_index]
+        self.robot.gripper['right'].current_action = np.clip(
+            2 * (fingers - gripper.actuator_min) / (gripper.actuator_max - gripper.actuator_min) - 1, -1, 1)
         # Pixel-center depth from a separate single-sample context; RGB keeps native antialiasing.
         quality = self.model.vis.quality
         samples, quality.offsamples = quality.offsamples, 0
@@ -179,12 +224,6 @@ class RoboCasaSim:
             self._depth = mj.Renderer(self.model, height=self.height, width=self.width)
         finally:
             quality.offsamples = samples
-        if self.spectators:
-            from kinex_sim.core.mujoco_rendering import SpectatorRenderer
-            context = self.env.sim._render_context_offscreen
-            self._spectator = SpectatorRenderer(self.model, self.data, self.spectators,
-                                               restore_context=context.gl_ctx, options=context.vopt)
-            self._spectator.capture()
 
     def _index(self):
         parts, model = self.robot.part_controllers, self.model
@@ -197,11 +236,47 @@ class RoboCasaSim:
         self._base = model.body(self.robot.robot_model.base.root_body).id
         arm, torso = (model.jnt_range[parts[name].joint_index] for name in ('right', 'torso'))
         low, high = parts['base'].control_limits
+        # By default the arm takes poses of its flange, which upstream's OSC executes; basic takes joint targets.
+        tip = None if self.configuration == 'basic' else 'flange'
         self.layout = ActionLayout((*joints['right'], 'gripper', *joints['torso'], *joints['base']), (
-            CommandGroup('arm', tuple(range(7)), tuple(arm[:, 0]), tuple(arm[:, 1])),
+            CommandGroup('arm', tuple(range(7)), tuple(arm[:, 0]), tuple(arm[:, 1]), tip=tip),
             CommandGroup('gripper', (7,), (-1.,), (1.,), scalar=True),
             CommandGroup('torso', (8,), tuple(torso[:, 0]), tuple(torso[:, 1])),
             CommandGroup('base', (9, 10, 11), tuple(low), tuple(high), velocity=True)))
+        if tip:
+            # The grip site OSC tracks (the gripper's tcp), fixed in the flange's frame, and where the last target
+            # put it.
+            self._grip = np.linalg.inv(self._in_arm_base('body', FLANGE)) @ self._in_arm_base(
+                'site', parts['right'].ref_name)
+            self._site = None
+
+    def _in_arm_base(self, kind, name):
+        """A body's or site's measured pose in the arm base as a float64 4x4 transform."""
+        return np.linalg.inv(placement(self.data.body(ARM_BASE))) @ placement(getattr(self.data, kind)(name))
+
+    def tip_pose(self, group):
+        """The measured flange, robosuite's robot0_right_hand, in the arm base: [x, y, z, qx, qy, qz, qw]."""
+        pose = self._in_arm_base('body', FLANGE)
+        return np.r_[pose[:3, 3], Rotation.from_matrix(pose[:3, :3]).as_quat()]
+
+    def _arm(self, pose, desired):
+        """The OSC_POSE input for a flange pose target in the arm base, OSC's frame: the delta of the grip site
+        it puts, which upstream applies as a policy's. In upstream's arm mode the delta is from where the site is
+        now; in its base mode (desired), which moves the previous goal, from the previous target. Zero, upstream's
+        idle, while the arm has had no command."""
+        if pose is None:
+            return np.zeros(6)
+        osc = self.robot.part_controllers['right']
+        site = matrix(pose) @ self._grip
+        reference = self._site if desired and self._site is not None else self._in_arm_base('site', osc.ref_name)
+        self._site = site
+        return normalized(osc, np.r_[site[:3, 3] - reference[:3, 3],
+                                     Rotation.from_matrix(site[:3, :3] @ reference[:3, :3].T).as_rotvec()])
+
+    def _torso(self, target):
+        """The JOINT_POSITION delta input that moves the torso's goal from the measured lift to target."""
+        torso = self.robot.part_controllers['torso']
+        return normalized(torso, np.atleast_1d(target) - self.data.qpos[torso.qpos_index])
 
     @property
     def time_s(self):
@@ -228,7 +303,7 @@ class RoboCasaSim:
         grip = self.robot.gripper['right'].current_action[1]
         return np.r_[q[:7], grip, q[7:], pose], np.r_[v[:7], self._grip_rate, v[7:], twist]
 
-    def step(self, action):
+    def step(self, action, poses=None):
         if self.done:
             raise RuntimeError('episode is done')
         action = np.asarray(action, dtype=float)
@@ -240,9 +315,16 @@ class RoboCasaSim:
         after = np.clip(before + gripper.speed * np.sign(error), -1, 1)
         direction = float(np.sign(error)) if abs(action[7] - after) < abs(error) else 0.
         # In kitchens the native (legacy) base controller already takes body-frame velocity.
-        self.env.step(self.robot.create_action_vector({
-            'right': action[:7], 'right_gripper': [direction], 'torso': action[8:9],
-            'base': action[9:12]}))
+        base = action[9:12]
+        if self.configuration == 'basic':
+            parts = {'right': action[:7], 'torso': action[8:9]}
+        else:
+            # Upstream's base mode while the base drives, as its demonstrations switch to it: the arm's goal then
+            # updates from its previous goal, which keeps the hand there in the moving arm base.
+            mode = 1. if np.any(base) else -1.
+            parts = {'right': self._arm((poses or {}).get('arm'), mode > 0), 'torso': self._torso(action[8]),
+                     'base_mode': mode}
+        self.env.step(self.robot.create_action_vector({**parts, 'right_gripper': [direction], 'base': base}))
         # Upstream's evaluation (robocasa/wrappers/gym_wrapper.py) evaluates the task again after the step's
         # state update and scores that, so predicates that count calls count twice per step, as there.
         self.success = bool(self.env._check_success())
@@ -277,7 +359,7 @@ class RoboCasaSim:
 
     def render_depth(self, camera):
         from kinex_sim.core.mujoco_rendering import render_depth
-        if camera not in self.cameras:
+        if camera not in self.cameras or self._depth is None:  # only basic's cameras are RGB-D
             raise KeyError(camera)
         options = self.env.sim._render_context_offscreen.vopt
         self._depth.update_scene(self.data, camera=camera, scene_option=options)

@@ -1,0 +1,108 @@
+arm:
+  operations:
+    pose_target: null
+    pose_state: null
+    joint_target:
+      description: Position trajectory naming every joint once, without velocities, accelerations or effort, with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs linearly from the current target and replaces the active command. One that is malformed or leaves the joint limits is refused, which the world's next wait reply reports.
+      transport: topic
+      direction: input
+      endpoint: /arm/joint_target
+      type: trajectory_msgs/msg/JointTrajectory
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+    stop:
+      description: Stop motion and hold the measured posture.
+  description: Franka Panda seven-joint arm.
+camera_left:
+  layout: null
+  operations:
+    depth:
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
+      transport: topic
+      direction: output
+      endpoint: /camera_left/depth
+      type: sensor_msgs/msg/Image
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+  type: rgbd
+  description: RGB-D camera on the torso lift, behind and above the robot's left side, looking forward and down past the arm.
+  depth:
+    width: 256
+    height: 256
+    fps: null
+    quantity: z
+    scale_m_per_unit: 0.001
+    invalid_value: 0
+    valid_range_m:
+      min: 0.030031
+      max: 65.535
+    reliable_range_m:
+      min: 0.030031
+      max: 65.535
+    registration: color
+camera_right:
+  layout: null
+  operations:
+    depth:
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
+      transport: topic
+      direction: output
+      endpoint: /camera_right/depth
+      type: sensor_msgs/msg/Image
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+  type: rgbd
+  description: RGB-D camera on the torso lift, behind and above the robot's right side, looking forward and down past the arm.
+  depth:
+    width: 256
+    height: 256
+    fps: null
+    quantity: z
+    scale_m_per_unit: 0.001
+    invalid_value: 0
+    valid_range_m:
+      min: 0.030031
+      max: 65.535
+    reliable_range_m:
+      min: 0.030031
+      max: 65.535
+    registration: color
+camera_wrist:
+  layout: null
+  operations:
+    depth:
+      description: 16UC1 depth registered to image, in millimetres, with the image's stamp; 0 marks missing samples.
+      transport: topic
+      direction: output
+      endpoint: /camera_wrist/depth
+      type: sensor_msgs/msg/Image
+      qos:
+        depth: 1
+        reliability: reliable
+        durability: volatile
+      timeout_s: 10
+  type: rgbd
+  description: RGB-D camera on the hand, looking along the fingers.
+  depth:
+    width: 256
+    height: 256
+    fps: null
+    quantity: z
+    scale_m_per_unit: 0.001
+    invalid_value: 0
+    valid_range_m:
+      min: 0.030031
+      max: 65.535
+    reliable_range_m:
+      min: 0.030031
+      max: 65.535
+    registration: color

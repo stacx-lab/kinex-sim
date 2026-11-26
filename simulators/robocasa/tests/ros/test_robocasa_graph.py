@@ -1,11 +1,13 @@
-"""The RoboCasa graph: base velocity and odometry, torso, arm, gripper and RGB-D."""
+"""The RoboCasa graph: base velocity and odometry, torso, the arm's flange pose targets, gripper and RGB; in the
+basic configuration the arm's joint targets and RGB-D."""
 from builtin_interfaces.msg import Duration
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Transform, Twist, Vector3
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64
+from sensor_msgs.msg import JointState, MultiDOFJointState
+from std_msgs.msg import Float64, Header
 from std_srvs.srv import Trigger
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from trajectory_msgs.msg import (JointTrajectory, JointTrajectoryPoint, MultiDOFJointTrajectory,
+                                 MultiDOFJointTrajectoryPoint)
 
 from kinex_sim_runtime.devices import STREAM_QOS
 from tests.ros.support import Graph, seconds
@@ -18,19 +20,25 @@ def test_robocasa_graph_serves_its_mobile_devices(tmp_path):
     node, last = graph.node, {}
     try:
         for kind, topic, key in ((JointState, 'arm/joint_state', 'arm'),
+                                 (MultiDOFJointState, 'arm/pose_state', 'pose'),
                                  (JointState, 'torso/joint_state', 'torso'),
                                  (JointState, 'gripper/joint_state', 'gripper'),
                                  (Odometry, 'base/odometry', 'base')):
             node.create_subscription(kind, topic, lambda msg, k=key: last.update({k: msg}), STREAM_QOS)
+        pose_target = node.create_publisher(MultiDOFJointTrajectory, 'arm/pose_target', 1)
+        joint_target = node.create_publisher(JointTrajectory, 'arm/joint_target', 1)
         torso = node.create_publisher(JointTrajectory, 'torso/joint_target', 1)
         gripper = node.create_publisher(Float64, 'gripper/target', 1)
         velocity = node.create_publisher(Twist, 'base/velocity', 1)
         stop = node.create_client(Trigger, 'base/stop')
         graph.until(lambda: torso.get_subscription_count() and gripper.get_subscription_count()
-                    and velocity.get_subscription_count() and stop.service_is_ready())
+                    and velocity.get_subscription_count() and stop.service_is_ready()
+                    and pose_target.get_subscription_count())
         assert graph.wait(.1).success
-        graph.until(lambda: all(k in last for k in ('arm', 'torso', 'gripper', 'base')))
+        graph.until(lambda: all(k in last for k in ('arm', 'pose', 'torso', 'gripper', 'base')))
+        assert not joint_target.get_subscription_count()  # the arm takes flange poses, which OSC executes
         assert last['arm'].name == [f'robot0_joint{i}' for i in range(1, 8)]
+        assert (last['pose'].header.frame_id, list(last['pose'].joint_names)) == ('arm/base', ['flange'])
         assert last['torso'].name == ['mobilebase0_joint_torso_height']
         assert last['gripper'].name == ['gripper']
         assert (last['base'].header.frame_id, last['base'].child_frame_id) == ('base/odom', 'base/base')
@@ -40,6 +48,13 @@ def test_robocasa_graph_serves_its_mobile_devices(tmp_path):
             assert graph.wait(duration).success
             graph.spin(.1)
 
+        start = last['pose'].transforms[0]
+        reach = Transform(translation=Vector3(x=start.translation.x + .04, y=start.translation.y,
+                                              z=start.translation.z), rotation=start.rotation)
+        pose_target.publish(MultiDOFJointTrajectory(header=Header(frame_id='arm/base'), joint_names=['flange'], points=[
+            MultiDOFJointTrajectoryPoint(transforms=[reach], time_from_start=Duration(sec=1))]))
+        moved(2.)
+        assert abs(last['pose'].transforms[0].translation.x - reach.translation.x) < .005
         torso.publish(JointTrajectory(joint_names=['mobilebase0_joint_torso_height'], points=[
             JointTrajectoryPoint(positions=[.15], time_from_start=Duration(nanosec=500_000_000))]))
         gripper.publish(Float64(data=1.))
@@ -67,12 +82,39 @@ def test_robocasa_graph_serves_its_mobile_devices(tmp_path):
         assert not refused.success and '/base/velocity: only linear.x' in refused.message
         moved(.3)
         assert abs(last['base'].twist.twist.angular.z) < .05
-        image, depth = graph.frame('camera_wrist', depth=True)  # the paused world's current frame
-        assert image.header.frame_id == 'camera_wrist/base' and depth.encoding == '16UC1'
-        assert len(image.data) == 256 * 256 * 3
+        image, _ = graph.frame('camera_wrist')  # the paused world's current frame
+        assert image.header.frame_id == 'camera_wrist/base' and len(image.data) == 256 * 256 * 3
         assert seconds(image.header.stamp) == seconds(graph.last['clock'].clock)
+        assert not {'/camera_left/depth', '/camera_right/depth', '/camera_wrist/depth'} & {
+            name for name, _ in node.get_topic_names_and_types()}
     finally:
         graph.close()
     log = (tmp_path / 'process_0.log').read_text()
     assert 'task description: {"task": "PickPlaceCounterToCabinet", "seed": 0, "instruction": ' in log
     assert 'layout_id=4 split=target style_id=4' in log
+
+
+def test_robocasa_basic_graph_serves_joint_targets_and_rgbd(tmp_path):
+    """In basic the arm takes joint targets, and no pose targets; the cameras add registered depth."""
+    graph = Graph(tmp_path, backend='robocasa', mode='stepped', startup_s=120., configuration='basic')
+    node, last = graph.node, {}
+    try:
+        node.create_subscription(JointState, 'arm/joint_state', lambda msg: last.update(arm=msg), STREAM_QOS)
+        joint_target = node.create_publisher(JointTrajectory, 'arm/joint_target', 1)
+        pose_target = node.create_publisher(MultiDOFJointTrajectory, 'arm/pose_target', 1)
+        graph.until(lambda: joint_target.get_subscription_count())
+        assert graph.wait(.1).success
+        graph.until(lambda: 'arm' in last)
+        assert not pose_target.get_subscription_count()
+        start = list(last['arm'].position)
+        joint_target.publish(JointTrajectory(joint_names=list(last['arm'].name), points=[
+            JointTrajectoryPoint(positions=[start[0] + .1, *start[1:]], time_from_start=Duration(sec=1))]))
+        graph.spin(.1)
+        assert graph.wait(1.5).success
+        graph.spin(.1)
+        assert abs(last['arm'].position[0] - start[0] - .1) < .02
+        image, depth = graph.frame('camera_wrist', depth=True)
+        assert image.header.frame_id == 'camera_wrist/base' and depth.encoding == '16UC1'
+        assert seconds(depth.header.stamp) == seconds(image.header.stamp)
+    finally:
+        graph.close()
