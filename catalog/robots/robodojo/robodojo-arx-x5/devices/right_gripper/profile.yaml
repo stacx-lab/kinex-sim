@@ -17,8 +17,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   stop:
-    description: Keep the commanded grip, so a held object stays gripped; before the first
-      command, hold the measured opening.
+    description: Keep the commanded grip, so a held object stays gripped; before the first command, hold the measured opening.
     transport: service
     direction: input
     endpoint: /right_gripper/stop
@@ -29,13 +28,7 @@ operations:
       durability: volatile
     timeout_s: 10
   grasp:
-    description: 'Close the fingers and keep squeezing: {}, no fields. The goal succeeds once
-      the fingers have closed (reached: nothing is between them) or have stopped short (stalled,
-      as on an object), and aborts if they are still moving after 24 steps (late) or a step
-      moves a TCP more than 0.2 m or 0.8 rad, or that of an arm holding still more than 0.05
-      m or 0.25 rad (unsafe_motion). Result: {stop_reason: reached | stalled | late | unsafe_motion
-      | ended, opening, steps}, opening as joint_state gives it; feedback: opening and steps.
-      A newer goal or a stop ends it.'
+    description: 'Close the fingers and keep squeezing: {}, no fields. The goal succeeds once the fingers have closed (reached: nothing is between them) or have stopped short (stalled, as on an object), and aborts if they are still moving after 24 steps (late) or a step moves a TCP more than 0.2 m or 0.8 rad, or that of an arm holding still more than 0.05 m or 0.25 rad (unsafe_motion). Result: {stop_reason: reached | stalled | late | unsafe_motion | ended, opening, steps}, opening as joint_state gives it; feedback: opening and steps. A newer goal or a stop ends it.'
     transport: action
     direction: input
     endpoint: /right_gripper/grasp
@@ -46,10 +39,7 @@ operations:
       durability: volatile
     timeout_s: 10
   release:
-    description: 'Open the fingers: {opening}, a grip joint position, fully open by default.
-      The goal succeeds once the opening is reached and aborts when the fingers stall, are
-      still moving after 24 steps (late) or a step is unsafe as for grasp. Result and feedback:
-      as grasp''s. A newer goal or a stop ends it.'
+    description: 'Open the fingers: {opening}, a grip joint position, fully open by default. The goal succeeds once the opening is reached and aborts when the fingers stall, are still moving after 24 steps (late) or a step is unsafe as for grasp. Result and feedback: as grasp''s. A newer goal or a stop ends it.'
     transport: action
     direction: input
     endpoint: /right_gripper/release
@@ -64,8 +54,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: gripper
-description: ARX X5 right parallel two-finger gripper. A closed grip squeezes past the finger
-  stop. The TCP is the pad centre and approaches along +x.
+description: ARX X5 right parallel two-finger gripper. A closed grip squeezes past the finger stop. The TCP is the pad centre and approaches along +x.
 source: introspected
 calibrated_at: null
 method: introspection

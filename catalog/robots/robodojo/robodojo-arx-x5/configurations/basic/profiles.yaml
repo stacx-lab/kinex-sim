@@ -2,11 +2,7 @@ left_arm:
   operations:
     move: null
     joint_target:
-      description: Position trajectory naming every joint once, without velocities, accelerations
-        or effort, with strictly increasing time_from_start ending within 120 s. It starts
-        on receipt, or at a nonzero header stamp not in the past, runs linearly from the current
-        target and replaces the active command. One that is malformed or leaves the joint
-        limits is refused, which the world's next wait reply reports.
+      description: Position trajectory naming every joint once, without velocities, accelerations or effort, with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs linearly from the current target and replaces the active command. One that is malformed or leaves the joint limits is refused, which the world's next wait reply reports.
       transport: topic
       direction: input
       endpoint: /left_arm/joint_target
@@ -22,9 +18,7 @@ left_gripper:
     grasp: null
     release: null
     target:
-      description: Grip joint position (data), a normalized opening, between closed and open.
-        It persists until replaced or stopped; one out of range is refused, which the world's
-        next wait reply reports.
+      description: Grip joint position (data), a normalized opening, between closed and open. It persists until replaced or stopped; one out of range is refused, which the world's next wait reply reports.
       transport: topic
       direction: input
       endpoint: /left_gripper/target
@@ -38,11 +32,7 @@ right_arm:
   operations:
     move: null
     joint_target:
-      description: Position trajectory naming every joint once, without velocities, accelerations
-        or effort, with strictly increasing time_from_start ending within 120 s. It starts
-        on receipt, or at a nonzero header stamp not in the past, runs linearly from the current
-        target and replaces the active command. One that is malformed or leaves the joint
-        limits is refused, which the world's next wait reply reports.
+      description: Position trajectory naming every joint once, without velocities, accelerations or effort, with strictly increasing time_from_start ending within 120 s. It starts on receipt, or at a nonzero header stamp not in the past, runs linearly from the current target and replaces the active command. One that is malformed or leaves the joint limits is refused, which the world's next wait reply reports.
       transport: topic
       direction: input
       endpoint: /right_arm/joint_target
@@ -58,9 +48,7 @@ right_gripper:
     grasp: null
     release: null
     target:
-      description: Grip joint position (data), a normalized opening, between closed and open.
-        It persists until replaced or stopped; one out of range is refused, which the world's
-        next wait reply reports.
+      description: Grip joint position (data), a normalized opening, between closed and open. It persists until replaced or stopped; one out of range is refused, which the world's next wait reply reports.
       transport: topic
       direction: input
       endpoint: /right_gripper/target

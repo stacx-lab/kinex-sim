@@ -6,8 +6,7 @@ runtime:
   ready_timeout_s: 30
 operations:
   joint_state:
-    description: Measured mean finger opening as a normalized grip joint position, stamped
-      at acquisition.
+    description: Measured mean finger opening as a normalized grip joint position, stamped at acquisition.
     transport: topic
     direction: output
     endpoint: /right_gripper/joint_state
@@ -18,9 +17,7 @@ operations:
       durability: transient_local
     timeout_s: 10
   target:
-    description: Grip joint position (data), a normalized opening, between closed and open.
-      It persists until replaced or stopped; one out of range is refused, which the world's
-      next wait reply reports.
+    description: Grip joint position (data), a normalized opening, between closed and open. It persists until replaced or stopped; one out of range is refused, which the world's next wait reply reports.
     transport: topic
     direction: input
     endpoint: /right_gripper/target
@@ -31,8 +28,7 @@ operations:
       durability: volatile
     timeout_s: 10
   stop:
-    description: Keep the commanded grip, so a held object stays gripped; before the first
-      command, hold the measured opening.
+    description: Keep the commanded grip, so a held object stays gripped; before the first command, hold the measured opening.
     transport: service
     direction: input
     endpoint: /right_gripper/stop

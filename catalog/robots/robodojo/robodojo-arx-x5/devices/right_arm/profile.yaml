@@ -38,25 +38,7 @@ operations:
       durability: volatile
     timeout_s: 10
   move:
-    description: 'Move right_gripper/tcp in a straight line to a pose: {pose: [x, y, z, qx,
-      qy, qz, qw] of right_gripper/tcp in right_arm/base, profile, position_tolerance_m, orientation_tolerance_rad,
-      max_steps}. profile is the gear, the most a 0.04 s step moves the TCP and how near the
-      pose it has reached it: standard 4 cm within 0.03 m and 0.1 rad, approach 4 cm within
-      0.02 m and 0.05 rad, precision 1 cm within 0.005 m and 0.05 rad; standard by default.
-      A turn about the TCP takes part of the step: it sweeps the flange, 0.150 m away, at
-      most half the step. position_tolerance_m (0.001 to 0.1) and orientation_tolerance_rad
-      (0.02 to 0.5) replace the gear''s tolerances. max_steps (1 to 24, 24 by default) bounds
-      the goal''s steps. The goal succeeds once the TCP is within the tolerance of the pose
-      (reached) or has taken max_steps steps (max_steps, the result''s errors saying how far
-      it is from the pose), and aborts when the TCP stalls, moves away from the pose on two
-      steps running (diverging), when a step moves a TCP more than 0.2 m or 0.8 rad, or that
-      of an arm holding still more than 0.05 m or 0.25 rad (unsafe_motion) or when a step
-      has no IK solution (unreachable). Before it is unreachable the TCP goes, once, for a
-      pose the arm can reach within the tolerance of the goal''s, if there is one. Result:
-      {stop_reason: reached | stalled | diverging | unsafe_motion | unreachable | max_steps
-      | ended, pose of the TCP, position_error_m, orientation_error_rad, steps, recovered:
-      whether it went for such a pose}; feedback: the errors and steps. A newer goal or a
-      stop ends it.'
+    description: 'Move right_gripper/tcp in a straight line to a pose: {pose: [x, y, z, qx, qy, qz, qw] of right_gripper/tcp in right_arm/base, profile, position_tolerance_m, orientation_tolerance_rad, max_steps}. profile is the gear, the most a 0.04 s step moves the TCP and how near the pose it has reached it: standard 4 cm within 0.03 m and 0.1 rad, approach 4 cm within 0.02 m and 0.05 rad, precision 1 cm within 0.005 m and 0.05 rad; standard by default. A turn about the TCP takes part of the step: it sweeps the flange, 0.150 m away, at most half the step. position_tolerance_m (0.001 to 0.1) and orientation_tolerance_rad (0.02 to 0.5) replace the gear''s tolerances. max_steps (1 to 24, 24 by default) bounds the goal''s steps. The goal succeeds once the TCP is within the tolerance of the pose (reached) or has taken max_steps steps (max_steps, the result''s errors saying how far it is from the pose), and aborts when the TCP stalls, moves away from the pose on two steps running (diverging), when a step moves a TCP more than 0.2 m or 0.8 rad, or that of an arm holding still more than 0.05 m or 0.25 rad (unsafe_motion) or when a step has no IK solution (unreachable). Before it is unreachable the TCP goes, once, for a pose the arm can reach within the tolerance of the goal''s, if there is one. Result: {stop_reason: reached | stalled | diverging | unsafe_motion | unreachable | max_steps | ended, pose of the TCP, position_error_m, orientation_error_rad, steps, recovered: whether it went for such a pose}; feedback: the errors and steps. A newer goal or a stop ends it.'
     transport: action
     direction: input
     endpoint: /right_arm/move
@@ -71,8 +53,7 @@ meta:
   created_at: '2026-10-24T00:00:00Z'
   updated_at: '2026-10-24T00:00:00Z'
 type: joint
-description: ARX X5 six-joint right arm, moved by goals of right_gripper/tcp through its own
-  IK.
+description: ARX X5 six-joint right arm, moved by goals of right_gripper/tcp through its own IK.
 source: introspected
 calibrated_at: null
 method: introspection

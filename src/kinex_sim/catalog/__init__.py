@@ -2,7 +2,14 @@
 from pathlib import Path
 import tomllib
 
+import yaml
+
 from kinex_sim.project import project_root
+
+
+def yaml_text(value):
+    """A profile or manifest as YAML, every string on one line, so a line search finds whole descriptions."""
+    return yaml.safe_dump(value, sort_keys=False, width=float("inf"))
 
 
 def simulator(name, project=None):

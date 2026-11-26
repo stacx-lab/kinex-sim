@@ -112,6 +112,10 @@ def test_every_rig_exports_loaded_profiles_on_kinex_sim_endpoints(tmp_path, iden
         assert {op: (spec["endpoint"], spec["type"]) for op, spec in profile["operations"].items()} == expected
         assert all(isinstance(op["description"], str) and op["description"]
                    for op in profile["operations"].values())
+        # Each description is whole on one line, as a line search finds it.
+        lines = (root / "devices" / name / "profile.yaml").read_text().splitlines()
+        found = {yaml.safe_load(line.split("description: ", 1)[1]) for line in lines if "description: " in line}
+        assert {profile["description"], *(op["description"] for op in profile["operations"].values())} <= found
         assert all("parent" in frame for frame in profile["frames"].values())
         # Every operation is an endpoint of kinex-sim's world node, so no device declares a node of its own.
         assert profile["runtime"]["nodes"] == []

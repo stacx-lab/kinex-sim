@@ -8,9 +8,8 @@ from pathlib import Path
 import math
 
 import numpy as np
-import yaml
 
-from kinex_sim.catalog import cameras
+from kinex_sim.catalog import cameras, yaml_text
 
 CREATED = "2026-10-24T00:00:00Z"
 
@@ -472,11 +471,11 @@ def write_rig(directory, manifest, devices, files=None, configurations=None):
     devices' profiles to configurations/<name>/profiles.yaml."""
     directory = Path(directory)
     (directory / "devices").mkdir(parents=True, exist_ok=True)
-    (directory / "workspace.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
+    (directory / "workspace.yaml").write_text(yaml_text(manifest))
     for name, profile in devices.items():
         folder = directory / "devices" / name
         folder.mkdir(exist_ok=True)
-        (folder / "profile.yaml").write_text(yaml.safe_dump(profile, sort_keys=False, width=88))
+        (folder / "profile.yaml").write_text(yaml_text(profile))
     for path, text in (files or {}).items():
         (directory / path).write_text(text)
     for configuration, profiles in (configurations or {}).items():
@@ -489,4 +488,4 @@ def write_configuration(directory, name, devices, profiles):
     folder = Path(directory) / "configurations" / name
     folder.mkdir(parents=True, exist_ok=True)
     changes = {device: patch(devices[device], profile) for device, profile in profiles.items()}
-    (folder / "profiles.yaml").write_text(yaml.safe_dump(changes, sort_keys=False, width=88))
+    (folder / "profiles.yaml").write_text(yaml_text(changes))

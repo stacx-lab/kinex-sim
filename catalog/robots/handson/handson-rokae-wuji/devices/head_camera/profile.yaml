@@ -16,8 +16,7 @@ operations:
       durability: volatile
     timeout_s: 10
   geometry:
-    description: 'Lens geometry: {} returns {streams: {color: descriptor}} with width, height,
-      projection, distortion, optical frame and calibration_id.'
+    description: 'Lens geometry: {} returns {streams: {color: descriptor}} with width, height, projection, distortion, optical frame and calibration_id.'
     transport: service
     direction: input
     endpoint: /head_camera/geometry
@@ -28,8 +27,7 @@ operations:
       durability: volatile
     timeout_s: 10
   unproject:
-    description: 'Pixels to optical-frame rays: {stream, calibration_id, pixels: [[u, v],
-      ...]} returns {rays: [[x, y, 1], ...]}, null where invalid; at most 8192 pixels.'
+    description: 'Pixels to optical-frame rays: {stream, calibration_id, pixels: [[u, v], ...]} returns {rays: [[x, y, 1], ...]}, null where invalid; at most 8192 pixels.'
     transport: service
     direction: input
     endpoint: /head_camera/unproject
@@ -40,9 +38,7 @@ operations:
       durability: volatile
     timeout_s: 10
   project:
-    description: 'Optical-frame points to pixels: {stream, calibration_id, points: [[X, Y,
-      Z], ...]} with Z > 0 returns {pixels: [[u, v], ...]}, null where invalid; at most 8192
-      points.'
+    description: 'Optical-frame points to pixels: {stream, calibration_id, points: [[X, Y, Z], ...]} with Z > 0 returns {pixels: [[u, v], ...]}, null where invalid; at most 8192 points.'
     transport: service
     direction: input
     endpoint: /head_camera/project
