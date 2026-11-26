@@ -59,8 +59,12 @@ def test_robocasa_graph_serves_its_mobile_devices(tmp_path):
         assert graph.call(stop, Trigger.Request()).success
         moved(.3)
         assert abs(last['base'].twist.twist.angular.z) < .05
-        twist.linear.z = 1.  # undeclared axes are rejected, so the base stays at rest
+        # Undeclared axes are refused, which ends the next wait at once and names it; the base stays at rest.
+        twist.linear.z = 1.
         velocity.publish(twist)
+        graph.spin(.1)
+        refused = graph.wait(.3)
+        assert not refused.success and '/base/velocity: only linear.x' in refused.message
         moved(.3)
         assert abs(last['base'].twist.twist.angular.z) < .05
         image, depth = graph.frame('camera_wrist', depth=True)  # the paused world's current frame
@@ -70,5 +74,5 @@ def test_robocasa_graph_serves_its_mobile_devices(tmp_path):
     finally:
         graph.close()
     log = (tmp_path / 'process_0.log').read_text()
-    assert 'seed 0, split target, layout 4, style 4:' in log
+    assert 'task description: {"task": "PickPlaceCounterToCabinet", "seed": 0, "instruction": ' in log
     assert 'layout_id=4 split=target style_id=4' in log
