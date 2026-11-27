@@ -1,7 +1,8 @@
 # RoboDojo
 
-RoboDojo runs its 42 simulation tasks on the dual ARX X5 rig in Isaac Sim 5.1,
-with upstream's saved evaluation layouts. The integration follows RoboEnv's
+RoboDojo runs its 42 simulation tasks, and the twelve `*_random` variants of its
+generalization tasks, on the dual ARX X5 rig in Isaac Sim 5.1, with upstream's saved
+evaluation layouts. The integration follows RoboEnv's
 RoboDojo device runtime. Upstream is pinned to
 `c3af1ac6ad7302c0c09d17f4b050fd3a5c68c921`, with its Isaac Lab fork
 (`yuechen0614/IsaacLab@afca7b09`) and cuRobo fork (`yuechen0614/curobo@895c6517`)
@@ -18,8 +19,8 @@ kinex-sim launch robodojo/stack-bowls --config depth --execution-mode stepped --
 kinex-sim launch robodojo/stack-bowls --config basic --execution-mode stepped --timeout 1800
 ```
 
-`robodojo` selects `pack_objects_into_box`. The twelve `*_random` variants are not
-cataloged. Three competition tasks (`imitate_sorting_sequence`, `make_kong`,
+`robodojo` selects `pack_objects_into_box`. Each `*_random` variant (`robodojo/make-toast-random`)
+is upstream's own task with its own saved layouts and the base task's step limit. Three competition tasks (`imitate_sorting_sequence`, `make_kong`,
 `play_tic_tac_toe`) add a Franka support arm that the native environment drives;
 it is not a device.
 
