@@ -1,5 +1,6 @@
-# RoboDojo simulation tasks on the dual ARX X5 rig with saved evaluation layouts, as
-# cataloged by RoboEnv (the *_random variants are excluded). Three competition tasks
+# RoboDojo simulation tasks on the dual ARX X5 rig with saved evaluation layouts: the 42 base
+# tasks RoboEnv catalogs, then upstream's twelve *_random variants (their own saved layouts,
+# with the base task's step limit). Three competition tasks
 # (imitate_sorting_sequence, make_kong, play_tic_tac_toe) add a Franka support arm
 # that the native environment drives; it is not a device.
 # max_steps: a stepped episode's step limit, the task's native step_lim (task/RoboDojo/tasks/<task>.py).
@@ -296,4 +297,88 @@ id = "robodojo/sweep-blocks"
 max_steps = 1000
 robot = "robodojo/robodojo-arx-x5"
 native_task = "sweep_blocks"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/arrange-largest-number-random"
+max_steps = 1050
+robot = "robodojo/robodojo-arx-x5"
+native_task = "arrange_largest_number_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/fold-clothes-random"
+max_steps = 500
+robot = "robodojo/robodojo-arx-x5"
+native_task = "fold_clothes_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/hang-mugs-random"
+max_steps = 800
+robot = "robodojo/robodojo-arx-x5"
+native_task = "hang_mugs_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/make-toast-random"
+max_steps = 1400
+robot = "robodojo/robodojo-arx-x5"
+native_task = "make_toast_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/pack-objects-into-box-random"
+max_steps = 1300
+robot = "robodojo/robodojo-arx-x5"
+native_task = "pack_objects_into_box_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/pour-liquid-into-cup-random"
+max_steps = 400
+robot = "robodojo/robodojo-arx-x5"
+native_task = "pour_liquid_into_cup_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/push-t-random"
+max_steps = 600
+robot = "robodojo/robodojo-arx-x5"
+native_task = "push_T_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/sort-nesting-dolls-by-size-random"
+max_steps = 1050
+robot = "robodojo/robodojo-arx-x5"
+native_task = "sort_nesting_dolls_by_size_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/stack-blocks-random"
+max_steps = 550
+robot = "robodojo/robodojo-arx-x5"
+native_task = "stack_blocks_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/stack-bowls-random"
+max_steps = 800
+robot = "robodojo/robodojo-arx-x5"
+native_task = "stack_bowls_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/store-laptop-and-headphones-random"
+max_steps = 800
+robot = "robodojo/robodojo-arx-x5"
+native_task = "store_laptop_and_headphones_random"
+env_cfg_type = "arx_x5"
+
+[[tasks]]
+id = "robodojo/sweep-blocks-random"
+max_steps = 1000
+robot = "robodojo/robodojo-arx-x5"
+native_task = "sweep_blocks_random"
 env_cfg_type = "arx_x5"

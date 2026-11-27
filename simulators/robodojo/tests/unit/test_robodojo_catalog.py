@@ -10,12 +10,18 @@ from kinex_sim_robodojo import assets
 
 def test_catalog_pairs_the_base_tasks_with_the_dual_x5_rig():
     entries = list(tasks(name="robodojo").values())
-    assert len(entries) == 42 and not any(t["native_task"].endswith("_random") for t in entries)
+    random = {t["native_task"]: t for t in entries if t["native_task"].endswith("_random")}
+    base = {t["native_task"]: t for t in entries if t not in random.values()}
+    assert (len(base), len(random)) == (42, 12)
+    for native, variant in random.items():
+        paired = base[native.removesuffix("_random")]
+        assert (variant["id"], variant["max_steps"]) == (paired["id"] + "-random", paired["max_steps"])
     for task in entries:
         assert (task["robot"], task["env_cfg_type"]) == ("robodojo/robodojo-arx-x5", "arx_x5")
         assert resolve(task["id"])[2] == task
     assert resolve("robodojo")[2]["native_task"] == "pack_objects_into_box"
     assert resolve("play_Xylophone")[2]["id"] == "robodojo/play-xylophone"
+    assert resolve("make_toast_random")[2]["id"] == "robodojo/make-toast-random"
 
 
 def test_manifest_runs_isaac_in_a_native_worker_with_pinned_forks():
