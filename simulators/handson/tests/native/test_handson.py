@@ -186,8 +186,18 @@ def test_catalog_task_loads_steps_and_commands_the_arms_upstream_drives(task, tm
         for side, _ in SIDES:
             assert ("pose_target" in operations[f"{side}_arm"]) == (side not in held), side
             assert ("joint_target" in operations[f"{side}_hand"]) == (side not in held), side
-        assert not sim.done and sim.max_steps > 0
+        assert not sim.done and sim.max_steps is None
         sim.step(sim.state()[0], IDLE)
         assert sim.steps == 1 and np.isfinite(sim.state()[0]).all() and sim.reward in (0., 1.)
     finally:
         sim.close()
+
+
+def test_catalog_step_limits_are_upstreams_budgets():
+    """Each task's max_steps is its budget in upstream's handson/evaluation/budgets.json, as its evaluator runs it."""
+    import json
+    from pathlib import Path
+    from handson.evaluation import native as evaluation
+    budgets = json.loads(Path(evaluation.__file__).with_name("budgets.json").read_text())
+    assert {t["native_task"]: t["max_steps"] for t in tasks(name="handson").values()} == {
+        task: int(budget["steps"]) for task, budget in budgets.items()}

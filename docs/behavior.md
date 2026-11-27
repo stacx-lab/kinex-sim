@@ -45,11 +45,12 @@ Upstream's evaluator gives its policy no text, only the activity's task id
 
 Success is the activity's BDDL goal predicate, evaluated every step; the reward is
 1 while it holds. `--early-stop` ends the episode at the first success, as the
-evaluator's termination does; BEHAVIOR has no failure termination. The default horizon is
-the evaluator's timeout, 1.5 average human demonstrations (`task.jsonl`), for example 3224
-for `turning_on_radio`: upstream's `Timeout` checks the step count before counting the
-step, so the episode ends on the step after it, step 3225 (107.5 s). The world node's `max_steps` parameter overrides the
-horizon.
+evaluator's termination does; BEHAVIOR has no failure termination. A stepped run's step limit,
+the catalog's `max_steps`, is the evaluator's timeout, 1.5 average human demonstrations
+(`task.jsonl`), plus one: for example 3224 for `turning_on_radio`, whose upstream `Timeout`
+checks the step count before counting the step, so the episode ends on the step after it,
+step 3225 (107.5 s), its `max_steps`. The backend gives upstream's `Timeout` the limit less
+one; a realtime run has no limit, and no `Timeout` ends it.
 
 Episode records add the evaluator's partial credit, `q_score`, as its `TaskMetric`
 computes it: 1 on success, else the best grounded goal option's fraction of literals

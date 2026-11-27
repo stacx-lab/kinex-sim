@@ -54,6 +54,32 @@ def scene_argument(config, scene):
     return "scene:=" + json.dumps(scene, separators=(",", ":"), sort_keys=True, allow_nan=False)
 
 
+def launch_arguments(config, task, options, *, configuration=None, scene=None, recording=False, demo=False):
+    """The world graph's launch arguments for a catalog task and launch options: its backend, task and seed, its
+    execution mode and, in a stepped run, its step limit, its configuration and scene, and a recording's spectators."""
+    mode = options.get("execution_mode") or ("stepped" if demo else None)
+    arguments = [f"backend:={config['name']}", f"task:={task['native_task']}"]
+    # A catalog task may name a default seed, e.g. a scene that is stable from seed 0.
+    seed = options.get("seed") if options.get("seed") is not None else task.get("seed")
+    # A stepped run ends at the task's step limit, its catalog's max_steps (upstream's evaluation horizon); a realtime
+    # run, whose world time passes whether or not anyone spends it, has none.
+    max_steps = task.get("max_steps") if mode == "stepped" else None
+    for name, value in (("mode", mode), ("seed", seed), ("configuration", configuration), ("max_steps", max_steps),
+                        ("early_stop", options.get("early_stop") or None)):
+        if value is not None:
+            arguments.append(f"{name}:={str(value).lower() if isinstance(value, bool) else value}")
+    if scene is not None:
+        arguments.append(scene)
+    if recording:
+        rate, width, height, views, _ = recording_settings(options)
+        arguments += [f"spectator_rate_hz:={rate}", f"spectator_width:={width}", f"spectator_height:={height}"]
+        if views:
+            arguments.append(f"spectator_select:={','.join(views)}")
+    if demo:
+        arguments.append(f"demo:={config['ros_package']}")
+    return arguments
+
+
 def launch(selection, *, project=None, options=None, demo=False):
     options = options or {}
     root, config, task = resolve(selection, project)
@@ -64,23 +90,9 @@ def launch(selection, *, project=None, options=None, demo=False):
         raise ValueError("; ".join(report["issues"] + report["next_steps"]))
     recording_dir = destination(options["record"]) if options.get("record") is not None else None
     recording_type = options.get("record_type") or "mp4"
-    mode = options.get("execution_mode") or ("stepped" if demo else None)
-    arguments = [f"backend:={config['name']}", f"task:={task['native_task']}"]
-    # A catalog task may name a default seed, e.g. a scene that is stable from seed 0.
-    seed = options.get("seed") if options.get("seed") is not None else task.get("seed")
-    for name, value in (("mode", mode), ("seed", seed), ("configuration", configuration),
-                        ("early_stop", options.get("early_stop") or None)):
-        if value is not None:
-            arguments.append(f"{name}:={str(value).lower() if isinstance(value, bool) else value}")
-    if scene is not None:
-        arguments.append(scene)
-    if recording_dir is not None:
-        rate, width, height, views, crf = recording_settings(options)
-        arguments += [f"spectator_rate_hz:={rate}", f"spectator_width:={width}", f"spectator_height:={height}"]
-        if views:
-            arguments.append(f"spectator_select:={','.join(views)}")
-    if demo:
-        arguments.append(f"demo:={config['ros_package']}")
+    crf = recording_settings(options)[4] if recording_dir is not None else None
+    arguments = launch_arguments(config, task, options, configuration=configuration, scene=scene,
+                                 recording=recording_dir is not None, demo=demo)
     run_id = uuid.uuid4().hex[:12]
     folder = directory(root) / run_id
     folder.mkdir(parents=True, mode=0o700)
@@ -197,11 +209,18 @@ def follow(record, process):
 
 
 def describe(domain_id, *, project=None):
-    """The task description the live run on a ROS domain stated in its log when its episode started."""
-    _, record = on_domain(project_root(project), domain_id)
+    """The task description the live run on a ROS domain stated in its log when its episode started: its
+    instructions, and under `episode` the episode the world initialized, with the run and the catalog task it
+    belongs to and the upstream revision of its simulator."""
+    root = project_root(project)
+    _, record = on_domain(root, domain_id)
     description = stated(record["log"])
     if description is None:
         raise ValueError(f"Run {record['id']} on ROS domain {domain_id} has not started its episode yet")
+    if "episode" in description:
+        _, _, config = simulator(record["simulator"], root)
+        description["episode"].update(run=record["id"], simulator=record["simulator"], task_id=record["task"],
+                                      source_revision=config.get("source_revision"))
     return description
 
 

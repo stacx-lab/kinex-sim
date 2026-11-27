@@ -39,7 +39,7 @@ class LiberoSim:
             raise ValueError(f'LIBERO has no configuration {configuration!r}')
         self.configuration = configuration
         self.cameras, self.width, self.height = tuple(cameras), width, height
-        self.requested_max_steps = self.max_steps = max_steps
+        self.max_steps = max_steps
         self.early_stop = early_stop
         self.wrapper = self._spectator = None
         self.spectators = ()
@@ -76,7 +76,7 @@ class LiberoSim:
         task = spec['native_task']
         check_task(runtime, task)
         candidate = LiberoSim(cameras=self.cameras, width=self.width, height=self.height,
-                              max_steps=self.requested_max_steps, early_stop=self.early_stop,
+                              max_steps=self.max_steps, early_stop=self.early_stop,
                               configuration=self.configuration)
         candidate.spectators = self.spectators
         # Native construction uses process RNGs. A failed reset must also preserve
@@ -119,6 +119,7 @@ class LiberoSim:
         # The wrapper retries randomization forever. Let reset failures propagate.
         self.env.reset()
         self.wrapper.set_init_state(states[index])
+        self.initialization = {'init_state_index': int(index), 'initialization_frames': INITIALIZATION_STEPS}
         for camera in (*self.cameras, *(v.source for v in self.spectators)):
             if mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_CAMERA, camera) < 0:
                 raise ValueError(f'unknown camera: {camera}')
@@ -137,10 +138,6 @@ class LiberoSim:
             initial = self.state()[0]
             for _ in range(INITIALIZATION_STEPS):
                 self._advance(initial)
-        import yaml
-        # Upstream's evaluation horizon (libero/configs/eval/default.yaml), unless the launch gives one.
-        evaluation = yaml.safe_load((runtime / 'libero/configs/eval/default.yaml').read_text())
-        self.max_steps = self.requested_max_steps or int(evaluation['max_steps'])
         self._time_origin = float(self.data.time)
         self.steps, self.done = 0, False
         self.success = bool(self.wrapper.check_success())
@@ -237,7 +234,7 @@ class LiberoSim:
         # Upstream's success is env.step's done: the BDDL goal on the kinematics the step leaves, before the
         # forward above refreshes them.
         self.success = bool(done)
-        self.done = bool(self.steps >= self.max_steps or (self.early_stop and self.success))
+        self.done = bool((self.max_steps and self.steps >= self.max_steps) or (self.early_stop and self.success))
 
     @staticmethod
     def _quat(matrix):

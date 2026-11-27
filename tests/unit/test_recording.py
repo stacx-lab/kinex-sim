@@ -181,3 +181,27 @@ def test_recorder_failure_detail_is_retained(tmp_path):
     finalize(record, 1)
     assert record['error'] == 'Recorder exited unexpectedly; recording: encoder failed'
     assert record['recording_state'] == 'failed'
+
+
+def test_a_lossless_stream_waits_for_its_encoder_instead_of_dropping(tmp_path, monkeypatch):
+    """A synchronous recording keeps every frame: a full queue makes the frame wait, and the world with it."""
+    import threading
+    release = threading.Event()
+    seen = []
+    def frame(self, *args):
+        assert release.wait(5.)
+        seen.append(args[0])
+    monkeypatch.setattr(VideoStream, '_frame', frame)
+    stream = VideoStream(tmp_path, 'overview', 10., '/bin/false', lossless=True)
+    submitted = threading.Thread(target=lambda: [stream.submit(i, 1, 1, bytes(3)) for i in range(40)])
+    try:
+        submitted.start()
+        time.sleep(.3)
+        assert submitted.is_alive()  # waiting for room in the queue
+        release.set()
+        submitted.join(5.)
+        assert not submitted.is_alive()
+    finally:
+        release.set()
+        stream.close()
+    assert stream.dropped == 0 and seen == list(range(40))

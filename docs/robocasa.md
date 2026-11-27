@@ -154,9 +154,10 @@ The base and the gripper's target are the same in both configurations.
 
 Each action interval advances 0.05 simulation seconds (25 MuJoCo substeps). The task,
 seed and scene options (see [Scenes](#scenes-split-layout-and-style)) determine the
-episode; building the kitchen takes about 10 s. The default horizon is upstream's dataset horizon for the task (for example 750 steps
-for `PickPlaceCounterToCabinet`), or none when upstream has no dataset; the world
-node's `max_steps` parameter overrides it. Success is the task's native predicate, scored
+episode; building the kitchen takes about 10 s. A stepped run's step limit, the catalog's
+`max_steps`, is upstream's dataset horizon for the task (for example 750 steps for
+`PickPlaceCounterToCabinet`); the 48 tasks upstream gives no dataset take the longest of
+those horizons, 7200 steps (360 s). A realtime run has none. `kinex-sim describe` states the kitchen the seed picked as its `initialization`. Success is the task's native predicate, scored
 as upstream's evaluation scores it (`robocasa/wrappers/gym_wrapper.py`): evaluated again
 after each step, once the kitchen has updated its fixtures' state, and that value is both
 the success and the reward. As there, the predicate also runs inside the step, so tasks

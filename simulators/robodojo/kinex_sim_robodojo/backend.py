@@ -12,6 +12,7 @@ checks it, and a gripper's grasp and release run its fingers until they stop
 on topics instead. Resets load upstream's saved evaluation layouts. Ported from
 RoboEnv's RoboDojo adapter.
 """
+import math
 import os
 import secrets
 import sys
@@ -205,7 +206,6 @@ class RoboDojoSim:
         self.depth = configuration == "depth"  # RGB-D cameras
         self.targets = configuration == "basic"  # joint and grip targets on topics, in place of goals
         self._captures = None  # each camera's annotator outputs at the current step; None until it is rendered
-        self.requested_max_steps = max_steps
         self.max_steps = max_steps
         self.early_stop = early_stop
         self.stop = None
@@ -250,7 +250,6 @@ class RoboDojoSim:
             self.interval = int(self.env.obs_manager.collect_interval)
             self.physics_dt = float(self.env.dt)
             self.period = self.interval * self.physics_dt
-            self.native_step_limit = int(self.env.step_lim)
         layouts = list(getattr(self.env.seed_manager, "seed_list", None)
                        or sorted(getattr(self.env.seed_manager, "seed_info", {})))
         if not layouts:
@@ -280,9 +279,9 @@ class RoboDojoSim:
         manager = self.env.obs_manager
         self.description = {"instruction": manager.instruction[0],
                             "detailed_instruction": manager.detailed_instruction[0]}
-        self.max_steps = self.requested_max_steps or self.native_step_limit
-        # EvalEnv checks its own counter in take_action; keep both limits equal.
-        self.env.step_lim = self.max_steps
+        # EvalEnv compares its own counter with step_lim in take_action; keep both limits equal, none without one.
+        self.env.step_lim = self.max_steps or math.inf
+        self.initialization = {"layout_id": int(layout), "layouts": len(layouts)}
         self._index()
         self.steps, self.done, self.stop = 0, False, None
         self.goals, self._active = {}, {}  # each action's goal as the world reads it, and those that execute
@@ -379,9 +378,9 @@ class RoboDojoSim:
             found = violations(self.env.reward_manager)
             if self.success:
                 self.stop = ("success", None)
-            elif found or self.steps < self.max_steps:
+            elif found or not self.max_steps or self.steps < self.max_steps:
                 self.stop = ("failure", found or "a task constraint failed")
-        self.done = bool(self.env.end_flag[0] or self.steps >= self.max_steps)
+        self.done = bool(self.env.end_flag[0] or (self.max_steps and self.steps >= self.max_steps))
         poses = {arm: self.tcp_pose(arm) for arm in before}
         moving = {operation.partition("/")[0] for operation in self._active if operation.endswith("/move")}
         unsafe = move.unsafe({arm: move.offset(before[arm], poses[arm]) for arm in before}, moving)

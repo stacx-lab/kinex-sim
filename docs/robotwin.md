@@ -111,7 +111,7 @@ expert dry run (`play_once`, whose planning may fail without consequence), then
 `setup_demo` again in evaluation mode. It takes about a minute. Success is
 upstream's `check_success`, evaluated on every substep from the first action on, as
 upstream's `take_action` does, and latched; the episode
-horizon is the native `step_lim` unless a maximum is given. `--early-stop` ends the
+stepped step limit is the native `step_lim`, the catalog's `max_steps`; a realtime run has none. `--early-stop` ends the
 episode at the first success, as the evaluator does; RoboTwin has no failure termination.
 
 The [task description](devices.md#task-description)'s `instruction` is the one upstream's

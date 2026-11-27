@@ -36,8 +36,11 @@ def test_the_run_log_states_the_task_description(tmp_path):
     graph = Graph(tmp_path, task="succeeds")
     try:
         graph.logs[0].flush()
+        # Its instructions, and the episode the world initialized: stepped, with no step limit and no recording.
         assert stated(graph.logs[0].name) == {
-            "task": "succeeds", "seed": 0, "instruction": "Move the toy's axes (succeeds, seed 0)."}
+            "task": "succeeds", "seed": 0, "instruction": "Move the toy's axes (succeeds, seed 0).",
+            "episode": {"execution_mode": "stepped", "period_s": .1, "max_steps": None, "early_stop": False,
+                        "configuration": None, "scene": {}, "initialization": {}, "recording": None}}
     finally:
         graph.close()
 

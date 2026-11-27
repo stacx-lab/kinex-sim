@@ -5,12 +5,14 @@ from pathlib import Path
 import signal
 import sys
 import time
+import traceback
 
 import rclpy
 from rclpy.node import Node
 from rclpy.serialization import serialize_message
 from rclpy.signals import SignalHandlerOptions
 from rcl_interfaces.srv import GetParameters
+from builtin_interfaces.msg import Time
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, Image
 
@@ -47,6 +49,12 @@ class Recorder(Node):
         self.parameters_future = None
         self.last_report = 0.
         self.last_metadata = None
+        # A stepped run's recording is synchronous: no frame is dropped, and the recorder acknowledges the latest
+        # stamp it holds for every view, on which the world takes its next step.
+        self.sync = False
+        self.latest = {}
+        self.acknowledged_ns = -1
+        self.acknowledgements = None
 
     def _open_bag(self):
         if self.record['recording_type'] not in ('bag', 'both'):
@@ -73,17 +81,20 @@ class Recorder(Node):
     def configure(self, values):
         self.views = list(values[0].string_array_value)
         fps = values[1].double_value
+        self.sync = values[2].string_value == 'stepped'
         if not self.views:
             raise ValueError('world must expose spectator views to record')
         if not math.isfinite(fps) or fps <= 0:
             raise ValueError('--record requires a positive spectator_rate_hz')
         self._open_bag()
         self.received = dict.fromkeys(self.views, 0)
-        self.metadata.update(spectator_views=self.views)
+        self.metadata.update(spectator_views=self.views, sync=self.sync)
+        if self.sync:
+            self.acknowledgements = self.create_publisher(Clock, 'world/spectator/acknowledged', STREAM_QOS)
         for view in self.views:
             if self.executable is not None:
                 self.streams[view] = VideoStream(self.directory, view, fps, self.executable,
-                                                 crf=self.record['recording_crf'])
+                                                 crf=self.record['recording_crf'], lossless=self.sync)
             image_topic = self._topic(f'world/spectator/{view}/image_raw', 'sensor_msgs/msg/Image')
             info_topic = self._topic(f'world/spectator/{view}/camera_info', 'sensor_msgs/msg/CameraInfo')
             self.create_subscription(Image, image_topic,
@@ -104,6 +115,13 @@ class Recorder(Node):
         if view in self.streams:
             self.streams[view].submit(timestamp, msg.width, msg.height, bytes(msg.data))
         self.received[view] += 1
+        if self.sync:
+            self.latest[view] = max(self.latest.get(view, -1), timestamp)
+            held = min(self.latest.get(name, -1) for name in self.views)
+            if held > self.acknowledged_ns:
+                self.acknowledged_ns = held
+                self.acknowledgements.publish(Clock(clock=Time(sec=held // 1_000_000_000,
+                                                               nanosec=held % 1_000_000_000)))
 
     def info(self, view, topic, msg):
         self._write_bag(topic, msg, stamp_ns(msg.header.stamp))
@@ -122,7 +140,7 @@ class Recorder(Node):
         if not self.configured:
             if self.parameters_future is None and self.parameters.service_is_ready():
                 self.parameters_future = self.parameters.call_async(
-                    GetParameters.Request(names=['spectator_views', 'spectator_rate_hz']))
+                    GetParameters.Request(names=['spectator_views', 'spectator_rate_hz', 'mode']))
             elif self.parameters_future is not None and self.parameters_future.done():
                 self.configure(self.parameters_future.result().values)
         for stream in self.streams.values():
@@ -178,6 +196,7 @@ def main():
             node.progress()
     except Exception as failure:
         error = str(failure)
+        traceback.print_exc()
         print(error, file=sys.stderr, flush=True)
     finally:
         try:

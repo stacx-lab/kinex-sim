@@ -89,6 +89,7 @@ class AbcSim:
                            max_steps=self.max_steps, early_stop=self.early_stop)
         candidate.spectators = self.spectators
         candidate.env, candidate.task, candidate.seed, candidate.world_seed = env, spec.name, seed, native
+        candidate.initialization = {"world_seed": int(native)}
         try:
             env.reset(seed=native, randomize=randomize)
             # The prompt upstream's evaluator gives its policy: the task's, or the one its randomizer drew for the

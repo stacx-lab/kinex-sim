@@ -10,6 +10,10 @@ import threading
 import time
 
 
+# How long a lossless stream's frame waits for room in its encoder queue before the recording fails.
+LOSSLESS_TIMEOUT_S = 30.
+
+
 def encoder_path():
     executable = shutil.which('ffmpeg')
     if executable is None:
@@ -41,12 +45,14 @@ def close_streams(streams, timeout=10., kill_timeout=2.):
 
 
 class VideoStream:
-    """One camera, at most sixteen pending frames, and one file: `segments` lists it once it opens."""
-    def __init__(self, directory, name, fps, executable, crf=20):
+    """One camera, at most sixteen pending frames, and one file: `segments` lists it once it opens. lossless: a
+    frame that finds the queue full waits for the encoder (at most `LOSSLESS_TIMEOUT_S`) instead of being dropped,
+    as a synchronous recording holds the world until it has every frame."""
+    def __init__(self, directory, name, fps, executable, crf=20, lossless=False):
         if not math.isfinite(fps) or fps <= 0:
             raise ValueError('recording requires a positive, finite spectator rate')
         self.directory, self.name, self.fps, self.crf = Path(directory), name, fps, int(crf)
-        self.executable = executable
+        self.executable, self.lossless = executable, lossless
         self.queue = queue.Queue(maxsize=16)
         self.received = self.dropped = 0
         self.segments = []
@@ -83,6 +89,14 @@ class VideoStream:
     def submit(self, stamp_ns, width, height, pixels):
         if width <= 0 or height <= 0 or len(pixels) != width * height * 3:
             raise ValueError(f'invalid RGB frame for {self.name}')
+        if self.lossless:
+            try:
+                self.queue.put((stamp_ns, width, height, pixels), timeout=LOSSLESS_TIMEOUT_S)
+            except queue.Full:
+                raise RuntimeError(f'{self.name}: the encoder took no frame for {LOSSLESS_TIMEOUT_S:.0f} s') from None
+            with self._lock:
+                self.received += 1
+            return
         with self._lock:
             self.received += 1
             try:

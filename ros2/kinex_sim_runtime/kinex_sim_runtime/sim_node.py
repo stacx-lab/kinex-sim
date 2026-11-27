@@ -16,12 +16,13 @@ from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 from rclpy.task import Future
 from std_srvs.srv import Trigger
 from unique_identifier_msgs.msg import UUID
 
 from kinex_sim.core import load_backend
-from kinex_sim.runtime.description import logged, task_description
+from kinex_sim.runtime.description import episode_record, logged, task_description
 from kinex_sim.runtime.world import WorldRuntime
 from .devices import Goals, device
 from .publishing import ObservationPublisher
@@ -47,10 +48,15 @@ class SimNode(Node):
                 raise ValueError(f"this simulator offers no spectator views {unknown}")
         # A run is one episode: the launch's task, seed and scene options, loaded once.
         self.sim.reset(p["task"] or self.sim.default_task, p["seed"], p["randomize"], **p["scene"])
-        # The run log states the episode's task description, which `kinex-sim describe` reads back.
-        self.get_logger().info(logged(task_description(p["task"], self.sim)))
+        # A run's recorder (the supervisor's, which KINEX_SIM_RECORDING_READY names) gets the state the episode ends
+        # in and, in a stepped run, every frame: the world steps once the recorder holds every frame sampled so far.
+        # Realtime pacing follows the wall clock.
+        recording = bool(p["spectator_rate_hz"] and os.environ.get("KINEX_SIM_RECORDING_READY"))
+        sync = recording and p["mode"] == "stepped"
         self.world = WorldRuntime(self.sim, p["mode"], lambda: self.observations.publish(),
-                                  early_stop=p["early_stop"])
+                                  early_stop=p["early_stop"],
+                                  held=(lambda: self.observations.held()) if sync else None,
+                                  final=(lambda: self.observations.final()) if recording else None)
         # Action goals by id, each with the future of its end (done) and end(reason); those a server is still
         # accepting, by the id of their request, which have no goal id yet; and the ids of those that have ended
         # since the last wait reply, which names them (devices.Goals).
@@ -59,7 +65,15 @@ class SimNode(Node):
         self.actions = [Goals(action, self) for action in getattr(self.sim, "actions", ())]
         self.declare_parameter("spectator_views", [v.name for v in self.sim.spectators],
                                ParameterDescriptor(read_only=True), ignore_override=True)
-        self.observations = ObservationPublisher(self, p["spectator_rate_hz"])
+        self.observations = ObservationPublisher(self, p["spectator_rate_hz"], sync=sync)
+        recording = ({"rate_hz": p["spectator_rate_hz"], "width": p["spectator_width"],
+                      "height": p["spectator_height"], "views": [v.name for v in self.sim.spectators], "sync": sync}
+                     if recording else None)
+        # The run log states the episode's task description, which `kinex-sim describe` reads back: its
+        # instructions and the episode the world initialized.
+        self.get_logger().info(logged(task_description(p["task"], self.sim, episode_record(
+            self.sim, mode=p["mode"], early_stop=p["early_stop"], configuration=p["configuration"],
+            scene=p["scene"], recording=recording))))
         # World waits are sequential; stop cancels the pending one.
         services = ReentrantCallbackGroup()
         self.create_service(Now, "world/now", self._now, callback_group=services)
@@ -151,7 +165,12 @@ class SimNode(Node):
 def main():
     # SIGUSR1 writes every thread's Python stack to stderr (graph.log): a world that stops answering can be located.
     faulthandler.register(signal.SIGUSR1, all_threads=True)
-    rclpy.init()
+    # The world, not rclpy, handles SIGINT and SIGTERM: they interrupt its main thread, which then closes the episode
+    # while ROS still runs, so a recording's final frame and its acknowledgement still travel, and shuts ROS down.
+    def interrupted(*_):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, interrupted)
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = SimNode.__new__(SimNode)
     executor = MultiThreadedExecutor(num_threads=4)
     spinner, error = None, None

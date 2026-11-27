@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
+from kinex_sim.catalog import resolve
 from kinex_sim_robocasa.backend import ROBOT, RoboCasaSim
 
 
@@ -20,13 +21,15 @@ def kitchen(sim):
 @pytest.mark.parametrize('task,horizon', [
     ('PickPlaceCounterToCabinet', 750),   # atomic
     ('WashLettuce', 1650),                # composite
-    ('PrepareVeggieDip', None),           # composite without a dataset horizon
+    ('PrepareVeggieDip', 7200),           # composite without a dataset horizon: the longest one
 ])
 def test_representative_tasks_load_and_step_without_a_split(task, horizon):
     sim = RoboCasaSim(cameras=())
     try:
         sim.reset(task, 3)
-        assert sim.steps == 0 and sim.time_s == 0 and sim.period == .05 and sim.max_steps == horizon
+        # Without a launch's step limit the episode has none; a stepped launch gives the catalog's, the horizon.
+        assert sim.steps == 0 and sim.time_s == 0 and sim.period == .05 and sim.max_steps is None
+        assert resolve('robocasa', task=task)[2].get('max_steps') == horizon
         layout, style = kitchen(sim)  # create_env(split=None): every kitchen and object
         assert 1 <= layout <= 60 and 1 <= style <= 60 and sim.env.obj_instance_split is None
         assert sim.measures() == {'split': None, 'layout_id': layout, 'style_id': style}

@@ -183,13 +183,26 @@ is the episode's task description; the operator reads native outcomes with
 
 ### Task description
 
-Every simulator describes an episode the same way: its native task and seed, and the
+Every simulator describes an episode the same way: its native task and seed, the
 instructions upstream's evaluator gives its policy for that episode, which may depend on the
-seed or the scene. When the episode starts, the world node states it in the run log
-(`graph.log`) as one `task description: {...}` line of JSON, and `kinex-sim describe` prints it
-for the live run on a ROS domain, the one launch printed. It reads the line back, so it opens
-nothing and answers at once; `--json` prints the JSON. Give it to the agent; nothing is
-published on ROS or written to a file.
+seed or the scene, and under `episode` the episode the world initialized. When the episode
+starts, the world node states it in the run log (`graph.log`) as one `task description: {...}`
+line of JSON, and `kinex-sim describe` prints it for the live run on a ROS domain, the one launch
+printed. It reads the line back, so it opens nothing and answers at once; `--json` prints the
+JSON. Nothing is published on ROS or written to a file.
+
+The instructions are the agent's: every key but `task`, `seed` and `episode`
+(`kinex_sim.runtime.description.instructions`). The seed and `episode` are the operator's, for
+a harness to check before it hands the agent its instructions:
+
+| `episode` field | What it states |
+|---|---|
+| `execution_mode`, `period_s` | `stepped` or `realtime`, and the native control period |
+| `max_steps` | The step limit: the catalog task's in a stepped run, `null` without one (realtime, or no upstream horizon) |
+| `early_stop`, `configuration`, `scene` | The launch's options: early stop, device configuration and scene options |
+| `initialization` | What the backend resolved from the task, seed and scene, such as RoboCasa's kitchen (`split`, `layout_id`, `style_id`), RoboDojo's `layout_id`, RoboTwin's and HandsOn's `native_seed`, BEHAVIOR's `instance`, LIBERO's `init_state_index` |
+| `recording` | `null`, or its rate, size, views, and whether it is synchronous (`sync`, a stepped run's); every recording ends with the final state |
+| `run`, `simulator`, `task_id`, `source_revision` | The run, the catalog task, and the simulator's pinned upstream revision |
 
 ```sh
 kinex-sim launch robodojo/stack-bowls --execution-mode stepped --domain-id 83 --detach

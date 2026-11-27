@@ -151,6 +151,12 @@ class SimulatorBackend(Protocol):
     Optionally, measures() returns the backend's own measures of the episode as
     JSON fields, such as BEHAVIOR's q_score; the episode record adds them.
 
+    max_steps is the episode's step limit, given at construction (a stepped launch gives its catalog task's,
+    upstream's evaluation horizon); None, as in a realtime run, means the episode has none, so no native time
+    limit ends it either. Optionally, after a reset, initialization holds what the backend resolved for the
+    episode from its task, seed and scene options, such as the kitchen a RoboCasa seed picked; `kinex-sim
+    describe` states it.
+
     After a reset, description holds the instructions upstream's evaluator gives
     its policy for the episode: {"instruction": text}, plus any further text it
     gives under its own name, such as RoboDojo's detailed_instruction. The world

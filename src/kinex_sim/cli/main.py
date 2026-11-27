@@ -105,12 +105,14 @@ def parser():
 
 
 def described(description):
-    """A task description as text: its task and seed, then each instruction under its name."""
+    """A task description as text: its task and seed, each instruction under its name, then its episode."""
+    from kinex_sim.runtime.description import instructions
     lines = [f"Task: {description['task']}", f"Seed: {description['seed']}"]
-    for name, text in description.items():
-        if name not in ("task", "seed"):
-            label = name.replace("_", " ").capitalize()
-            lines += ["", f"{label}:", str(text)] if "\n" in str(text) else [f"{label}: {text}"]
+    for name, text in instructions(description).items():
+        label = name.replace("_", " ").capitalize()
+        lines += ["", f"{label}:", str(text)] if "\n" in str(text) else [f"{label}: {text}"]
+    if description.get("episode"):
+        lines += ["", "Episode:", *(f"  {name}: {json.dumps(value)}" for name, value in description["episode"].items())]
     return "\n".join(lines)
 
 
@@ -154,7 +156,9 @@ def main(argv=None):
                 entries = {key: value for key, value in entries.items() if value.get("robot") == args.robot}
             if args.json:
                 emit({"tasks": len(entries), "ids": sorted(entries),
-                      "robots": {key: value.get("robot") for key, value in sorted(entries.items())}}, True)
+                      "robots": {key: value.get("robot") for key, value in sorted(entries.items())},
+                      # Each task's stepped step limit, upstream's evaluation horizon; null where upstream has none.
+                      "max_steps": {key: value.get("max_steps") for key, value in sorted(entries.items())}}, True)
             else:
                 print("\n".join(sorted(entries)))
             return 0

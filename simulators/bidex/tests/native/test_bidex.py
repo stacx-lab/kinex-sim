@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from kinex_sim.catalog import tasks
+from kinex_sim.catalog import resolve, tasks
 from kinex_sim_bidex.backend import BiDexSim, episode
 
 RIGS = {("dual_fr3v2_sharpa", (0.5, -0.45, 0.6)): "bidex/bidex-fr3v2-sharpa-tabletop",
@@ -33,7 +33,9 @@ def test_representative_tasks_reset_hold_step_and_render(task, seed, joint):
         sim.reset(task, seed)
         assert sim.description["instruction"]
         suite, name = sim.task.removesuffix("__ood").split("/")
-        assert (sim.steps, sim.time_s, sim.period, sim.max_steps) == (0, 0, .04, max_steps_for_task(suite, name))
+        assert (sim.steps, sim.time_s, sim.period, sim.max_steps) == (0, 0, .04, None)
+        # The catalog's step limit is upstream's leaderboard horizon.
+        assert resolve("bidex", task=task)[2]["max_steps"] == max_steps_for_task(suite, name)
         assert sim.layout.joint_names[0] == joint and len(sim.layout.joint_names) == 58
         assert [g.name for g in sim.layout.groups] == ["right_arm", "left_arm", "right_hand", "left_hand"]
         # As the evaluator's joint adapter, kinex-sim bounds no target; MuJoCo's actuators do.

@@ -46,7 +46,7 @@ class BiDexSim:
     period = 1 / 25  # BiDexEnv's control_freq_hz; a reset reads the episode's own
 
     def __init__(self, *, max_steps=None, early_stop=False):
-        self.requested_max_steps = self.max_steps = max_steps
+        self.max_steps = max_steps
         self.early_stop = early_stop
         self.stop = None  # BiDex ends no episode at a failure; done with success names a success
         self.cameras = tuple(CAMERAS.values())
@@ -64,7 +64,7 @@ class BiDexSim:
         """The seeded evaluator episode; randomize has no effect."""
         native = resolve("bidex", task=task)[2]["native_task"]
         check_task(project_root() / ".runtime/bidex", native)
-        candidate = BiDexSim(max_steps=self.requested_max_steps, early_stop=self.early_stop)
+        candidate = BiDexSim(max_steps=self.max_steps, early_stop=self.early_stop)
         candidate.spectators = self.spectators
         try:
             candidate._initialize(native, seed)
@@ -107,7 +107,6 @@ class BiDexSim:
         env.settle(1.0)
         self.period = 1 / env.control_freq
         self._weights = subtask_weights_from_task(self._loaded)
-        self.max_steps = self.requested_max_steps or evaluator.max_steps_for_task(suite, name)
         self._index()
         env._init_renderer()
         if env.renderer is None:
@@ -151,7 +150,9 @@ class BiDexSim:
         refresh(self.env.model, self.env.data)
         self.steps += 1
         self.reward, self.success = float(reward), bool(info["success"])
-        self.done = bool(self.steps >= self.max_steps or info["timed_out"] or (self.early_stop and self.success))
+        # Upstream's max_seconds never ends an episode before its horizon; without a step limit neither ends it.
+        limited = bool(self.max_steps) and (self.steps >= self.max_steps or info["timed_out"])
+        self.done = bool(limited or (self.early_stop and self.success))
 
     def measures(self):
         """The evaluator's progress score, 0-100: the weights of the subtasks credited now."""
