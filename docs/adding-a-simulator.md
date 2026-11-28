@@ -192,6 +192,9 @@ Implement `SimulatorBackend` (`src/kinex_sim/core/backend.py`). Its docstring is
     that end in `stop`.
   - `measures()` adds the backend's own fields to the episode record, such as a native seed or a
     graded score.
+  - `finalizes = True` with `finalize()`: the native evaluator's final check of the state a stopped
+    episode is left in, as upstream makes it at the step limit; the world calls it on every stop
+    before the episode ended.
 - **Optional.**
   - spectators (`configure_spectators`, `render_spectators`, `spectator_intrinsics`): one call returns a frame
     of every view, so a renderer that draws all its views in one pass renders once;

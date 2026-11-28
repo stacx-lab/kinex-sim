@@ -152,6 +152,30 @@ def test_records_say_why_the_episode_ended(tmp_path, monkeypatch, task, early_st
         reason, cause, first_success_step, early_stop)
 
 
+class FinalizedToy(ToyBackend):
+    """A toy whose native evaluator's final check finds the task done."""
+    finalizes = True
+
+    def finalize(self):
+        self.success, self.reward = True, 1.
+
+
+@pytest.mark.parametrize("backend, stopped_at_end", [(FinalizedToy, False), (ToyBackend, False),
+                                                     (FinalizedToy, True)])
+def test_a_stopped_episode_gets_the_backends_final_check(tmp_path, monkeypatch, backend, stopped_at_end):
+    monkeypatch.setenv('KINEX_SIM_RUN_DIR', str(tmp_path))
+    runtime, _ = world(max_steps=2 if stopped_at_end else None, backend=backend)
+    wait(runtime, 1. if stopped_at_end else .05)
+    finish(runtime)
+    runtime.close()
+    outcome, = records(tmp_path)
+    # Only an episode stopped before it ended is checked, by a backend that has a final check; one that ended keeps
+    # its own verdict.
+    checked = backend is FinalizedToy and not stopped_at_end
+    assert (outcome['final_checked'], outcome['success'], outcome['reason']) == (
+        checked, checked, 'timeout' if stopped_at_end else 'stopped')
+
+
 def replied(runtime, duration):
     """A world wait as the world node admits it: its reply names the commands refused since the previous one."""
     return wait(runtime, duration)

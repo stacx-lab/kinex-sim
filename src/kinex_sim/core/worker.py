@@ -17,7 +17,7 @@ import numpy as np
 
 # Attributes the world reads from a backend. Static ones change only on reset.
 STATIC = ("default_task", "layout", "devices", "cameras", "period", "spectators", "camera_rate_hz", "distortion",
-          "description", "initialization", "actions")
+          "description", "initialization", "actions", "finalizes")
 DYNAMIC = ("time_s", "task", "seed", "steps", "max_steps", "done", "reward", "success", "stop", "goals")
 # Exceptions whose type the world interprets; others become RuntimeError.
 ERRORS = {error.__name__: error for error in (ValueError, KeyError, RuntimeError, NotImplementedError)}
@@ -176,6 +176,9 @@ class WorkerBackend:
 
     def reset(self, task, seed, randomize=True, **scene):
         return self._call("reset", task, seed, randomize, **scene)
+
+    def finalize(self):
+        return self._call("finalize")
 
     def state(self):
         return self._call("state")
