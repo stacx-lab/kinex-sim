@@ -12,10 +12,12 @@ checks it, and a gripper's grasp and release run its fingers until they stop
 on topics instead. Resets load upstream's saved evaluation layouts. Ported from
 RoboEnv's RoboDojo adapter.
 """
+import hashlib
 import math
 import os
 import secrets
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -149,6 +151,10 @@ def choose(candidates, previous, lower, upper, step_limit, path_free, names):
     return None, nearest
 
 
+# Upstream's evaluation seed for physics and randomization; the saved layout, not this seed, varies an episode.
+NATIVE_EVAL_SEED = 0
+
+
 def config(task, early_stop, env_cfg_type="arx_x5", depth=False):
     """Upstream src/eval_client/main.py configuration for one environment; with depth, every camera also
     captures upstream's distance_to_image_plane, as env_cfg/camera/camera_config.yml shows commented out."""
@@ -184,7 +190,7 @@ def config(task, early_stop, env_cfg_type="arx_x5", depth=False):
                          {"type": "distance_to_image_plane", "device": "cpu"}, force_add=True)
     OmegaConf.update(cfg, "camera.default_frequency",
                      eval_cfg["observation"].get("collect_freq", 0), force_add=True)
-    cfg.sim.seed = [0]
+    cfg.sim.seed = [NATIVE_EVAL_SEED]
     cfg.eval_cfg.config_name = env_cfg_type
     for robot in cfg.robot.robots:
         # Rounded source quaternions such as [0.707, 0, 0, 0.707] are not unit length;
@@ -196,6 +202,7 @@ def config(task, early_stop, env_cfg_type="arx_x5", depth=False):
 
 class RoboDojoSim:
     default_task = "pack_objects_into_box"
+    finalizes = True  # finalize(): upstream's final check, which a run stopped before its step limit makes
     width, height = 640, 480
     # cuRobo IK seeds: upstream's 32, then 128 when none of their solutions can be taken, uni-robot-agent's budgets.
     seeds = (32, 128)
@@ -281,7 +288,12 @@ class RoboDojoSim:
                             "detailed_instruction": manager.detailed_instruction[0]}
         # EvalEnv compares its own counter with step_lim in take_action; keep both limits equal, none without one.
         self.env.step_lim = self.max_steps or math.inf
-        self.initialization = {"layout_id": int(layout), "layouts": len(layouts)}
+        # The layout as a file: upstream's saved layout that the seed manager loaded, and its bytes; and the native
+        # evaluation seed the configuration fixes (cfg.sim.seed).
+        path = Path(self.env.seed_manager.seed_info[layout]["scene_layout"])
+        self.initialization = {"layout_id": int(layout), "layouts": len(layouts), "native_eval_seed": NATIVE_EVAL_SEED,
+                               "layout_file": path.name,
+                               "layout_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
         self._index()
         self.steps, self.done, self.stop = 0, False, None
         self.goals, self._active = {}, {}  # each action's goal as the world reads it, and those that execute
@@ -586,6 +598,18 @@ class RoboDojoSim:
     def _path_free(self, planner, rows):
         """Whether the constraints hold at every joint row."""
         return bool(self._constraints(planner, rows)[0].all())
+
+    def finalize(self):
+        """Upstream's final check of the state a stopped episode is left in, as EvalEnv.is_episode_end makes it at the
+        step limit: the reward with its final checks and final score; a completed task succeeds, else it fails."""
+        env = self.env
+        if not env.end_flag[0]:
+            reward = env.reward_manager.get_reward(final_check=True)[0]
+            env.completed[0] = reward > 1 - 1e-3
+            env.success[0] = bool(env.completed[0])
+            env.end_flag[0] = True
+        self._score()
+        self.done = True
 
     def _score(self):
         self.success = bool(self.env.completed[0] and self.env.success[0])

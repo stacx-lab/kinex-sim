@@ -34,10 +34,13 @@ class WorldRuntime:
     held: while it returns true, the world takes no step, as a synchronous recording holds it until the recorder
     has every spectator frame sampled so far. final: publishes the state the episode ends in, once it has ended or
     the world stops, as a recording's final frame does.
+    A world stopped before its episode ended has a backend with a native final check (finalizes) make it on the
+    state the episode is left in (finalize()), as upstream does at the step limit, before the record.
     """
     def __init__(self, sim, mode, publish, early_stop=False, held=None, final=None, **pacer_options):
         self.sim, self.publish, self.early_stop = sim, publish, early_stop
         self.held, self.final = held, final
+        self.final_checked = False
         self.ended = None  # once the episode has ended, why, as wait replies state it
         self._owner = threading.get_ident()
         self._requests = queue.SimpleQueue()
@@ -248,7 +251,8 @@ class WorldRuntime:
         return {"task": self.sim.task, "seed": self.sim.seed,
                 "step": self.steps, "time_s": self.time_s, "reward": self.sim.reward,
                 "success": bool(self.sim.success), "first_success_step": self.first_success_step,
-                "done": self.ended is not None, "early_stop": self.early_stop, "reason": reason}
+                "done": self.ended is not None, "early_stop": self.early_stop, "reason": reason,
+                "final_checked": self.final_checked}
 
     def _record_terminal(self, reason, *, error=None, cause=None):
         if self._judged:
@@ -298,6 +302,9 @@ class WorldRuntime:
         try:
             if self.final is not None and error is None and self.ended is None:
                 self.final()  # the state the stopped episode is left in
+            if getattr(self.sim, "finalizes", False) and error is None and self.ended is None:
+                self.sim.finalize()
+                self.final_checked = True
             self._record_terminal("stopped", error=error)
         finally:
             self.commands.close()

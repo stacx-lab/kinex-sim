@@ -19,8 +19,9 @@ kinex-sim launch robodojo/stack-bowls --config depth --execution-mode stepped --
 kinex-sim launch robodojo/stack-bowls --config basic --execution-mode stepped --timeout 1800
 ```
 
-`robodojo` selects `pack_objects_into_box`. Each `*_random` variant (`robodojo/make-toast-random`)
-is upstream's own task with its own saved layouts and the base task's step limit. Three competition tasks (`imitate_sorting_sequence`, `make_kong`,
+`robodojo` selects `pack_objects_into_box`. Each `*_random` variant
+(`robodojo/make-toast-random`) is upstream's own task with its own saved layouts and the base
+task's step limit. Three competition tasks (`imitate_sorting_sequence`, `make_kong`,
 `play_tic_tac_toe`) add a Franka support arm that the native environment drives;
 it is not a device.
 
@@ -215,7 +216,15 @@ constraint as the cause. Without it a failed constraint keeps success false and 
 episode runs to its horizon.
 
 The episode loads saved layout `ids[seed % len(ids)]`, retried up to three times
-when it fails upstream's settle check, so a seed keeps its layout.
+when it fails upstream's settle check, so a seed keeps its layout. Its `initialization` names
+the layout (`layout_id` of `layouts`), its file and that file's SHA-256 (`layout_file`,
+`layout_sha256`), and upstream's evaluation seed (`native_eval_seed`, always 0), so a harness
+can check the scene it sampled before the agent starts.
+
+**Final check.** Upstream checks an episode's ending conditions, such as both arms back at their
+initial poses, at its step limit (`get_reward(final_check=True)`). A run stopped before its limit,
+as an agent that ends its session early stops it, makes that check on the state it is left in,
+and a task that passes it succeeds.
 
 **Instruction.** The episode's instructions are upstream's, drawn for its layout, so a seed
 keeps them too. Upstream's policy receives two, and the

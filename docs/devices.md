@@ -200,7 +200,7 @@ a harness to check before it hands the agent its instructions:
 | `execution_mode`, `period_s` | `stepped` or `realtime`, and the native control period |
 | `max_steps` | The step limit: the catalog task's in a stepped run, `null` without one (realtime, or no upstream horizon) |
 | `early_stop`, `configuration`, `scene` | The launch's options: early stop, device configuration and scene options |
-| `initialization` | What the backend resolved from the task, seed and scene, such as RoboCasa's kitchen (`split`, `layout_id`, `style_id`), RoboDojo's `layout_id`, RoboTwin's and HandsOn's `native_seed`, BEHAVIOR's `instance`, LIBERO's `init_state_index` |
+| `initialization` | What the backend resolved from the task, seed and scene, such as RoboCasa's kitchen (`split`, `layout_id`, `style_id`), RoboDojo's `layout_id`, `layouts`, `layout_file`, `layout_sha256` and `native_eval_seed`, RoboTwin's and HandsOn's `native_seed`, BEHAVIOR's `instance`, LIBERO's `init_state_index` |
 | `recording` | `null`, or its rate, size, views, and whether it is synchronous (`sync`, a stepped run's); every recording ends with the final state |
 | `run`, `simulator`, `task_id`, `source_revision` | The run, the catalog task, and the simulator's pinned upstream revision |
 

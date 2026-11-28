@@ -135,7 +135,9 @@ episode ended; `first_success_step` is the step of the first success either way,
 `early_stop` says how the run was launched. Termination completes a wait due on that tick
 and fails an unfinished one; from then on, every valid wait's reply adds `; the episode
 ended because the task succeeded`, `because the task failed (<cause>)`, `because the time
-limit was reached` or `because the simulation failed (<exception type>)`. A wait admitted before a client times out stays pending until it completes
+limit was reached` or `because the simulation failed (<exception type>)`. A run stopped before its episode ended has a simulator whose evaluator makes final checks
+at the step limit (RoboDojo's include ending poses) make them on the state the episode is
+left in; its record's `final_checked` says so. A wait admitted before a client times out stays pending until it completes
 or `world/stop` cancels it; abrupt process loss may prevent a response, so use wall
 timeouts.
 
